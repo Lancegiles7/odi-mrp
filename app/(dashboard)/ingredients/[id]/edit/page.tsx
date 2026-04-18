@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { updateIngredient } from '../../actions'
 import { IngredientForm } from '@/components/ingredients/ingredient-form'
+import type { Ingredient } from '@/lib/types/database.types'
 
 export const metadata: Metadata = {
   title: 'Edit Ingredient',
@@ -23,13 +24,13 @@ interface PageProps {
 export default async function EditIngredientPage({ params, searchParams }: PageProps) {
   const supabase = createClient()
 
-  const { data: ingredient, error } = await supabase
+  const { data: ingredient } = await supabase
     .from('ingredients')
     .select('*')
     .eq('id', params.id)
-    .single()
+    .single() as { data: Ingredient | null; error: unknown }
 
-  if (error || !ingredient) notFound()
+  if (!ingredient) notFound()
 
   const errorKey = searchParams.error
   const errorMessage = errorKey ? ERROR_MESSAGES[errorKey] ?? 'An error occurred.' : null

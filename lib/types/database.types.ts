@@ -39,6 +39,7 @@ export type Database = {
           description?: string | null
           created_at?: string
         }
+        Relationships: []
       }
 
       locations: {
@@ -66,6 +67,7 @@ export type Database = {
           is_active?: boolean
           created_at?: string
         }
+        Relationships: []
       }
 
       user_profiles: {
@@ -93,6 +95,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
 
       products: {
@@ -165,6 +168,7 @@ export type Database = {
           updated_at?: string
           created_by?: string | null
         }
+        Relationships: []
       }
 
       ingredients: {
@@ -228,6 +232,7 @@ export type Database = {
           updated_at?: string
           created_by?: string | null
         }
+        Relationships: []
       }
 
       boms: {
@@ -261,6 +266,7 @@ export type Database = {
           updated_at?: string
           created_by?: string | null
         }
+        Relationships: []
       }
 
       bom_items: {
@@ -300,6 +306,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
 
       suppliers: {
@@ -345,6 +352,7 @@ export type Database = {
           updated_at?: string
           created_by?: string | null
         }
+        Relationships: []
       }
 
       purchase_orders: {
@@ -384,6 +392,7 @@ export type Database = {
           updated_at?: string
           created_by?: string | null
         }
+        Relationships: []
       }
 
       purchase_order_lines: {
@@ -423,6 +432,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
 
       inventory_balances: {
@@ -450,6 +460,7 @@ export type Database = {
           last_movement_at?: string | null
           updated_at?: string
         }
+        Relationships: []
       }
 
       stock_movements: {
@@ -519,6 +530,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
         }
+        Relationships: []
       }
     }
 
