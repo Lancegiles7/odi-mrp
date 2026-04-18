@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/lancegiles/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/28441c3a-311e-4fdf-a8e1-ec13e2d586d3/9bd640eb-451c-4a45-993a-b3d0594c3f7d/skills/xlsx/**)",
+      "Bash(python3 -c ':*)",
+      "Bash(python3 -c \"import openpyxl; wb = openpyxl.load_workbook\\('/Users/lancegiles/Desktop/Ingredients Claude.xlsx', data_only=True\\); ws = wb.active; rows = list\\(ws.iter_rows\\(values_only=True\\)\\); print\\('Headers:', rows[0]\\); print\\(\\); [print\\(r\\) for r in rows[1:11]]\")",
+      "Bash(pip3 install:*)"
+    ]
+  }
+}

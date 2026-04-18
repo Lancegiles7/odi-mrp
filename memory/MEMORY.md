@@ -1,0 +1,2 @@
+- [Odi MRP project context](project_odi_mrp.md) — Phase plan, stack, key schema decisions, inventory design
+- [Lance — user profile](user_lance.md) — Business owner at Odi, prefers structured explanations and senior-engineer framing
