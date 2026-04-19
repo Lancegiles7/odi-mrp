@@ -5,55 +5,40 @@ import * as XLSX from 'xlsx'
 import { importProductsAndBoms } from '../actions'
 import type { ImportProductInput, ImportResult } from '../actions'
 
-// ─── Parser constants ────────────────────────────────────────────────────────
-// The BOM spreadsheet has products side-by-side, each 9 columns wide.
-// Column layout within each block (0-based offset from block start):
-//   0: Label column (e.g. "Product Type", "Product Name", etc.)
-//   1: Product value / ingredient SKU
-//   2: Ingredient Name
-//   3: Quantity (g)
-//   4: Price per kg
-//   5: % of pack
-//   6: $/unit
-//   7: Serve amount
-//   8: Unit of Measure flag / is_organic hint
-
-const BLOCK_WIDTH = 9
-
-// Row offsets from the top of a block (0-based):
-//   Row 0: "Product Type" header row → product_type in col+1
-//   Row 1: "Product Name" → name in col+1
-//   Row 2: "SKU Code" (optional) → sku_code
-//   Row 3: "Hero Call Out" → hero_call_out
-//   Row 4: "Back of Pack" → back_of_pack
-//   Row 5: "Serving Size" → serving_size
-//   Row 6: "Pack Size (g)" or "Size" → size_g
-//   Row 7: "RRP" → rrp
-//   Row 8: "Packaging" → packaging
-//   Row 9: "Toll" → toll
-//   Row 10: "Margin" → margin
-//   Row 11: "Other" → other
-//   Row 12: "Currency Exchange" → currency_exchange
-//   Row 13: "Freight" → freight
-// After row 13: ingredient lines until empty ingredient name
-
-const PRODUCT_HEADER_ROW_LABELS: Record<string, keyof ImportProductInput> = {
-  'product type':      'product_type',
-  'product name':      'name',
-  'sku code':          'sku_code',
-  'hero call out':     'hero_call_out',
-  'back of pack':      'back_of_pack',
-  'serving size':      'serving_size',
-  'pack size':         'size_g',
-  'size':              'size_g',
-  'rrp':               'rrp',
-  'packaging':         'packaging',
-  'toll':              'toll',
-  'margin':            'margin',
-  'other':             'other',
-  'currency exchange': 'currency_exchange',
-  'freight':           'freight',
-}
+// ─── Parser ──────────────────────────────────────────────────────────────────
+//
+// Spreadsheet layout (0-indexed rows, each product block is 9 columns wide):
+//
+// Within each block, col 0 = label, col 1 = product value / ingredient name
+//
+// Row 0-1: empty
+// Row 2:  col 0 = "Product Type",  col 1 = type value (e.g. "Sachet")
+// Row 3:  col 0 = "SKU",           col 1 = product name (e.g. "Odi Baby Puree...")
+// Row 4:  col 0 = "Size (G)",      col 2 = size value (e.g. 20)
+// Row 5:  col 0 = "Ingredients",   col 1 = "SKU Code" (header row)
+//
+// Row 2 also has: col 3 = "Hero Call out", col 4 = hero value
+//                 col 6 = "RRP",            col 7 = rrp value
+// Row 3 also has: col 3 = "Back of pack",  col 4 = back of pack value
+//                 col 6 = "COS",            col 7 = cos value
+// Row 4 also has: col 3 = "Serving Size",  col 5 = serving size value
+//
+// Ingredient rows (row 6 until label col = "Total"):
+//   col 0 = ingredient name
+//   col 1 = ingredient SKU code
+//   col 2 = quantity_g
+//   col 6 = price_per_kg
+//
+// After "Total" row:
+//   "Packaging"            → col 7
+//   "Toll"                 → col 7
+//   "Margin"               → col 7
+//   "Other"                → col 7
+//   "Currency Exchange..." → col 7
+//   "Freight"              → col 7
+//
+// Products repeat horizontally every 9 columns (block starts at col 1, 10, 19, 28, 37…)
+// Products also repeat vertically — next block starts ~18 rows after previous block's "Product Type"
 
 function round2(n: number) { return Math.round(n * 100) / 100 }
 
@@ -68,32 +53,21 @@ function toStr(val: unknown): string {
   return String(val).trim()
 }
 
-function normaliseLabel(val: unknown): string {
-  return toStr(val).toLowerCase().trim()
+function norm(val: unknown): string {
+  return toStr(val).toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
-/**
- * Auto-generate a product SKU from name, type, and size.
- * e.g. "Odi Baby Broccoli Puree" + "Sachet" + 20g → "ODI-BROC-SACHET-20G"
- */
 function generateSku(name: string, productType?: string | null, sizeG?: number | null): string {
   const words = name.toUpperCase().replace(/[^A-Z0-9\s]/g, '').split(/\s+/).filter(Boolean)
-  // Take first meaningful word fragment (up to 4 chars)
   const nameFragment = words.slice(0, 3).map((w) => w.slice(0, 4)).join('-')
-  const typeFragment = productType
-    ? productType.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
-    : ''
+  const typeFragment = productType ? productType.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) : ''
   const sizeFragment = sizeG ? `${Math.round(sizeG)}G` : ''
   return ['ODI', nameFragment, typeFragment, sizeFragment].filter(Boolean).join('-')
 }
 
-/**
- * Detect if an ingredient row is non-organic based on its SKU / name.
- * Clues: "Non Organic" prefix in SKU, or common non-organic ingredients.
- */
 function detectIsOrganic(sku: string, name: string): boolean {
   const combined = `${sku} ${name}`.toLowerCase()
-  const nonOrganicClues = ['non organic', 'non-organic', 'sea salt', 'iodised', 'iodized', 'vitamin', 'vit ', 'mineral', 'additive']
+  const nonOrganicClues = ['non organic', 'non-organic', 'sea salt', 'iodised', 'iodized', 'vitamin', 'vit ', 'mineral']
   return !nonOrganicClues.some((clue) => combined.includes(clue))
 }
 
@@ -104,105 +78,134 @@ interface ParsedProduct extends ImportProductInput {
 function parseSheet(workbook: XLSX.WorkBook): ParsedProduct[] {
   const sheetName = workbook.SheetNames[0]
   const sheet = workbook.Sheets[sheetName]
+  // Read as 2D array with no headers, fill missing cells with null
   const raw: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
 
   if (!raw.length) return []
 
-  // Find all columns that start a product block by scanning row 0 for "Product Type"
-  const blockStartCols: number[] = []
-  const firstRow = raw[0] ?? []
-  for (let col = 0; col < firstRow.length; col++) {
-    if (normaliseLabel(firstRow[col]) === 'product type') {
-      blockStartCols.push(col)
+  const numRows = raw.length
+  const numCols = raw[0] ? raw[0].length : 0
+
+  // Find all (row, col) positions where "Product Type" appears
+  const blockStarts: Array<{ row: number; col: number }> = []
+  for (let r = 0; r < numRows; r++) {
+    for (let c = 0; c < numCols; c++) {
+      if (norm(raw[r]?.[c]) === 'product type') {
+        blockStarts.push({ row: r, col: c })
+      }
     }
   }
 
   const products: ParsedProduct[] = []
 
-  for (const startCol of blockStartCols) {
-    // Extract header rows into a map: label → value
-    const headerMap: Record<string, unknown> = {}
-    let ingredientStartRow = 1 // will be overridden
-
-    for (let rowIdx = 0; rowIdx < raw.length; rowIdx++) {
-      const row = raw[rowIdx]
-      const label = normaliseLabel(row?.[startCol])
-      const value = row?.[startCol + 1]
-
-      if (label && PRODUCT_HEADER_ROW_LABELS[label]) {
-        headerMap[PRODUCT_HEADER_ROW_LABELS[label]] = value
-        ingredientStartRow = rowIdx + 1
-      }
-    }
-
-    // Skip if no product name
-    const productName = toStr(headerMap['name'])
+  for (const { row: r0, col: c0 } of blockStarts) {
+    // c0 = label column, c0+1 = value column for most fields
+    const productType = toStr(raw[r0]?.[c0 + 1])     // Row 0 of block, col+1
+    const productName = toStr(raw[r0 + 1]?.[c0 + 1]) // Row 1 = "SKU" row, col+1 = name
     if (!productName) continue
 
-    const productType = toStr(headerMap['product_type']) || undefined
-    const sizeG = toNum(headerMap['size_g'])
-    const rawSku = toStr(headerMap['sku_code'])
-    const skuCode = rawSku || generateSku(productName, productType, sizeG)
-    const generatedSku = !rawSku
+    // Size: row+2, col+2
+    const sizeG = toNum(raw[r0 + 2]?.[c0 + 2])
+    // Serving size: row+2, col+5
+    const servingSize = toNum(raw[r0 + 2]?.[c0 + 5])
 
-    // Collect ingredient rows (everything after last header row until empty ingredient SKU)
+    // Hero call out: row+0, col+4
+    const heroCallOut = toStr(raw[r0]?.[c0 + 4]) || null
+    // Back of pack: row+1, col+4
+    const backOfPack = toStr(raw[r0 + 1]?.[c0 + 4]) || null
+    // RRP: row+0, col+7
+    const rrp = toNum(raw[r0]?.[c0 + 7])
+
+    // Ingredient rows start at row+4 (row+3 is the "Ingredients / SKU Code" header)
+    const ingStartRow = r0 + 4
     const bomItems: ImportProductInput['bom_items'] = []
     let sortOrder = 0
 
-    for (let rowIdx = ingredientStartRow; rowIdx < raw.length; rowIdx++) {
-      const row = raw[rowIdx]
-      if (!row) continue
+    // Cost fields — collected after "Total" row
+    let packaging: number | null = null
+    let toll: number | null = null
+    let margin: number | null = null
+    let other: number | null = null
+    let currencyExchange: number | null = null
+    let freight: number | null = null
 
-      const ingSkuRaw = toStr(row[startCol + 1])
-      const ingName   = toStr(row[startCol + 2])
-      const qtyRaw    = toNum(row[startCol + 3])
-      const priceRaw  = toNum(row[startCol + 4])
+    let pastTotal = false
 
-      // Stop at empty row (no sku and no name)
-      if (!ingSkuRaw && !ingName) break
+    for (let r = ingStartRow; r < numRows; r++) {
+      const labelCol = toStr(raw[r]?.[c0])
+      const labelNorm = norm(raw[r]?.[c0])
 
-      // Skip sub-header / total rows
-      const skuLower = ingSkuRaw.toLowerCase()
-      if (skuLower === 'sku code' || skuLower === 'ingredient' || skuLower === 'total') continue
+      // Stop if we hit the next "Product Type" block in the same column
+      if (r > r0 && labelNorm === 'product type') break
+      // Also stop if we've gone 30 rows past the block start with nothing useful
+      if (r > r0 + 40) break
 
-      if (!ingName || qtyRaw == null) continue
+      if (!pastTotal) {
+        if (labelNorm === 'total') {
+          pastTotal = true
+          continue
+        }
 
-      // Handle auto-generated SKU for non-organic markers
-      let ingredientSku = ingSkuRaw
-      if (!ingredientSku || ingredientSku.toLowerCase().startsWith('non organic') || ingredientSku.toLowerCase().startsWith('non-organic')) {
-        // Generate a simple SKU from name
-        ingredientSku = ingName.toUpperCase().replace(/[^A-Z0-9\s]/g, '').split(/\s+/).slice(0, 3).join('-')
+        // Skip the header row ("Ingredients" / "SKU Code")
+        if (labelNorm === 'ingredients' || labelNorm === 'sku code') continue
+
+        const ingName = toStr(raw[r]?.[c0])
+        const ingSkuRaw = toStr(raw[r]?.[c0 + 1])
+        const qtyG = toNum(raw[r]?.[c0 + 2])
+        const pricePerKg = toNum(raw[r]?.[c0 + 6])
+
+        if (!ingName || qtyG == null || qtyG === 0) continue
+
+        // Generate SKU if missing
+        let ingSku = ingSkuRaw
+        if (!ingSku || ingSku.toLowerCase().startsWith('non organic') || ingSku.toLowerCase().startsWith('non-organic')) {
+          ingSku = ingName.toUpperCase().replace(/[^A-Z0-9\s]/g, '').split(/\s+/).slice(0, 3).join('-')
+        }
+
+        const isOrganic = detectIsOrganic(ingSkuRaw, ingName)
+
+        bomItems.push({
+          ingredient_sku_code: ingSku,
+          ingredient_name: ingName,
+          quantity_g: qtyG,
+          price_per_kg: pricePerKg,
+          is_organic: isOrganic,
+          sort_order: sortOrder++,
+        })
+      } else {
+        // Cost rows — value is in col+7
+        const val = toNum(raw[r]?.[c0 + 7])
+        if (labelNorm === 'packaging') packaging = val
+        else if (labelNorm === 'toll') toll = val
+        else if (labelNorm.startsWith('margin')) margin = val
+        else if (labelNorm === 'other' || labelNorm.startsWith('other')) other = val
+        else if (labelNorm.startsWith('currency exchange')) currencyExchange = val
+        else if (labelNorm === 'freight') freight = val
+        else if (labelNorm === 'grand total') break // done with this block
       }
-
-      const isOrganic = detectIsOrganic(ingSkuRaw, ingName)
-
-      bomItems.push({
-        ingredient_sku_code: ingredientSku,
-        ingredient_name: ingName,
-        quantity_g: qtyRaw,
-        price_per_kg: priceRaw,
-        is_organic: isOrganic,
-        sort_order: sortOrder++,
-      })
     }
+
+    if (bomItems.length === 0) continue // skip empty blocks
+
+    const skuCode = generateSku(productName, productType, sizeG)
 
     products.push({
       sku_code:          skuCode,
       name:              productName,
       product_type:      productType || null,
       size_g:            sizeG,
-      hero_call_out:     toStr(headerMap['hero_call_out']) || null,
-      back_of_pack:      toStr(headerMap['back_of_pack']) || null,
-      serving_size:      toNum(headerMap['serving_size']),
-      rrp:               toNum(headerMap['rrp']),
-      packaging:         toNum(headerMap['packaging']),
-      toll:              toNum(headerMap['toll']),
-      margin:            toNum(headerMap['margin']),
-      other:             toNum(headerMap['other']),
-      currency_exchange: toNum(headerMap['currency_exchange']),
-      freight:           toNum(headerMap['freight']),
+      hero_call_out:     heroCallOut,
+      back_of_pack:      backOfPack,
+      serving_size:      servingSize,
+      rrp,
+      packaging,
+      toll,
+      margin,
+      other,
+      currency_exchange: currencyExchange,
+      freight,
       bom_items:         bomItems,
-      _generated_sku:    generatedSku,
+      _generated_sku:    true,
     })
   }
 
@@ -231,7 +234,7 @@ export default function ImportBomPage() {
         const wb = XLSX.read(data, { type: 'array' })
         const products = parseSheet(wb)
         if (products.length === 0) {
-          setParseError('No products found. Check that row 1 contains "Product Type" column headers.')
+          setParseError('No products found. Check that the spreadsheet contains "Product Type" cells.')
           return
         }
         setParsed(products)
@@ -262,7 +265,7 @@ export default function ImportBomPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Import BOM</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Upload your BOM spreadsheet. Products are laid out side-by-side — each block is 9 columns wide.
+            Upload your BOM spreadsheet. Products can be laid out side-by-side or stacked vertically.
           </p>
         </div>
 
@@ -278,7 +281,7 @@ export default function ImportBomPage() {
           className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-gray-400 transition-colors"
         >
           <p className="text-sm text-gray-600 mb-4">
-            Drag and drop your <span className="font-medium">.xlsx</span> or <span className="font-medium">.csv</span> file here
+            Drag and drop your <span className="font-medium">.xlsx</span> file here
           </p>
           <label className="cursor-pointer">
             <span className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
@@ -291,16 +294,6 @@ export default function ImportBomPage() {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
             />
           </label>
-        </div>
-
-        <div className="mt-6 text-sm text-gray-500">
-          <p className="font-medium text-gray-700 mb-2">Expected format</p>
-          <ul className="space-y-1 list-disc list-inside">
-            <li>Row 1 starts each product block with <code className="bg-gray-100 px-1 rounded">Product Type</code></li>
-            <li>Products sit side by side, each occupying 9 columns</li>
-            <li>Ingredient rows follow the product header rows</li>
-            <li>Non-organic ingredients should have "Non Organic" in the SKU or name</li>
-          </ul>
         </div>
       </div>
     )
@@ -339,9 +332,6 @@ export default function ImportBomPage() {
                 <div>
                   <span className="font-medium text-gray-900 text-sm">{p.name}</span>
                   <span className="ml-2 text-xs font-mono text-gray-500">{p.sku_code}</span>
-                  {p._generated_sku && (
-                    <span className="ml-2 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">auto SKU</span>
-                  )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   {p.product_type && <span>{p.product_type}</span>}
@@ -407,7 +397,6 @@ export default function ImportBomPage() {
     )
   }
 
-  // Done
   return (
     <div className="max-w-lg">
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Import complete</h1>
@@ -449,10 +438,7 @@ export default function ImportBomPage() {
       )}
 
       <div className="mt-6 flex gap-3">
-        <a
-          href="/products"
-          className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800"
-        >
+        <a href="/products" className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800">
           View products
         </a>
         <button
