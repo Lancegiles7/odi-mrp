@@ -49,25 +49,30 @@ function colIndexToKey(colIdx: number): string {
 }
 
 function yearMonthFromDate(v: unknown): string | null {
+  // SheetJS with cellDates:true creates Date objects using LOCAL time
+  // constructors. In timezones ahead of UTC (e.g. NZ, UTC+12/13) using
+  // UTC getters on such a Date returns the previous day — and therefore
+  // the previous month at month boundaries, shifting "April 1" to
+  // "March 31". We use local getters to match SheetJS's intent.
   if (v instanceof Date) {
-    const y = v.getUTCFullYear()
-    const m = String(v.getUTCMonth() + 1).padStart(2, '0')
+    const y = v.getFullYear()
+    const m = String(v.getMonth() + 1).padStart(2, '0')
     return `${y}-${m}-01`
   }
   if (typeof v === 'string') {
     const parsed = new Date(v)
     if (!isNaN(parsed.getTime())) {
-      const y = parsed.getUTCFullYear()
-      const m = String(parsed.getUTCMonth() + 1).padStart(2, '0')
+      const y = parsed.getFullYear()
+      const m = String(parsed.getMonth() + 1).padStart(2, '0')
       return `${y}-${m}-01`
     }
   }
   if (typeof v === 'number') {
-    // Excel serial date
-    const epoch = new Date(Date.UTC(1899, 11, 30))
-    const d = new Date(epoch.getTime() + v * 86400000)
-    const y = d.getUTCFullYear()
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+    // Excel serial date: 45748 = April 1, 2026. Anchor in local time to
+    // stay consistent with cellDates:true producing local Date objects.
+    const d = new Date(1899, 11, 30 + v)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
     return `${y}-${m}-01`
   }
   return null

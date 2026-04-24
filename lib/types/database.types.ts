@@ -207,6 +207,7 @@ export type Database = {
           total_loaded_cost: number | null
           is_organic: boolean
           is_active: boolean
+          opening_stock_override: number | null
           created_at: string
           updated_at: string
           created_by: string | null
@@ -228,6 +229,7 @@ export type Database = {
           total_loaded_cost?: number | null
           is_organic?: boolean
           is_active?: boolean
+          opening_stock_override?: number | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -249,6 +251,7 @@ export type Database = {
           total_loaded_cost?: number | null
           is_organic?: boolean
           is_active?: boolean
+          opening_stock_override?: number | null
           created_at?: string
           updated_at?: string
           created_by?: string | null

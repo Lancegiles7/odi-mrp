@@ -158,11 +158,27 @@ function FragmentCells({
           type="number"
           min={0}
           defaultValue={production || ''}
+          data-prod-month={month}
           onBlur={(e) => onCommit(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            const input = e.target as HTMLInputElement
+            input.blur()                           // triggers save via onBlur
+            // Jump to the same-month Prod input on the next row
+            const all = Array.from(document.querySelectorAll<HTMLInputElement>(
+              `input[data-prod-month="${month}"]`,
+            ))
+            const idx = all.indexOf(input)
+            const next = idx >= 0 ? all[idx + 1] : null
+            if (next) {
+              next.focus()
+              next.select()
+            }
+          }}
           placeholder="0"
-          title={`Production for ${monthLabel(month)}`}
-          className="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50 focus:bg-white"
+          title={`Production for ${monthLabel(month)} — Enter to save and move down`}
+          className="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none"
         />
       </td>
       <td className={`px-2 py-2 text-right tabular-nums ${negCls} ${balTxt}`}>

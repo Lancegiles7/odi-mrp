@@ -15,6 +15,7 @@ import {
   Trash2,
   TrendingUp,
   Factory,
+  Leaf,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROLES } from '@/lib/constants'
@@ -26,6 +27,7 @@ const ICON_MAP = {
   '/products':        Package,
   '/products/trash':  Trash2,
   '/ingredients':     FlaskConical,
+  '/ingredients/demand': Leaf,
   '/suppliers':       Truck,
   '/purchase-orders': ShoppingCart,
   '/inventory':       Warehouse,
@@ -42,10 +44,11 @@ const NAV_GROUPS = [
   {
     label: 'Planning',
     items: [
-      { name: 'Demand',          href: '/demand' },
-      { name: 'Production',      href: '/production' },
-      { name: 'Products / BOMs', href: '/products' },
-      { name: 'Ingredients',     href: '/ingredients' },
+      { name: 'Demand',             href: '/demand' },
+      { name: 'Production',         href: '/production' },
+      { name: 'Ingredient demand',  href: '/ingredients/demand' },
+      { name: 'Products / BOMs',    href: '/products' },
+      { name: 'Ingredients',        href: '/ingredients' },
     ],
   },
   {
@@ -80,15 +83,19 @@ interface SidebarProps {
 export function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname()
 
-  const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
-    return pathname.startsWith(href)
-  }
-
   const groups =
     userRole === ROLES.ADMIN
       ? [...NAV_GROUPS, ADMIN_GROUP]
       : NAV_GROUPS
+
+  // Pick the single nav item whose href is the longest prefix of the
+  // current path — avoids "/ingredients" lighting up on "/ingredients/demand".
+  const allHrefs = groups.flatMap((g) => g.items.map((i) => i.href))
+  const activeHref = allHrefs
+    .filter((h) => (h === '/' ? pathname === '/' : pathname === h || pathname.startsWith(h + '/')))
+    .sort((a, b) => b.length - a.length)[0] ?? null
+
+  const isActive = (href: string) => href === activeHref
 
   return (
     <aside className="w-60 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
