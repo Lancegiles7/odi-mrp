@@ -152,6 +152,12 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
     return sum + (calc?.price_per_unit ?? 0)
   }, 0)
 
+  const totalQtyG = rows.reduce((sum, row) => {
+    return sum + (row.quantity_g === '' ? 0 : Number(row.quantity_g))
+  }, 0)
+
+  const totalPct = sizeG > 0 ? totalQtyG / sizeG : 0
+
   return (
     <div>
       <div className="overflow-x-auto">
@@ -263,14 +269,29 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
           </tbody>
           <tfoot>
             <tr className="border-t border-gray-200 bg-gray-50">
-              <td colSpan={5} className="px-3 py-2 text-xs text-gray-500 font-medium">
-                Ingredient total
+              <td className="px-3 py-2 text-xs text-gray-500 font-medium text-right">
+                Totals
               </td>
+              <td className="px-3 py-2 text-right font-semibold text-gray-900 tabular-nums text-sm">
+                {totalQtyG > 0 ? totalQtyG.toFixed(2) : '—'}
+              </td>
+              <td className="px-3 py-2 text-right font-semibold text-gray-900 tabular-nums text-sm">
+                {sizeG > 0 ? `${(totalPct * 100).toFixed(1)}%` : '—'}
+              </td>
+              <td colSpan={2} />
               <td className="px-3 py-2 text-right font-semibold text-gray-900 tabular-nums text-sm">
                 {formatCurrency(Math.round(totalIngredientCost * 100) / 100)}
               </td>
               <td colSpan={2} />
             </tr>
+            {sizeG > 0 && Math.abs(totalQtyG - sizeG) > 0.01 && (
+              <tr>
+                <td colSpan={8} className="px-3 py-1 text-[11px] text-amber-700 bg-amber-50">
+                  Total weight {totalQtyG.toFixed(2)} g doesn&apos;t match product size {sizeG} g
+                  {totalQtyG < sizeG ? ` (${(sizeG - totalQtyG).toFixed(2)} g under)` : ` (${(totalQtyG - sizeG).toFixed(2)} g over)`}
+                </td>
+              </tr>
+            )}
           </tfoot>
         </table>
       </div>

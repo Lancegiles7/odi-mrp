@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Opening stock — inline entry mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-gray-100 p-8">
+
+<div class="max-w-6xl mx-auto space-y-8">
+
+  <header>
+    <h1 class="text-xl font-semibold">Opening stock — inline entry (mockup)</h1>
+    <p class="text-sm text-gray-600 mt-1">
+      Writes to <code class="bg-gray-200 px-1 rounded">products.opening_stock_override</code>.
+      Visually distinct from read-only forecast/balance cells so it's obvious it can be edited.
+    </p>
+  </header>
+
+  <!-- STATE LEGEND -->
+  <section class="bg-white border border-gray-200 rounded-lg p-4">
+    <h2 class="text-sm font-semibold mb-3">States</h2>
+    <div class="grid grid-cols-4 gap-4 text-xs">
+
+      <div>
+        <div class="text-gray-500 mb-1.5">Empty (no override set)</div>
+        <input class="w-20 text-right tabular-nums border border-dashed border-gray-300 rounded px-1.5 py-1 bg-white text-gray-400 placeholder-gray-300" placeholder="0" />
+        <p class="mt-1.5 text-[11px] text-gray-500">Dashed border = can be typed into</p>
+      </div>
+
+      <div>
+        <div class="text-gray-500 mb-1.5">Value entered & saved</div>
+        <input class="w-20 text-right tabular-nums border border-gray-300 rounded px-1.5 py-1 bg-white text-gray-900 font-medium" value="1,250" />
+        <p class="mt-1.5 text-[11px] text-gray-500">Solid border, bold = override in place</p>
+      </div>
+
+      <div>
+        <div class="text-gray-500 mb-1.5">Editing (focus)</div>
+        <input class="w-20 text-right tabular-nums border border-amber-400 rounded px-1.5 py-1 bg-amber-50 text-gray-900 ring-2 ring-amber-200" value="1,250" />
+        <p class="mt-1.5 text-[11px] text-gray-500">Amber ring while focused</p>
+      </div>
+
+      <div>
+        <div class="text-gray-500 mb-1.5">Saving…</div>
+        <div class="flex items-center gap-1.5">
+          <input class="w-20 text-right tabular-nums border border-gray-300 rounded px-1.5 py-1 bg-white text-gray-900 font-medium" value="1,250" disabled />
+          <span class="text-[10px] text-gray-400">saving…</span>
+        </div>
+        <p class="mt-1.5 text-[11px] text-gray-500">On blur, write to DB</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- IN-CONTEXT TABLE -->
+  <section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="text-sm font-semibold">In context — Production schedule table</h2>
+      <span class="text-[11px] text-gray-500">Only the <b>Opening</b> column is editable; Fcst & Bal stay read-only.</span>
+    </div>
+
+    <div class="overflow-x-auto">
+    <table class="w-full text-xs" style="min-width: 1100px;">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+          <th class="text-left font-medium px-4 py-2 w-[320px]">Product</th>
+          <th class="text-right font-medium px-3 py-2 w-[110px]">
+            Opening
+            <span class="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
+          </th>
+          <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">APR 26</th>
+          <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">MAY 26</th>
+          <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">JUN 26</th>
+        </tr>
+        <tr class="bg-gray-50 text-[10px] text-gray-500">
+          <th></th><th></th>
+          <th class="text-right px-2 py-1 border-l border-gray-200 font-medium">Fcst</th><th class="text-right px-2 py-1 font-medium">Prod</th><th class="text-right px-2 py-1 font-medium">Bal</th>
+          <th class="text-right px-2 py-1 border-l border-gray-200 font-medium">Fcst</th><th class="text-right px-2 py-1 font-medium">Prod</th><th class="text-right px-2 py-1 font-medium">Bal</th>
+          <th class="text-right px-2 py-1 border-l border-gray-200 font-medium">Fcst</th><th class="text-right px-2 py-1 font-medium">Prod</th><th class="text-right px-2 py-1 font-medium">Bal</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- Row 1: opening set -->
+        <tr class="border-t border-gray-100 hover:bg-gray-50/50">
+          <td class="px-4 py-2">
+            <div class="font-mono text-[11px] text-gray-500 truncate">ODI-ODI-BABY-PURE-SACHET-20G</div>
+            <div class="font-medium text-sm">Odi Baby Puree Powder Organic Baby Cereal</div>
+          </td>
+          <td class="px-3 py-2 text-right">
+            <input class="w-20 text-right tabular-nums border border-gray-300 rounded px-1.5 py-1 bg-white text-gray-900 font-medium" value="1,500" />
+          </td>
+          <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 tabular-nums">416</td>
+          <td class="px-1 py-2 text-right tabular-nums"><input class="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50" value="0" /></td>
+          <td class="px-2 py-2 text-right text-gray-700 tabular-nums">1,084</td>
+
+          <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 tabular-nums bg-red-50">498</td>
+          <td class="px-1 py-2 text-right tabular-nums bg-red-50"><input class="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50" value="0" /></td>
+          <td class="px-2 py-2 text-right text-red-700 font-semibold tabular-nums bg-red-50">586</td>
+
+          <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 tabular-nums bg-red-50">704</td>
+          <td class="px-1 py-2 text-right tabular-nums bg-red-50"><input class="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50" value="0" /></td>
+          <td class="px-2 py-2 text-right text-red-700 font-semibold tabular-nums bg-red-50">-118</td>
+        </tr>
+
+        <!-- Row 2: opening empty -->
+        <tr class="border-t border-gray-100 hover:bg-gray-50/50">
+          <td class="px-4 py-2">
+            <div class="font-mono text-[11px] text-gray-500 truncate">ODI-BABY-PURE-BEET-SACHET-20G</div>
+            <div class="font-medium text-sm">Odi Baby Puree Powder Organic Beetroot</div>
+          </td>
+          <td class="px-3 py-2 text-right">
+            <input class="w-20 text-right tabular-nums border border-dashed border-gray-300 rounded px-1.5 py-1 bg-white text-gray-400 placeholder-gray-300" placeholder="0" />
+          </td>
+          <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 tabular-nums bg-red-50">363</td>
+          <td class="px-1 py-2 text-right tabular-nums bg-red-50"><input class="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50" value="0" /></td>
+          <td class="px-2 py-2 text-right text-red-700 font-semibold tabular-nums bg-red-50">-363</td>
+
+          <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 tabular-nums bg-red-50">435</td>
+          <td class="px-1 py-2 text-right tabular-nums bg-red-50"><input class="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50" value="0" /></td>
+          <td class="px-2 py-2 text-right text-red-700 font-semibold tabular-nums bg-red-50">-798</td>
+
+          <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 tabular-nums bg-red-50">602</td>
+          <td class="px-1 py-2 text-right tabular-nums bg-red-50"><input class="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50" value="0" /></td>
+          <td class="px-2 py-2 text-right text-red-700 font-semibold tabular-nums bg-red-50">-1,400</td>
+        </tr>
+
+        <!-- Row 3: editing (focused) -->
+        <tr class="border-t border-gray-100 hover:bg-gray-50/50">
+          <td class="px-4 py-2">
+            <div class="font-mono text-[11px] text-gray-500 truncate">ODI-BABY-PURE-BLUE-SACHET-20G</div>
+            <div class="font-medium text-sm">Odi Baby Puree Powder Organic Blueberry</div>
+          </td>
+          <td class="px-3 py-2 text-right">
+            <input class="w-20 text-right tabular-nums border border-amber-400 rounded px-1.5 py-1 bg-amber-50 text-gray-900 ring-2 ring-amber-200" value="2,200" />
+          </td>
+          <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 tabular-nums">1,311</td>
+          <td class="px-1 py-2 text-right tabular-nums"><input class="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50" value="0" /></td>
+          <td class="px-2 py-2 text-right text-gray-700 tabular-nums">889</td>
+
+          <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 tabular-nums bg-red-50">1,440</td>
+          <td class="px-1 py-2 text-right tabular-nums bg-red-50"><input class="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50" value="0" /></td>
+          <td class="px-2 py-2 text-right text-red-700 font-semibold tabular-nums bg-red-50">-551</td>
+
+          <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 tabular-nums bg-red-50">1,759</td>
+          <td class="px-1 py-2 text-right tabular-nums bg-red-50"><input class="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50" value="0" /></td>
+          <td class="px-2 py-2 text-right text-red-700 font-semibold tabular-nums bg-red-50">-2,310</td>
+        </tr>
+
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- BEHAVIOR NOTES -->
+  <section class="bg-white border border-gray-200 rounded-lg p-5 space-y-3 text-sm">
+    <h2 class="font-semibold">Behaviour</h2>
+    <ul class="list-disc pl-5 space-y-1.5 text-gray-700">
+      <li><b>Save-on-blur</b> — same as Prod inputs. Enter key also blurs/saves.</li>
+      <li><b>Editing affects balance live</b> — Balance columns recompute as you type so the red shortfalls move with the opening stock.</li>
+      <li><b>Empty input = no override</b> — clearing the field sets <code class="bg-gray-100 px-1 rounded">opening_stock_override = NULL</code>, so the future on-hand inventory value will take over automatically.</li>
+      <li><b>Column header hint</b> — small "editable" tag under the "Opening" label so it's obvious on first glance.</li>
+      <li><b>Scope</b> — same permissions as the Prod cells (no admin-only gate needed beyond existing auth).</li>
+    </ul>
+  </section>
+
+  <!-- IMPLEMENTATION -->
+  <section class="bg-blue-50 border border-blue-200 rounded-lg p-5 space-y-3 text-sm">
+    <h2 class="font-semibold text-blue-900">Implementation (for reference)</h2>
+    <ul class="list-disc pl-5 space-y-1.5 text-blue-900">
+      <li>New server action <code class="bg-white px-1 rounded">updateOpeningStock(productId, units | null)</code> in <code class="bg-white px-1 rounded">app/(dashboard)/production/actions.ts</code>.</li>
+      <li><code class="bg-white px-1 rounded">ProductionRow</code> gains local state for opening + input; onBlur calls the action.</li>
+      <li>Balance calc already keys off opening → live recompute comes for free.</li>
+      <li>No schema changes — column already exists.</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>

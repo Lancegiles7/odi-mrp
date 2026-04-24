@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createProduct } from '../actions'
 import { ProductForm } from '@/components/products/product-form'
+import { getAppSettings } from '@/lib/settings'
 
 export const metadata: Metadata = { title: 'New Product' }
 
@@ -15,19 +16,23 @@ const ERROR_MESSAGES: Record<string, string> = {
   server:         'Something went wrong. Please try again.',
 }
 
-export default function NewProductPage({ searchParams }: PageProps) {
+export default async function NewProductPage({ searchParams }: PageProps) {
+  const settings = await getAppSettings()
   const errorMessage = searchParams.error ? (ERROR_MESSAGES[searchParams.error] ?? null) : null
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       <div className="mb-6">
         <Link href="/products" className="text-sm text-gray-500 hover:text-gray-900">
-          ← Products
+          ← Products / BOMs
         </Link>
         <h1 className="text-2xl font-semibold text-gray-900 mt-2">New product</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Create the product master record. You can add ingredients to the BOM after saving.
+        </p>
       </div>
 
-      <ProductForm action={createProduct} errorMessage={errorMessage} />
+      <ProductForm action={createProduct} errorMessage={errorMessage} fxRate={Number(settings.fx_rate)} />
     </div>
   )
 }

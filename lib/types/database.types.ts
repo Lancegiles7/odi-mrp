@@ -105,7 +105,7 @@ export type Database = {
           name: string
           description: string | null
           unit_of_measure: string | null
-          product_type: string | null
+          product_type: ProductGroup | null
           size_g: number | null
           hero_call_out: string | null
           back_of_pack: string | null
@@ -115,9 +115,15 @@ export type Database = {
           toll: number | null
           margin: number | null
           other: number | null
-          currency_exchange: number | null
+          currency_exchange: number | null        // legacy; kept for one release
           freight: number | null
+          apply_fx: boolean
+          wastage_pct: number
+          manufacturer: string | null
+          opening_stock_override: number | null
           is_active: boolean
+          deleted_at: string | null
+          deleted_by: string | null
           created_at: string
           updated_at: string
           created_by: string | null
@@ -128,7 +134,7 @@ export type Database = {
           name: string
           description?: string | null
           unit_of_measure?: string | null
-          product_type?: string | null
+          product_type?: ProductGroup | null
           size_g?: number | null
           hero_call_out?: string | null
           back_of_pack?: string | null
@@ -140,7 +146,13 @@ export type Database = {
           other?: number | null
           currency_exchange?: number | null
           freight?: number | null
+          apply_fx?: boolean
+          wastage_pct?: number
+          manufacturer?: string | null
+          opening_stock_override?: number | null
           is_active?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -151,7 +163,7 @@ export type Database = {
           name?: string
           description?: string | null
           unit_of_measure?: string | null
-          product_type?: string | null
+          product_type?: ProductGroup | null
           size_g?: number | null
           hero_call_out?: string | null
           back_of_pack?: string | null
@@ -163,7 +175,13 @@ export type Database = {
           other?: number | null
           currency_exchange?: number | null
           freight?: number | null
+          apply_fx?: boolean
+          wastage_pct?: number
+          manufacturer?: string | null
+          opening_stock_override?: number | null
           is_active?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
           created_at?: string
           updated_at?: string
           created_by?: string | null
@@ -180,7 +198,8 @@ export type Database = {
           unit_of_measure: string | null
           cost_per_unit: number | null
           reorder_point: number | null
-          confirmed_supplier: string | null
+          confirmed_supplier: string | null           // legacy text; prefer supplier_id
+          supplier_id: string | null
           lead_time: string | null
           status: 'confirmed' | 'pending' | 'inactive'
           price: number | null
@@ -201,6 +220,7 @@ export type Database = {
           cost_per_unit?: number | null
           reorder_point?: number | null
           confirmed_supplier?: string | null
+          supplier_id?: string | null
           lead_time?: string | null
           status?: 'confirmed' | 'pending' | 'inactive'
           price?: number | null
@@ -221,6 +241,7 @@ export type Database = {
           cost_per_unit?: number | null
           reorder_point?: number | null
           confirmed_supplier?: string | null
+          supplier_id?: string | null
           lead_time?: string | null
           status?: 'confirmed' | 'pending' | 'inactive'
           price?: number | null
@@ -231,6 +252,139 @@ export type Database = {
           created_at?: string
           updated_at?: string
           created_by?: string | null
+        }
+        Relationships: []
+      }
+
+      ingredient_price_history: {
+        Row: {
+          id: string
+          ingredient_id: string
+          price: number | null
+          freight: number | null
+          total_loaded_cost: number | null
+          change_reason: PriceChangeReason
+          changed_by: string | null
+          changed_at: string
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          ingredient_id: string
+          price?: number | null
+          freight?: number | null
+          total_loaded_cost?: number | null
+          change_reason?: PriceChangeReason
+          changed_by?: string | null
+          changed_at?: string
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          ingredient_id?: string
+          price?: number | null
+          freight?: number | null
+          total_loaded_cost?: number | null
+          change_reason?: PriceChangeReason
+          changed_by?: string | null
+          changed_at?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
+
+      demand_forecasts: {
+        Row: {
+          id: string
+          product_id: string
+          year_month: string
+          channel: DemandChannel
+          units: number
+          is_edited: boolean
+          source: string
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          year_month: string
+          channel: DemandChannel
+          units?: number
+          is_edited?: boolean
+          source?: string
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          year_month?: string
+          channel?: DemandChannel
+          units?: number
+          is_edited?: boolean
+          source?: string
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+
+      production_plans: {
+        Row: {
+          id: string
+          product_id: string
+          year_month: string
+          units_planned: number
+          notes: string | null
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          year_month: string
+          units_planned?: number
+          notes?: string | null
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          year_month?: string
+          units_planned?: number
+          notes?: string | null
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+
+      app_settings: {
+        Row: {
+          id: number
+          fx_rate: number
+          gst_nz_pct: number
+          gst_au_pct: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: number
+          fx_rate?: number
+          gst_nz_pct?: number
+          gst_au_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: number
+          fx_rate?: number
+          gst_nz_pct?: number
+          gst_au_pct?: number
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -318,6 +472,9 @@ export type Database = {
           email: string | null
           phone: string | null
           address: string | null
+          country_of_origin: string | null
+          country_of_purchase: string | null
+          currency: string | null
           notes: string | null
           is_active: boolean
           created_at: string
@@ -332,6 +489,9 @@ export type Database = {
           email?: string | null
           phone?: string | null
           address?: string | null
+          country_of_origin?: string | null
+          country_of_purchase?: string | null
+          currency?: string | null
           notes?: string | null
           is_active?: boolean
           created_at?: string
@@ -346,6 +506,9 @@ export type Database = {
           email?: string | null
           phone?: string | null
           address?: string | null
+          country_of_origin?: string | null
+          country_of_purchase?: string | null
+          currency?: string | null
           notes?: string | null
           is_active?: boolean
           created_at?: string
@@ -571,6 +734,10 @@ export type Location         = Tables<'locations'>
 export type UserProfile      = Tables<'user_profiles'>
 export type Product          = Tables<'products'>
 export type Ingredient       = Tables<'ingredients'>
+export type IngredientPriceHistory = Tables<'ingredient_price_history'>
+export type AppSettings      = Tables<'app_settings'>
+export type DemandForecast   = Tables<'demand_forecasts'>
+export type ProductionPlan   = Tables<'production_plans'>
 export type Bom              = Tables<'boms'>
 export type BomItem          = Tables<'bom_items'>
 export type Supplier         = Tables<'suppliers'>
@@ -602,6 +769,29 @@ export type ReferenceType =
   | 'production_run'
   | 'manual'
   | 'transfer'
+
+export type ProductGroup =
+  | 'pouches'
+  | 'snacks_4bs'
+  | 'puffs_melts'
+  | 'tubs'
+  | 'sachets'
+  | 'noodles'
+  | 'vitamin_d'
+
+export type PriceChangeReason =
+  | 'initial'
+  | 'manual_update'
+  | 'import'
+  | 'po_received'
+  | 'correction'
+
+export type DemandChannel =
+  | 'ecomm_nz'
+  | 'retail_nz'
+  | 'ecomm_au'
+  | 'retail_au'
+  | 'pipefill'
 
 // Commonly used joined types
 export type UserProfileWithRole = UserProfile & {
@@ -635,10 +825,45 @@ export type InventoryBalanceWithIngredient = InventoryBalance & {
   ingredients: Pick<Ingredient, 'id' | 'name' | 'sku_code' | 'unit_of_measure' | 'reorder_point'>
 }
 
-// Calculated cost summary — derived in app, never stored
+// Ingredient with its linked supplier — used on detail and edit pages
+export type IngredientWithSupplier = Ingredient & {
+  suppliers: Pick<
+    Supplier,
+    | 'id'
+    | 'code'
+    | 'name'
+    | 'contact_name'
+    | 'email'
+    | 'phone'
+    | 'country_of_origin'
+    | 'country_of_purchase'
+    | 'currency'
+  > | null
+}
+
+// Calculated cost summary — derived in app, never stored.
+// `grand_total` is retained as an alias for `nz_grand_total` for
+// backward compatibility with older callers.
 export interface ProductCostSummary {
-  ingredient_total: number
+  ingredient_subtotal: number         // per-pack, before wastage
+  ingredient_total_per_pack: number   // per-pack, after wastage
+  serving_multiplier: number          // serving_size / size_g (1 if unset)
+  ingredient_total: number            // per-serving, after wastage × serving multiplier
+  base_cost: number                   // ingredient_total + packaging + toll + margin + other + freight
+  nz_grand_total: number              // base_cost × fx_rate when apply_fx, else base_cost
+  au_grand_total: number              // base_cost always
+  rrp_ex_gst_nz: number               // rrp / (1 + gst_nz_pct)   — 0 when rrp not set
+  rrp_ex_gst_au: number               // rrp / (1 + gst_au_pct)   — 0 when rrp not set
+  cos_nz: number | null               // nz_grand_total / rrp_ex_gst_nz (ratio)
+  cos_au: number | null               // au_grand_total / rrp_ex_gst_au (ratio)
+  gp_nz: number | null                // 1 - cos_nz (ratio)
+  gp_au: number | null                // 1 - cos_au (ratio)
+  gp_nz_amount: number | null         // rrp_ex_gst_nz - nz_grand_total (dollars)
+  gp_au_amount: number | null         // rrp_ex_gst_au - au_grand_total (dollars)
+  /** @deprecated use nz_grand_total */
   grand_total: number
-  cos: number | null   // null if no RRP set
+  /** @deprecated use cos_nz */
+  cos: number | null
+  /** @deprecated use gp_nz */
   gp: number | null
 }

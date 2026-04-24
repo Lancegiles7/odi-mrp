@@ -3,6 +3,22 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { ROLES, SOFT_DELETE_WINDOW_DAYS } from '@/lib/constants'
+
+async function requireAdmin() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('id, roles(name)')
+    .eq('id', user.id)
+    .single() as { data: { id: string; roles: { name: string } | null } | null }
+
+  if (profile?.roles?.name !== ROLES.ADMIN) redirect('/?error=forbidden')
+  return { supabase, profileId: profile.id }
+}
 
 // ============================================================
 // Types
@@ -23,9 +39,16 @@ export interface ProductFormData {
   toll?: string
   margin?: string
   other?: string
-  currency_exchange?: string
   freight?: string
+  apply_fx?: string
+  wastage_pct_input?: string
+  manufacturer?: string
+  opening_stock_override?: string
 }
+
+const VALID_GROUPS = new Set([
+  'pouches', 'snacks_4bs', 'puffs_melts', 'tubs', 'sachets', 'noodles', 'vitamin_d',
+])
 
 export interface BomItemInput {
   ingredient_id: string
@@ -81,24 +104,36 @@ function parseNum(val: string | undefined | null): number | null {
 }
 
 function buildProductPayload(data: ProductFormData) {
+  const rawType = data.product_type?.trim() || null
+  const productType = rawType && VALID_GROUPS.has(rawType) ? rawType : null
+
+  const wastagePctInput = parseNum(data.wastage_pct_input)
+  // Convert % (0–100) → fraction (0–1), clamped.
+  const wastagePct = wastagePctInput != null
+    ? Math.max(0, Math.min(1, wastagePctInput / 100))
+    : 0
+
   return {
-    sku_code:          data.sku_code.trim().toUpperCase(),
-    name:              data.name.trim(),
-    product_type:      data.product_type?.trim() || null,
-    size_g:            parseNum(data.size_g),
-    hero_call_out:     data.hero_call_out?.trim() || null,
-    back_of_pack:      data.back_of_pack?.trim() || null,
-    serving_size:      parseNum(data.serving_size),
-    rrp:               parseNum(data.rrp),
-    unit_of_measure:   data.unit_of_measure?.trim() || 'each',
-    description:       data.description?.trim() || null,
-    packaging:         parseNum(data.packaging),
-    toll:              parseNum(data.toll),
-    margin:            parseNum(data.margin),
-    other:             parseNum(data.other),
-    currency_exchange: parseNum(data.currency_exchange),
-    freight:           parseNum(data.freight),
-    is_active:         true,
+    sku_code:        data.sku_code.trim().toUpperCase(),
+    name:            data.name.trim(),
+    product_type:    productType,
+    size_g:          parseNum(data.size_g),
+    hero_call_out:   data.hero_call_out?.trim() || null,
+    back_of_pack:    data.back_of_pack?.trim() || null,
+    serving_size:    parseNum(data.serving_size),
+    rrp:             parseNum(data.rrp),
+    unit_of_measure: data.unit_of_measure?.trim() || 'each',
+    description:     data.description?.trim() || null,
+    packaging:       parseNum(data.packaging),
+    toll:            parseNum(data.toll),
+    margin:          parseNum(data.margin),
+    other:           parseNum(data.other),
+    freight:         parseNum(data.freight),
+    apply_fx:        data.apply_fx === 'true',
+    wastage_pct:     wastagePct,
+    manufacturer:    data.manufacturer?.trim() || null,
+    opening_stock_override: parseNum(data.opening_stock_override),
+    is_active:       true,
   }
 }
 
@@ -118,8 +153,11 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     toll:              formData.get('toll') as string,
     margin:            formData.get('margin') as string,
     other:             formData.get('other') as string,
-    currency_exchange: formData.get('currency_exchange') as string,
     freight:           formData.get('freight') as string,
+    apply_fx:          formData.get('apply_fx') as string,
+    wastage_pct_input: formData.get('wastage_pct_input') as string,
+    manufacturer:      formData.get('manufacturer') as string,
+    opening_stock_override: formData.get('opening_stock_override') as string,
   }
 }
 
@@ -443,4 +481,90 @@ export async function importProductsAndBoms(
 
   revalidatePath('/products')
   return result
+}
+
+// ============================================================
+// SOFT DELETE — sets deleted_at + is_active=false. Admin only.
+// Recoverable from /products/trash for 30 days.
+// ============================================================
+export async function softDeleteProduct(id: string) {
+  const { supabase, profileId } = await requireAdmin()
+
+  const { error } = await supabase
+    .from('products')
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: profileId,
+      is_active:  false,
+    })
+    .eq('id', id)
+
+  if (error) redirect(`/products/${id}?error=delete_failed`)
+
+  revalidatePath('/products')
+  revalidatePath('/products/trash')
+  redirect('/products?deleted=1')
+}
+
+// ============================================================
+// RESTORE — clears deleted_at, sets is_active=true. Admin only.
+// ============================================================
+export async function restoreProduct(id: string) {
+  const { supabase } = await requireAdmin()
+
+  const { error } = await supabase
+    .from('products')
+    .update({
+      deleted_at: null,
+      deleted_by: null,
+      is_active:  true,
+    })
+    .eq('id', id)
+
+  if (error) redirect('/products/trash?error=restore_failed')
+
+  revalidatePath('/products')
+  revalidatePath('/products/trash')
+  redirect(`/products/${id}?restored=1`)
+}
+
+// ============================================================
+// PERMANENT DELETE — hard delete. Admin only.
+// Cascades to boms + bom_items via FK ON DELETE CASCADE.
+// ============================================================
+export async function permanentlyDeleteProduct(id: string) {
+  const { supabase } = await requireAdmin()
+
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', id)
+
+  if (error) redirect('/products/trash?error=purge_failed')
+
+  revalidatePath('/products')
+  revalidatePath('/products/trash')
+  redirect('/products/trash?purged=1')
+}
+
+// ============================================================
+// PURGE EXPIRED — deletes everything past the 30-day window.
+// Called from the trash page on load so it self-cleans.
+// ============================================================
+export async function purgeExpiredProducts(): Promise<{ purged: number }> {
+  const { supabase } = await requireAdmin()
+
+  const cutoff = new Date(Date.now() - SOFT_DELETE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data, error } = await supabase
+    .from('products')
+    .delete()
+    .lt('deleted_at', cutoff)
+    .not('deleted_at', 'is', null)
+    .select('id')
+
+  if (error) return { purged: 0 }
+
+  revalidatePath('/products/trash')
+  return { purged: data?.length ?? 0 }
 }
