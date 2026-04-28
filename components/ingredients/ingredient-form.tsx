@@ -2,13 +2,31 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import type { Ingredient } from '@/lib/types/database.types'
+import type { Ingredient, Supplier } from '@/lib/types/database.types'
 import { UNITS_OF_MEASURE } from '@/lib/constants'
+import { SupplierPicker } from './supplier-picker'
+
+type SupplierOption = Pick<
+  Supplier,
+  | 'id'
+  | 'code'
+  | 'name'
+  | 'contact_name'
+  | 'email'
+  | 'phone'
+  | 'country_of_origin'
+  | 'country_of_purchase'
+  | 'currency'
+>
 
 interface IngredientFormProps {
   ingredient?: Ingredient | null
+  suppliers: SupplierOption[]
   action: (formData: FormData) => void
   errorMessage?: string | null
+  /** When set, form Cancel / Save redirects use this path. Used for the
+   *  "+ Create new ingredient" flow from the product BOM editor. */
+  returnTo?: string | null
 }
 
 const STATUS_OPTIONS = [
@@ -17,25 +35,28 @@ const STATUS_OPTIONS = [
   { value: 'inactive',  label: 'Inactive' },
 ]
 
-export function IngredientForm({ ingredient, action, errorMessage }: IngredientFormProps) {
+export function IngredientForm({
+  ingredient,
+  suppliers,
+  action,
+  errorMessage,
+  returnTo,
+}: IngredientFormProps) {
   const isEdit = !!ingredient
 
   const [price, setPrice] = useState(ingredient?.price?.toString() ?? '')
   const [freight, setFreight] = useState(ingredient?.freight?.toString() ?? '')
   const [totalLoaded, setTotalLoaded] = useState(ingredient?.total_loaded_cost?.toString() ?? '')
 
-  // Auto-compute total loaded cost when price or freight changes
   useEffect(() => {
     const p = parseFloat(price)
     const f = parseFloat(freight)
-    if (!isNaN(p) && !isNaN(f)) {
-      setTotalLoaded((p + f).toFixed(2))
-    } else if (!isNaN(p)) {
-      setTotalLoaded(p.toFixed(2))
-    } else if (!isNaN(f)) {
-      setTotalLoaded(f.toFixed(2))
-    }
+    if (!isNaN(p) && !isNaN(f))      setTotalLoaded((p + f).toFixed(2))
+    else if (!isNaN(p))              setTotalLoaded(p.toFixed(2))
+    else if (!isNaN(f))              setTotalLoaded(f.toFixed(2))
   }, [price, freight])
+
+  const cancelHref = returnTo ? returnTo : '/ingredients'
 
   return (
     <form action={action} className="space-y-6">
@@ -45,7 +66,11 @@ export function IngredientForm({ ingredient, action, errorMessage }: IngredientF
         </div>
       )}
 
-      {/* Core identity */}
+      {returnTo && (
+        <input type="hidden" name="return_to" value={returnTo} />
+      )}
+
+      {/* Identity */}
       <div className="bg-white border border-gray-200 rounded-lg p-5">
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Identity</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -77,14 +102,11 @@ export function IngredientForm({ ingredient, action, errorMessage }: IngredientF
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
             >
               {STATUS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
           </div>
 
-          {/* Organic / Non-Organic toggle */}
           <div className="sm:col-span-2">
             <p className="block text-sm font-medium text-gray-700 mb-2">Organic status</p>
             <div className="flex gap-4">
@@ -97,8 +119,7 @@ export function IngredientForm({ ingredient, action, errorMessage }: IngredientF
                   className="accent-gray-900"
                 />
                 <span className="text-sm text-gray-700">
-                  Organic
-                  <span className="ml-1 text-xs text-gray-400">(default)</span>
+                  Organic <span className="ml-1 text-xs text-gray-400">(default)</span>
                 </span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -112,9 +133,6 @@ export function IngredientForm({ ingredient, action, errorMessage }: IngredientF
                 <span className="text-sm text-gray-700">Non-Organic</span>
               </label>
             </div>
-            <p className="text-xs text-gray-400 mt-1">
-              Ingredients not listed on a BOM are assumed organic by default.
-            </p>
           </div>
 
           <div className="sm:col-span-2">
@@ -144,9 +162,7 @@ export function IngredientForm({ ingredient, action, errorMessage }: IngredientF
             >
               <option value="">— select —</option>
               {UNITS_OF_MEASURE.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
-                </option>
+                <option key={u.value} value={u.value}>{u.label}</option>
               ))}
             </select>
           </div>
@@ -161,26 +177,6 @@ export function IngredientForm({ ingredient, action, errorMessage }: IngredientF
               type="text"
               defaultValue={ingredient?.description ?? ''}
               placeholder="Optional description"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Procurement */}
-      <div className="bg-white border border-gray-200 rounded-lg p-5">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Procurement</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="confirmed_supplier" className="block text-sm font-medium text-gray-700 mb-1.5">
-              Confirmed Supplier
-            </label>
-            <input
-              id="confirmed_supplier"
-              name="confirmed_supplier"
-              type="text"
-              defaultValue={ingredient?.confirmed_supplier ?? ''}
-              placeholder="Supplier name"
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
             />
           </div>
@@ -201,14 +197,22 @@ export function IngredientForm({ ingredient, action, errorMessage }: IngredientF
         </div>
       </div>
 
+      {/* Supplier */}
+      <div className="bg-white border border-gray-200 rounded-lg p-5">
+        <h2 className="text-sm font-semibold text-gray-900 mb-4">Supplier</h2>
+        <SupplierPicker
+          suppliers={suppliers}
+          defaultSupplierId={ingredient?.supplier_id ?? null}
+          defaultSupplierName={ingredient?.confirmed_supplier ?? null}
+        />
+      </div>
+
       {/* Pricing */}
       <div className="bg-white border border-gray-200 rounded-lg p-5">
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Pricing</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1.5">
-              Price
-            </label>
+            <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1.5">Price</label>
             <div className="relative">
               <span className="absolute left-3 top-2 text-sm text-gray-400">$</span>
               <input
@@ -226,9 +230,7 @@ export function IngredientForm({ ingredient, action, errorMessage }: IngredientF
           </div>
 
           <div>
-            <label htmlFor="freight" className="block text-sm font-medium text-gray-700 mb-1.5">
-              Freight
-            </label>
+            <label htmlFor="freight" className="block text-sm font-medium text-gray-700 mb-1.5">Freight</label>
             <div className="relative">
               <span className="absolute left-3 top-2 text-sm text-gray-400">$</span>
               <input
@@ -267,12 +269,17 @@ export function IngredientForm({ ingredient, action, errorMessage }: IngredientF
             <p className="text-xs text-gray-400 mt-1">Override if needed</p>
           </div>
         </div>
+        {isEdit && (
+          <p className="mt-3 text-xs text-gray-500">
+            A price change is recorded in the history ledger on save (any change to Price, Freight, or Total Loaded Cost).
+          </p>
+        )}
       </div>
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Link
-          href="/ingredients"
+          href={cancelHref}
           className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
         >
           Cancel

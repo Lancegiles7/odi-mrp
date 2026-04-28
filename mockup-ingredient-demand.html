@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Ingredient demand — mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-gray-100 p-8">
+
+<div class="max-w-[1600px] mx-auto space-y-6">
+
+  <!-- HEADER -->
+  <div class="flex items-start justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold">Ingredient demand</h1>
+      <p class="text-sm text-gray-500 mt-1">
+        Rolling 12 months (Apr 26 → Mar 27) · Based on <span class="font-semibold text-gray-800">production plan</span> · Balance = opening − cumulative demand
+      </p>
+    </div>
+    <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+      <button class="px-3 py-1.5 font-medium bg-white text-gray-700 hover:bg-gray-50">From forecast</button>
+      <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-gray-900 text-white">From production plan</button>
+    </div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="flex items-center gap-4 text-xs text-gray-500">
+    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-white border border-dashed border-gray-300"></span> Opening stock (editable)</span>
+    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-50 border border-red-200"></span> Shortfall (opening won't cover demand)</span>
+    <span class="text-gray-300">·</span>
+    <span>Click an ingredient row to see which products are driving the demand.</span>
+  </div>
+
+  <!-- TILES -->
+  <div class="grid grid-cols-4 gap-3">
+    <div class="p-3 bg-white border border-gray-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-gray-500">Ingredients</div>
+      <div class="text-lg font-semibold text-gray-900">27</div>
+      <div class="text-[11px] text-gray-500">across 4 suppliers</div>
+    </div>
+    <div class="p-3 bg-white border border-gray-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-gray-500">Demand 12mo</div>
+      <div class="text-lg font-semibold text-gray-900">1,842 kg</div>
+      <div class="text-[11px] text-gray-500">+ 184,000 sachets</div>
+    </div>
+    <div class="p-3 bg-red-50 border border-red-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-red-700">Shortfalls</div>
+      <div class="text-lg font-semibold text-red-800">3</div>
+      <div class="text-[11px] text-red-700">ingredients short</div>
+    </div>
+    <div class="p-3 bg-white border border-gray-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-gray-500">Opening stock</div>
+      <div class="text-lg font-semibold text-gray-900">412 kg</div>
+      <div class="text-[11px] text-gray-500">on hand (overrides)</div>
+    </div>
+  </div>
+
+  <!-- SUPPLIER GROUP 1 (expanded) -->
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50 cursor-pointer">
+      <div class="flex items-center gap-3">
+        <span class="text-gray-400">▼</span>
+        <span class="font-semibold text-sm">Organic Valley NZ</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">8 ingredients</span>
+      </div>
+      <span class="text-xs text-red-600 font-medium">2 shortfalls</span>
+    </div>
+
+    <div class="border-t border-gray-100 overflow-x-auto">
+      <table class="w-full text-xs" style="min-width: 1400px;">
+        <thead>
+          <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+            <th class="text-left font-medium px-4 py-2 w-[320px] min-w-[320px]">Ingredient</th>
+            <th class="text-right font-medium px-3 py-2 w-[110px]">
+              Opening
+              <span class="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
+            </th>
+            <th class="text-right font-medium px-2 py-2 border-l border-gray-200">Apr 26</th>
+            <th class="text-right font-medium px-2 py-2">May 26</th>
+            <th class="text-right font-medium px-2 py-2">Jun 26</th>
+            <th class="text-right font-medium px-2 py-2">Jul 26</th>
+            <th class="text-right font-medium px-2 py-2">Aug 26</th>
+            <th class="text-right font-medium px-2 py-2">Sep 26</th>
+            <th class="text-right font-medium px-2 py-2">Oct 26</th>
+            <th class="text-right font-medium px-2 py-2">Nov 26</th>
+            <th class="text-right font-medium px-2 py-2">Dec 26</th>
+            <th class="text-right font-medium px-2 py-2">Jan 27</th>
+            <th class="text-right font-medium px-2 py-2">Feb 27</th>
+            <th class="text-right font-medium px-2 py-2">Mar 27</th>
+            <th class="text-right font-medium px-3 py-2 bg-gray-100 border-l border-gray-200">12-mo total</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <!-- Ingredient 1: Organic Oats — opening covers demand -->
+          <tr class="border-t border-gray-100 hover:bg-gray-50/50 cursor-pointer">
+            <td class="px-4 py-2">
+              <div class="flex items-center gap-2">
+                <span class="text-gray-400 text-[10px]">▶</span>
+                <div>
+                  <div class="font-mono text-[11px] text-gray-500">ING-OATS-ORGANIC</div>
+                  <div class="font-medium text-sm">Organic Rolled Oats <span class="text-[10px] text-gray-400">(kg)</span></div>
+                </div>
+              </div>
+            </td>
+            <td class="px-3 py-2 text-right">
+              <input class="w-20 text-right tabular-nums border border-gray-300 rounded px-1.5 py-1 bg-white text-gray-900 font-medium text-[11px]" value="150" />
+            </td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">13.4</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">16.1</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">22.5</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">23.0</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">24.8</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">26.1</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">27.8</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">28.4</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">30.1</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">31.7</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">33.2</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">34.5</td>
+            <td class="px-3 py-2 text-right tabular-nums font-semibold text-gray-900 bg-gray-50 border-l border-gray-200">311.6</td>
+          </tr>
+
+          <!-- Ingredient 2: Beetroot Powder — EXPANDED showing product breakdown -->
+          <tr class="border-t border-gray-100 bg-blue-50/30 cursor-pointer">
+            <td class="px-4 py-2">
+              <div class="flex items-center gap-2">
+                <span class="text-blue-600 text-[10px]">▼</span>
+                <div>
+                  <div class="font-mono text-[11px] text-gray-500">ING-BEET-PWD</div>
+                  <div class="font-medium text-sm">Beetroot Powder <span class="text-[10px] text-gray-400">(kg)</span></div>
+                </div>
+              </div>
+            </td>
+            <td class="px-3 py-2 text-right">
+              <input class="w-20 text-right tabular-nums border border-dashed border-gray-300 rounded px-1.5 py-1 bg-white text-gray-400 placeholder-gray-300 text-[11px]" placeholder="0" />
+            </td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">7.3</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">8.7</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">12.0</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">12.1</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">12.8</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">13.4</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">14.3</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">14.7</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">15.6</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">16.5</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">17.2</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">17.8</td>
+            <td class="px-3 py-2 text-right tabular-nums font-semibold text-red-800 bg-red-100 border-l border-red-200">162.4</td>
+          </tr>
+
+          <!-- Expansion content: product-level contribution rows -->
+          <tr class="bg-blue-50/30 border-t border-blue-100">
+            <td class="px-4 pl-10 py-1.5 text-[11px] text-gray-600" colspan="15">
+              <div class="text-[10px] uppercase tracking-wider text-blue-700 font-semibold mb-1">Driven by 2 products</div>
+            </td>
+          </tr>
+          <tr class="bg-blue-50/30 hover:bg-blue-50/50 text-[11px]">
+            <td class="px-4 pl-12 py-1.5">
+              <div class="flex items-center gap-2">
+                <span class="text-gray-400">└</span>
+                <span class="text-gray-700">Odi Baby Puree Powder Organic Beetroot <span class="text-gray-400">· 20 g/unit</span></span>
+              </div>
+            </td>
+            <td class="px-3 py-1.5 text-right text-gray-400 tabular-nums">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">7.3</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">8.7</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">12.0</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">12.1</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">12.8</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">13.4</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">14.3</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">14.7</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">15.6</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">16.5</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">17.2</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-600">17.8</td>
+            <td class="px-3 py-1.5 text-right tabular-nums text-gray-600 border-l border-blue-100">162.4</td>
+          </tr>
+          <tr class="bg-blue-50/30 hover:bg-blue-50/50 text-[11px]">
+            <td class="px-4 pl-12 py-1.5">
+              <div class="flex items-center gap-2">
+                <span class="text-gray-400">└</span>
+                <span class="text-gray-700">Odi Organic Beet & Berry Smoothie <span class="text-gray-400">· 15 g/unit</span></span>
+              </div>
+            </td>
+            <td class="px-3 py-1.5 text-right text-gray-400 tabular-nums">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>
+            <td class="px-3 py-1.5 text-right tabular-nums text-gray-400 border-l border-blue-100">0.0</td>
+          </tr>
+
+          <!-- Ingredient 3: Carrot Powder — opening empty, small demand -->
+          <tr class="border-t border-gray-100 hover:bg-gray-50/50 cursor-pointer">
+            <td class="px-4 py-2">
+              <div class="flex items-center gap-2">
+                <span class="text-gray-400 text-[10px]">▶</span>
+                <div>
+                  <div class="font-mono text-[11px] text-gray-500">ING-CARR-PWD</div>
+                  <div class="font-medium text-sm">Carrot Powder <span class="text-[10px] text-gray-400">(kg)</span></div>
+                </div>
+              </div>
+            </td>
+            <td class="px-3 py-2 text-right">
+              <input class="w-20 text-right tabular-nums border border-dashed border-gray-300 rounded px-1.5 py-1 bg-white text-gray-400 placeholder-gray-300 text-[11px]" placeholder="0" />
+            </td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">8.6</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">10.3</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">14.3</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">14.4</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">15.2</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">16.0</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">17.0</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">17.5</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">18.6</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">19.6</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">20.5</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700 font-semibold">21.3</td>
+            <td class="px-3 py-2 text-right tabular-nums font-semibold text-red-800 bg-red-100 border-l border-red-200">193.3</td>
+          </tr>
+
+          <!-- Ingredient 4: Blueberry Freeze-dried — opening covers -->
+          <tr class="border-t border-gray-100 hover:bg-gray-50/50 cursor-pointer">
+            <td class="px-4 py-2">
+              <div class="flex items-center gap-2">
+                <span class="text-gray-400 text-[10px]">▶</span>
+                <div>
+                  <div class="font-mono text-[11px] text-gray-500">ING-BLUE-FD</div>
+                  <div class="font-medium text-sm">Blueberry Freeze-dried <span class="text-[10px] text-gray-400">(kg)</span></div>
+                </div>
+              </div>
+            </td>
+            <td class="px-3 py-2 text-right">
+              <input class="w-20 text-right tabular-nums border border-gray-300 rounded px-1.5 py-1 bg-white text-gray-900 font-medium text-[11px]" value="300" />
+            </td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">26.2</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">28.8</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">35.2</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">35.6</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">40.9</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">33.7</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">44.5</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">36.5</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">32.8</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">28.4</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">23.8</td>
+            <td class="px-2 py-2 text-right tabular-nums text-gray-700">19.0</td>
+            <td class="px-3 py-2 text-right tabular-nums font-semibold text-gray-900 bg-gray-50 border-l border-gray-200">385.4</td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SUPPLIER GROUP 2 (collapsed) -->
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50 cursor-pointer">
+      <div class="flex items-center gap-3">
+        <span class="text-gray-400">▶</span>
+        <span class="font-semibold text-sm">Flavour Makers AU</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">6 ingredients</span>
+      </div>
+      <span class="text-xs text-red-600 font-medium">1 shortfall</span>
+    </div>
+  </div>
+
+  <!-- SUPPLIER GROUP 3 (collapsed) -->
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50 cursor-pointer">
+      <div class="flex items-center gap-3">
+        <span class="text-gray-400">▶</span>
+        <span class="font-semibold text-sm">Packaging Co NZ</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">8 ingredients</span>
+      </div>
+      <span class="text-xs text-gray-500">On track</span>
+    </div>
+  </div>
+
+  <!-- SUPPLIER GROUP 4 (collapsed) -->
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="px-5 py-3 flex items-center justify-between hover:bg-gray-50 cursor-pointer">
+      <div class="flex items-center gap-3">
+        <span class="text-gray-400">▶</span>
+        <span class="font-semibold text-sm">Bulk Goods Ltd</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">5 ingredients</span>
+      </div>
+      <span class="text-xs text-gray-500">On track</span>
+    </div>
+  </div>
+
+  <!-- BEHAVIOR NOTES -->
+  <section class="bg-white border border-gray-200 rounded-lg p-5 space-y-2 text-sm mt-8">
+    <h2 class="font-semibold">Behaviour notes</h2>
+    <ul class="list-disc pl-5 space-y-1.5 text-gray-700">
+      <li><b>View toggle</b> — "From forecast" shows the raw forecast (including pipefill). "From production plan" shows what you're actually scheduled to make. URL is <code class="bg-gray-100 px-1 rounded">?source=production</code> (default) or <code class="bg-gray-100 px-1 rounded">?source=forecast</code>.</li>
+      <li><b>Row click</b> — anywhere on the ingredient row toggles the product-level breakdown open/closed. Each child row shows one product's monthly contribution, with "X g/unit" to remind you of the BOM rate.</li>
+      <li><b>Shortfall highlighting</b> — a month cell goes red when cumulative demand up to that month exceeds opening stock. Once purchase orders are wired later, their arrivals will be added to the balance.</li>
+      <li><b>Opening stock</b> — identical pattern to the Production schedule: dashed-border empty state, save-on-blur, leave blank to clear the override.</li>
+      <li><b>Units</b> — each ingredient shows its own unit (kg, g, each). Mixed-unit roll-ups happen per ingredient, not across them. "Demand 12mo" tile breaks out kg vs sachets.</li>
+    </ul>
+  </section>
+
+  <!-- IMPLEMENTATION NOTES -->
+  <section class="bg-blue-50 border border-blue-200 rounded-lg p-5 space-y-2 text-sm">
+    <h2 class="font-semibold text-blue-900">Implementation (for reference)</h2>
+    <ul class="list-disc pl-5 space-y-1.5 text-blue-900">
+      <li>New migration: add <code class="bg-white px-1 rounded">opening_stock_override</code> to <code class="bg-white px-1 rounded">ingredients</code> (nullable numeric).</li>
+      <li>New <code class="bg-white px-1 rounded">lib/ingredient-demand.ts</code>: given (products, BOMs, demand|production), aggregate per-ingredient per-month totals and per-product contributions. Handles g ↔ kg conversion.</li>
+      <li>New page <code class="bg-white px-1 rounded">app/(dashboard)/ingredients/demand/page.tsx</code>, new row component <code class="bg-white px-1 rounded">components/ingredients/ingredient-demand-row.tsx</code>.</li>
+      <li>Server action <code class="bg-white px-1 rounded">updateIngredientOpeningStock(ingredientId, value)</code> — mirrors the product override action.</li>
+      <li>Sidebar link: "Ingredient demand" under the Planning section, next to "Demand" and "Production".</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>

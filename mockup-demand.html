@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1600" />
+<title>Odi MRP — Demand + Production mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .screen-frame { box-shadow: 0 10px 40px -15px rgba(0,0,0,0.2); }
+  .tag { font-size: 10.5px; letter-spacing: 0.04em; }
+  .edited { background: #FEF3C7 !important; }
+  .neg { color: #B91C1C; }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900 py-12">
+
+<div class="max-w-[1560px] mx-auto px-6 mb-10">
+  <div class="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-1">Odi MRP · Demand + Production preview</div>
+  <h1 class="text-2xl font-bold">Demand planning & Production schedule</h1>
+  <p class="text-sm text-gray-600 mt-1">Static mockup based on the actual Units tab data. Numbers are illustrative. 12 rolling months. Amber cells = manually edited since import.</p>
+  <div class="mt-5 flex gap-2 text-xs flex-wrap">
+    <a href="#demand" class="px-3 py-1.5 rounded-full bg-gray-900 text-white font-medium">1. Demand (/demand)</a>
+    <a href="#production" class="px-3 py-1.5 rounded-full bg-white border border-gray-200 hover:bg-gray-50">2a. Production — grouped</a>
+    <a href="#production-all" class="px-3 py-1.5 rounded-full bg-white border border-gray-200 hover:bg-gray-50">2b. Production — view all</a>
+    <a href="#import" class="px-3 py-1.5 rounded-full bg-white border border-gray-200 hover:bg-gray-50">3. Import preview</a>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<!-- SCREEN 1 · DEMAND                                                   -->
+<!-- =================================================================== -->
+<section id="demand" class="max-w-[1560px] mx-auto mb-16 px-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="tag px-2 py-0.5 rounded bg-gray-900 text-white font-semibold uppercase">Screen 1</span>
+    <h2 class="text-base font-semibold">Demand — /demand</h2>
+  </div>
+  <div class="screen-frame rounded-lg overflow-hidden border border-gray-200 bg-white">
+    <div class="flex min-h-[1000px]">
+
+      <!-- sidebar -->
+      <aside class="w-60 bg-white border-r border-gray-200 flex-shrink-0">
+        <div class="h-14 flex items-center gap-2.5 px-5 border-b border-gray-200">
+          <div class="h-7 w-7 rounded-md bg-gray-900 flex items-center justify-center text-white text-xs font-bold">O</div>
+          <span class="text-sm font-semibold">Odi MRP</span>
+        </div>
+        <nav class="py-3 px-2 text-sm text-gray-600">
+          <div class="px-3 py-1.5">Dashboard</div>
+          <p class="mt-4 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Planning</p>
+          <div class="px-3 py-1.5 rounded-md bg-gray-900 text-white font-medium">Demand</div>
+          <div class="px-3 py-1.5">Production</div>
+          <div class="px-3 py-1.5">Products / BOMs</div>
+          <div class="px-3 py-1.5">Ingredients</div>
+          <p class="mt-4 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Procurement</p>
+          <div class="px-3 py-1.5">Suppliers</div>
+          <div class="px-3 py-1.5">Purchase Orders</div>
+        </nav>
+      </aside>
+
+      <main class="flex-1 bg-gray-50">
+        <div class="h-14 border-b border-gray-200 bg-white flex items-center px-6 text-sm text-gray-500">
+          Planning · <span class="text-gray-900 font-medium">Demand</span>
+        </div>
+        <div class="p-6 space-y-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <h1 class="text-2xl font-semibold">Demand</h1>
+              <p class="text-sm text-gray-500 mt-1">Rolling 12 months · last import 2026-04-24 from <span class="font-mono">Odi – FY26 Budget – Revised Apr 26.xlsx</span></p>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1.5 text-sm border border-gray-300 bg-white rounded-md hover:bg-gray-50">Export</button>
+              <button class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800">+ Import XLSX</button>
+            </div>
+          </div>
+
+          <!-- Legend -->
+          <div class="flex items-center gap-4 text-xs text-gray-500">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-amber-100 border border-amber-200"></span> Manually edited since import</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-blue-50 border border-blue-200"></span> Pipefill (manual)</span>
+            <span class="text-gray-300">|</span>
+            <span>Click any cell to edit · Tab to next · ↵ to save</span>
+          </div>
+
+          <!-- Group: Snacks (expanded + one product open) -->
+          <details class="bg-white rounded-lg border border-gray-200 overflow-hidden" open>
+            <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-400">▼</span>
+                <span class="font-semibold text-sm">Snacks (4B's)</span>
+                <span class="text-xs text-gray-500">7 products</span>
+              </div>
+              <div class="text-xs text-gray-500">Group total <span class="font-medium text-gray-900">58,210 units / yr</span></div>
+            </summary>
+
+            <div class="border-t border-gray-100 p-5 space-y-5">
+
+              <!-- Product panel: Brownie (open) -->
+              <div class="bg-white border border-gray-200 rounded-md">
+                <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+                  <div class="flex items-center gap-3">
+                    <span class="text-gray-400 text-xs">▼</span>
+                    <span class="font-mono text-xs text-gray-600">ODI-ODI-ORGA-BROW-SNACK4-30G</span>
+                    <span class="font-medium text-sm">Odi Organic Brownie</span>
+                  </div>
+                  <div class="text-xs text-gray-500">Yr total <span class="font-semibold text-gray-900">7,347</span></div>
+                </div>
+
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="text-[11px] uppercase tracking-wider text-gray-500 bg-gray-50">
+                      <th class="text-left font-medium px-4 py-1.5 w-[160px]">Channel</th>
+                      <th class="text-right font-medium px-2 py-1.5">Apr</th>
+                      <th class="text-right font-medium px-2 py-1.5">May</th>
+                      <th class="text-right font-medium px-2 py-1.5">Jun</th>
+                      <th class="text-right font-medium px-2 py-1.5">Jul</th>
+                      <th class="text-right font-medium px-2 py-1.5">Aug</th>
+                      <th class="text-right font-medium px-2 py-1.5">Sep</th>
+                      <th class="text-right font-medium px-2 py-1.5">Oct</th>
+                      <th class="text-right font-medium px-2 py-1.5">Nov</th>
+                      <th class="text-right font-medium px-2 py-1.5">Dec</th>
+                      <th class="text-right font-medium px-2 py-1.5">Jan</th>
+                      <th class="text-right font-medium px-2 py-1.5">Feb</th>
+                      <th class="text-right font-medium px-2 py-1.5">Mar</th>
+                    </tr>
+                  </thead>
+                  <tbody class="text-xs tabular-nums">
+                    <tr class="border-t border-gray-100">
+                      <td class="px-4 py-1.5 text-gray-700">Ecomm NZ</td>
+                      <td class="px-2 py-1.5 text-right">385</td>
+                      <td class="px-2 py-1.5 text-right">886</td>
+                      <td class="px-2 py-1.5 text-right">1,078</td>
+                      <td class="px-2 py-1.5 text-right edited" title="Edited 2026-04-24">991</td>
+                      <td class="px-2 py-1.5 text-right">666</td>
+                      <td class="px-2 py-1.5 text-right">743</td>
+                      <td class="px-2 py-1.5 text-right">680</td>
+                      <td class="px-2 py-1.5 text-right">888</td>
+                      <td class="px-2 py-1.5 text-right">701</td>
+                      <td class="px-2 py-1.5 text-right">802</td>
+                      <td class="px-2 py-1.5 text-right">771</td>
+                      <td class="px-2 py-1.5 text-right">787</td>
+                    </tr>
+                    <tr class="border-t border-gray-50">
+                      <td class="px-4 py-1.5 text-gray-700">Retail NZ</td>
+                      <td class="px-2 py-1.5 text-right">615</td>
+                      <td class="px-2 py-1.5 text-right">1,414</td>
+                      <td class="px-2 py-1.5 text-right">1,722</td>
+                      <td class="px-2 py-1.5 text-right">1,583</td>
+                      <td class="px-2 py-1.5 text-right">1,064</td>
+                      <td class="px-2 py-1.5 text-right">1,186</td>
+                      <td class="px-2 py-1.5 text-right">1,086</td>
+                      <td class="px-2 py-1.5 text-right">1,418</td>
+                      <td class="px-2 py-1.5 text-right">1,119</td>
+                      <td class="px-2 py-1.5 text-right">1,280</td>
+                      <td class="px-2 py-1.5 text-right">1,232</td>
+                      <td class="px-2 py-1.5 text-right">1,257</td>
+                    </tr>
+                    <tr class="border-t border-gray-50">
+                      <td class="px-4 py-1.5 text-gray-700">Ecomm AU</td>
+                      <td class="px-2 py-1.5 text-right">96</td>
+                      <td class="px-2 py-1.5 text-right">222</td>
+                      <td class="px-2 py-1.5 text-right">269</td>
+                      <td class="px-2 py-1.5 text-right">248</td>
+                      <td class="px-2 py-1.5 text-right">167</td>
+                      <td class="px-2 py-1.5 text-right">186</td>
+                      <td class="px-2 py-1.5 text-right">170</td>
+                      <td class="px-2 py-1.5 text-right">222</td>
+                      <td class="px-2 py-1.5 text-right">175</td>
+                      <td class="px-2 py-1.5 text-right">200</td>
+                      <td class="px-2 py-1.5 text-right">193</td>
+                      <td class="px-2 py-1.5 text-right">197</td>
+                    </tr>
+                    <tr class="border-t border-gray-50">
+                      <td class="px-4 py-1.5 text-gray-700">Retail AU</td>
+                      <td class="px-2 py-1.5 text-right">192</td>
+                      <td class="px-2 py-1.5 text-right">443</td>
+                      <td class="px-2 py-1.5 text-right">539</td>
+                      <td class="px-2 py-1.5 text-right">496</td>
+                      <td class="px-2 py-1.5 text-right">333</td>
+                      <td class="px-2 py-1.5 text-right">371</td>
+                      <td class="px-2 py-1.5 text-right">340</td>
+                      <td class="px-2 py-1.5 text-right">444</td>
+                      <td class="px-2 py-1.5 text-right">350</td>
+                      <td class="px-2 py-1.5 text-right">401</td>
+                      <td class="px-2 py-1.5 text-right">386</td>
+                      <td class="px-2 py-1.5 text-right">393</td>
+                    </tr>
+                    <tr class="border-t border-gray-50 bg-blue-50/50">
+                      <td class="px-4 py-1.5 text-blue-700 font-medium">Pipefill</td>
+                      <td class="px-2 py-1.5 text-right text-gray-300">0</td>
+                      <td class="px-2 py-1.5 text-right text-gray-300">0</td>
+                      <td class="px-2 py-1.5 text-right edited">500</td>
+                      <td class="px-2 py-1.5 text-right text-gray-300">0</td>
+                      <td class="px-2 py-1.5 text-right text-gray-300">0</td>
+                      <td class="px-2 py-1.5 text-right text-gray-300">0</td>
+                      <td class="px-2 py-1.5 text-right text-gray-300">0</td>
+                      <td class="px-2 py-1.5 text-right edited">300</td>
+                      <td class="px-2 py-1.5 text-right text-gray-300">0</td>
+                      <td class="px-2 py-1.5 text-right text-gray-300">0</td>
+                      <td class="px-2 py-1.5 text-right text-gray-300">0</td>
+                      <td class="px-2 py-1.5 text-right text-gray-300">0</td>
+                    </tr>
+                    <tr class="border-t-2 border-gray-300 bg-gray-50 font-semibold text-gray-900">
+                      <td class="px-4 py-2">Grand Total</td>
+                      <td class="px-2 py-2 text-right">1,288</td>
+                      <td class="px-2 py-2 text-right">2,964</td>
+                      <td class="px-2 py-2 text-right">4,108</td>
+                      <td class="px-2 py-2 text-right">3,318</td>
+                      <td class="px-2 py-2 text-right">2,230</td>
+                      <td class="px-2 py-2 text-right">2,486</td>
+                      <td class="px-2 py-2 text-right">2,276</td>
+                      <td class="px-2 py-2 text-right">3,272</td>
+                      <td class="px-2 py-2 text-right">2,345</td>
+                      <td class="px-2 py-2 text-right">2,683</td>
+                      <td class="px-2 py-2 text-right">2,581</td>
+                      <td class="px-2 py-2 text-right">2,634</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Product panel collapsed examples -->
+              <div class="bg-white border border-gray-200 rounded-md px-4 py-2.5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <span class="text-gray-400 text-xs">▶</span>
+                  <span class="font-mono text-xs text-gray-600">ODI-ODI-ORGA-BANA-SNACK4-30G</span>
+                  <span class="font-medium text-sm">Odi Organic Banana</span>
+                </div>
+                <div class="text-xs text-gray-500">Yr total <span class="font-semibold text-gray-900">6,608</span></div>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-md px-4 py-2.5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <span class="text-gray-400 text-xs">▶</span>
+                  <span class="font-mono text-xs text-gray-600">ODI-ODI-ORGA-CHER-SNACK4-30G</span>
+                  <span class="font-medium text-sm">Odi Organic Cherry Choc</span>
+                </div>
+                <div class="text-xs text-gray-500">Yr total <span class="font-semibold text-gray-900">6,262</span></div>
+              </div>
+
+            </div>
+          </details>
+
+          <!-- Group: Pouches (collapsed) -->
+          <details class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-400">▶</span>
+                <span class="font-semibold text-sm">Pouches</span>
+                <span class="text-xs text-gray-500">4 products · 2 placeholder</span>
+              </div>
+              <div class="text-xs text-gray-500">Group total <span class="font-medium text-gray-900">72,158</span></div>
+            </summary>
+          </details>
+          <details class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-400">▶</span>
+                <span class="font-semibold text-sm">Sachets</span>
+                <span class="text-xs text-gray-500">5 products</span>
+              </div>
+              <div class="text-xs text-gray-500">Group total <span class="font-medium text-gray-900">59,869</span></div>
+            </summary>
+          </details>
+          <details class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-400">▶</span>
+                <span class="font-semibold text-sm">Tubs</span>
+                <span class="text-xs text-gray-500">4 products</span>
+              </div>
+              <div class="text-xs text-gray-500">Group total <span class="font-medium text-gray-900">32,825</span></div>
+            </summary>
+          </details>
+          <details class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-400">▶</span>
+                <span class="font-semibold text-sm">Puffs &amp; Melts</span>
+                <span class="text-xs text-gray-500">2 products · 2 placeholder</span>
+              </div>
+              <div class="text-xs text-gray-500">Group total <span class="font-medium text-gray-900">21,580</span></div>
+            </summary>
+          </details>
+
+          <!-- NOT ACTIVE PRODUCTS — dropdown shown at the bottom -->
+          <details class="bg-white rounded-lg border border-dashed border-gray-300 overflow-hidden">
+            <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-400">▶</span>
+                <span class="font-semibold text-sm text-gray-700">Inactive products</span>
+                <span class="text-xs text-gray-500">11 products — Vit D, Noodles, Protein, Odi Go, Post Partum, Other, NEW pouches</span>
+              </div>
+              <div class="text-xs text-gray-400">Demand tracked; no active BOM</div>
+            </summary>
+            <div class="border-t border-gray-100 p-5 space-y-2 text-xs">
+              <div class="flex items-center justify-between px-3 py-1.5 bg-gray-50 rounded">
+                <span class="text-gray-700">Odi Organic Vitamin D <span class="text-gray-400 ml-2">Vitamin D</span></span>
+                <span class="tabular-nums text-gray-500">Yr total 5,050</span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-1.5 bg-gray-50 rounded">
+                <span class="text-gray-700">Odi Organic Noodles — Flavour 1 <span class="text-gray-400 ml-2">Odi Noodles</span></span>
+                <span class="tabular-nums text-gray-500">Yr total 2,525</span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-1.5 bg-gray-50 rounded">
+                <span class="text-gray-700">Odi Baby Puree NEW # 1 <span class="text-gray-400 ml-2">Pouches (placeholder)</span></span>
+                <span class="tabular-nums text-gray-500">Yr total 0</span>
+              </div>
+              <div class="text-[11px] text-gray-400 mt-2">… 8 more</div>
+            </div>
+          </details>
+
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+
+<!-- =================================================================== -->
+<!-- SCREEN 2 · PRODUCTION                                               -->
+<!-- =================================================================== -->
+<section id="production" class="max-w-[1560px] mx-auto mb-16 px-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="tag px-2 py-0.5 rounded bg-gray-900 text-white font-semibold uppercase">Screen 2</span>
+    <h2 class="text-base font-semibold">Production schedule — /production</h2>
+    <span class="text-sm text-gray-500">Grouped by manufacturer · rolling balance with stock shortfalls highlighted</span>
+  </div>
+  <div class="screen-frame rounded-lg overflow-hidden border border-gray-200 bg-white">
+    <div class="flex min-h-[900px]">
+
+      <aside class="w-60 bg-white border-r border-gray-200 flex-shrink-0">
+        <div class="h-14 flex items-center gap-2.5 px-5 border-b border-gray-200">
+          <div class="h-7 w-7 rounded-md bg-gray-900 flex items-center justify-center text-white text-xs font-bold">O</div>
+          <span class="text-sm font-semibold">Odi MRP</span>
+        </div>
+        <nav class="py-3 px-2 text-sm text-gray-600">
+          <p class="mt-4 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Planning</p>
+          <div class="px-3 py-1.5">Demand</div>
+          <div class="px-3 py-1.5 rounded-md bg-gray-900 text-white font-medium">Production</div>
+          <div class="px-3 py-1.5">Products / BOMs</div>
+          <div class="px-3 py-1.5">Ingredients</div>
+        </nav>
+      </aside>
+
+      <main class="flex-1 bg-gray-50">
+        <div class="h-14 border-b border-gray-200 bg-white flex items-center px-6 text-sm text-gray-500">
+          Planning · <span class="text-gray-900 font-medium">Production</span>
+        </div>
+
+        <div class="p-6 space-y-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <h1 class="text-2xl font-semibold">Production schedule</h1>
+              <p class="text-sm text-gray-500 mt-1">Rolling 12 months · Forecast = demand + pipefill · Balance = prev balance + production − forecast</p>
+            </div>
+            <div class="flex gap-2 items-center">
+              <!-- View toggle -->
+              <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+                <a href="#production" class="px-3 py-1.5 bg-gray-900 text-white font-medium">Grouped by manufacturer</a>
+                <a href="#production-all" class="px-3 py-1.5 bg-white text-gray-700 border-l border-gray-300 hover:bg-gray-50">View all products</a>
+              </div>
+              <button class="px-3 py-1.5 text-sm border border-gray-300 bg-white rounded-md">Adjust opening stock</button>
+              <button class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md">Export</button>
+            </div>
+          </div>
+
+          <!-- Legend -->
+          <div class="flex items-center gap-4 text-xs text-gray-500">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-white border border-gray-300"></span> Forecast (read-only)</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-gray-100 border border-gray-300"></span> Production (editable)</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-50 border border-red-200"></span> Shortfall (negative balance)</span>
+            <span class="text-gray-300">|</span>
+            <span>Opening stock from Inventory · or manual override per SKU</span>
+          </div>
+
+          <!-- Brand Nation -->
+          <details class="bg-white rounded-lg border border-gray-200 overflow-hidden" open>
+            <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-400">▼</span>
+                <span class="font-semibold text-sm">Brand Nation</span>
+                <span class="text-xs text-gray-500">9 products · sachets + tubs</span>
+              </div>
+              <div class="text-xs text-red-600 font-medium">2 shortfalls in next 12 mo</div>
+            </summary>
+
+            <div class="border-t border-gray-100 overflow-x-auto">
+              <table class="w-full text-xs" style="min-width: 1400px">
+                <thead>
+                  <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+                    <th class="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 w-[340px]">Product</th>
+                    <th class="text-right font-medium px-3 py-2 w-[120px]">Opening</th>
+                    <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">Apr 2026</th>
+                    <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">May 2026</th>
+                    <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">Jun 2026</th>
+                    <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">Jul 2026</th>
+                  </tr>
+                  <tr class="bg-gray-50 text-[10px] text-gray-500">
+                    <th class="sticky left-0 bg-gray-50"></th>
+                    <th></th>
+                    <th class="text-right px-2 py-1 border-l border-gray-200">Fcst</th>
+                    <th class="text-right px-2 py-1">Prod</th>
+                    <th class="text-right px-2 py-1">Bal</th>
+                    <th class="text-right px-2 py-1 border-l border-gray-200">Fcst</th>
+                    <th class="text-right px-2 py-1">Prod</th>
+                    <th class="text-right px-2 py-1">Bal</th>
+                    <th class="text-right px-2 py-1 border-l border-gray-200">Fcst</th>
+                    <th class="text-right px-2 py-1">Prod</th>
+                    <th class="text-right px-2 py-1">Bal</th>
+                    <th class="text-right px-2 py-1 border-l border-gray-200">Fcst</th>
+                    <th class="text-right px-2 py-1">Prod</th>
+                    <th class="text-right px-2 py-1">Bal</th>
+                  </tr>
+                </thead>
+                <tbody class="tabular-nums">
+                  <tr class="border-t border-gray-100">
+                    <td class="px-4 py-2 sticky left-0 bg-white">
+                      <div class="font-mono text-[11px] text-gray-500">ODI-BABY-PURE-BROC-SACHET-20G</div>
+                      <div class="font-medium text-sm">Odi Baby Puree Powder Organic Broccoli</div>
+                    </td>
+                    <td class="px-3 py-2 text-right text-gray-700">2,500</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">6,000</td>
+                    <td class="px-2 py-2 text-right"><input class="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50" value="6,000"/></td>
+                    <td class="px-2 py-2 text-right">2,500</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">5,497</td>
+                    <td class="px-2 py-2 text-right"><input class="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50" value="7,000"/></td>
+                    <td class="px-2 py-2 text-right">4,003</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">3,449</td>
+                    <td class="px-2 py-2 text-right"><input class="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50" value="0"/></td>
+                    <td class="px-2 py-2 text-right">554</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">2,806</td>
+                    <td class="px-2 py-2 text-right"><input class="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50" value="5,000"/></td>
+                    <td class="px-2 py-2 text-right">2,748</td>
+                  </tr>
+                  <tr class="border-t border-gray-100">
+                    <td class="px-4 py-2 sticky left-0 bg-white">
+                      <div class="font-mono text-[11px] text-gray-500">ODI-BABY-PURE-BLUE-SACHET-20G</div>
+                      <div class="font-medium text-sm">Odi Baby Puree Powder Organic Blueberry</div>
+                    </td>
+                    <td class="px-3 py-2 text-right text-gray-700">1,200</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">6,100</td>
+                    <td class="px-2 py-2 text-right"><input class="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50" value="6,100"/></td>
+                    <td class="px-2 py-2 text-right">1,200</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">6,882</td>
+                    <td class="px-2 py-2 text-right"><input class="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50" value="7,500"/></td>
+                    <td class="px-2 py-2 text-right">1,818</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">3,561</td>
+                    <td class="px-2 py-2 text-right"><input class="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50" value="1,250"/></td>
+                    <td class="px-2 py-2 text-right">-493</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 bg-red-50">2,940</td>
+                    <td class="px-2 py-2 text-right bg-red-50"><input class="w-16 text-right text-[11px] border border-red-200 rounded px-1 py-0.5 bg-white" value="0"/></td>
+                    <td class="px-2 py-2 text-right bg-red-50 neg font-semibold">-3,433</td>
+                  </tr>
+                  <tr class="border-t border-gray-100">
+                    <td class="px-4 py-2 sticky left-0 bg-white">
+                      <div class="font-mono text-[11px] text-gray-500">ODI-ODI-ORGA-SMOO-TUB-125G</div>
+                      <div class="font-medium text-sm">Odi Organic Smoothie Booster</div>
+                    </td>
+                    <td class="px-3 py-2 text-right text-gray-700">420</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">1,000</td>
+                    <td class="px-2 py-2 text-right"><input class="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50" value="1,000"/></td>
+                    <td class="px-2 py-2 text-right">420</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">487</td>
+                    <td class="px-2 py-2 text-right"><input class="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50" value="0"/></td>
+                    <td class="px-2 py-2 text-right">-67</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 bg-red-50">1,196</td>
+                    <td class="px-2 py-2 text-right bg-red-50"><input class="w-16 text-right text-[11px] border border-red-200 rounded px-1 py-0.5 bg-white" value="2,750"/></td>
+                    <td class="px-2 py-2 text-right bg-red-50 neg font-semibold">1,487</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">956</td>
+                    <td class="px-2 py-2 text-right"><input class="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50" value="1,500"/></td>
+                    <td class="px-2 py-2 text-right">2,031</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+
+          <!-- I Eat Fresh -->
+          <details class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-400">▶</span>
+                <span class="font-semibold text-sm">I Eat Fresh</span>
+                <span class="text-xs text-gray-500">7 products · Snacks 4B's</span>
+              </div>
+              <div class="text-xs text-gray-500">On track</div>
+            </summary>
+          </details>
+
+          <!-- Flavour Makers -->
+          <details class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-400">▶</span>
+                <span class="font-semibold text-sm">Flavour Makers</span>
+                <span class="text-xs text-gray-500">4 products · Pouches</span>
+              </div>
+              <div class="text-xs text-red-600 font-medium">4 shortfalls</div>
+            </summary>
+          </details>
+
+          <!-- Unassigned -->
+          <details class="bg-white rounded-lg border border-dashed border-gray-300 overflow-hidden">
+            <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-400">▶</span>
+                <span class="font-semibold text-sm text-gray-700">Manufacturer not set</span>
+                <span class="text-xs text-gray-500">Set manufacturer on each product to group here</span>
+              </div>
+            </summary>
+          </details>
+
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+<!-- =================================================================== -->
+<!-- SCREEN 2b · PRODUCTION (VIEW ALL)                                    -->
+<!-- =================================================================== -->
+<section id="production-all" class="max-w-[1560px] mx-auto mb-16 px-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="tag px-2 py-0.5 rounded bg-gray-900 text-white font-semibold uppercase">Screen 2b</span>
+    <h2 class="text-base font-semibold">Production schedule — View all products</h2>
+    <span class="text-sm text-gray-500">Same data, one flat table · manufacturer shown as a chip per row · sticky product column on scroll</span>
+  </div>
+  <div class="screen-frame rounded-lg overflow-hidden border border-gray-200 bg-white">
+    <div class="flex min-h-[900px]">
+
+      <aside class="w-60 bg-white border-r border-gray-200 flex-shrink-0">
+        <div class="h-14 flex items-center gap-2.5 px-5 border-b border-gray-200">
+          <div class="h-7 w-7 rounded-md bg-gray-900 flex items-center justify-center text-white text-xs font-bold">O</div>
+          <span class="text-sm font-semibold">Odi MRP</span>
+        </div>
+        <nav class="py-3 px-2 text-sm text-gray-600">
+          <p class="mt-4 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Planning</p>
+          <div class="px-3 py-1.5">Demand</div>
+          <div class="px-3 py-1.5 rounded-md bg-gray-900 text-white font-medium">Production</div>
+          <div class="px-3 py-1.5">Products / BOMs</div>
+        </nav>
+      </aside>
+
+      <main class="flex-1 bg-gray-50">
+        <div class="h-14 border-b border-gray-200 bg-white flex items-center px-6 text-sm text-gray-500">
+          Planning · <span class="text-gray-900 font-medium">Production</span> · <span class="text-gray-900">All products</span>
+        </div>
+
+        <div class="p-6 space-y-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <h1 class="text-2xl font-semibold">Production schedule · All products</h1>
+              <p class="text-sm text-gray-500 mt-1">All active SKUs in one table, sorted by manufacturer then name. Shortfalls highlighted red.</p>
+            </div>
+            <div class="flex gap-2 items-center">
+              <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+                <a href="#production" class="px-3 py-1.5 bg-white text-gray-700 font-medium hover:bg-gray-50">Grouped by manufacturer</a>
+                <a href="#production-all" class="px-3 py-1.5 bg-gray-900 text-white border-l border-gray-300">View all products</a>
+              </div>
+              <select class="px-2 py-1.5 text-xs border border-gray-300 rounded-md bg-white">
+                <option>All manufacturers</option>
+                <option>Brand Nation</option>
+                <option>I Eat Fresh</option>
+                <option>Flavour Makers</option>
+                <option>Not set</option>
+              </select>
+              <select class="px-2 py-1.5 text-xs border border-gray-300 rounded-md bg-white">
+                <option>All groups</option>
+                <option>Only shortfalls</option>
+              </select>
+              <button class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md">Export</button>
+            </div>
+          </div>
+
+          <!-- Summary strip -->
+          <div class="grid grid-cols-5 gap-3">
+            <div class="p-3 bg-white border border-gray-200 rounded-md">
+              <div class="text-[11px] uppercase text-gray-500 font-semibold">Products</div>
+              <div class="text-lg font-semibold">20</div>
+              <div class="text-[11px] text-gray-500">15 active · 5 inactive</div>
+            </div>
+            <div class="p-3 bg-white border border-gray-200 rounded-md">
+              <div class="text-[11px] uppercase text-gray-500 font-semibold">Forecast 12mo</div>
+              <div class="text-lg font-semibold">246,884</div>
+              <div class="text-[11px] text-gray-500">units</div>
+            </div>
+            <div class="p-3 bg-white border border-gray-200 rounded-md">
+              <div class="text-[11px] uppercase text-gray-500 font-semibold">Production 12mo</div>
+              <div class="text-lg font-semibold">238,500</div>
+              <div class="text-[11px] text-gray-500">scheduled</div>
+            </div>
+            <div class="p-3 bg-red-50 border border-red-200 rounded-md">
+              <div class="text-[11px] uppercase text-red-700 font-semibold">Shortfalls</div>
+              <div class="text-lg font-semibold text-red-800">6</div>
+              <div class="text-[11px] text-red-700">months × SKU</div>
+            </div>
+            <div class="p-3 bg-white border border-gray-200 rounded-md">
+              <div class="text-[11px] uppercase text-gray-500 font-semibold">Opening stock</div>
+              <div class="text-lg font-semibold">12,940</div>
+              <div class="text-[11px] text-gray-500">units on hand</div>
+            </div>
+          </div>
+
+          <!-- Flat table -->
+          <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs" style="min-width: 1800px">
+                <thead>
+                  <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+                    <th class="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 w-[380px] z-10 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">Product</th>
+                    <th class="text-left font-medium px-3 py-2 w-[130px]">Manufacturer</th>
+                    <th class="text-right font-medium px-3 py-2 w-[100px]">Opening</th>
+                    <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">Apr</th>
+                    <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">May</th>
+                    <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">Jun</th>
+                    <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">Jul</th>
+                    <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">Aug</th>
+                    <th colspan="3" class="text-center font-medium px-3 py-2 border-l border-gray-200">Sep</th>
+                  </tr>
+                  <tr class="bg-gray-50 text-[10px] text-gray-500">
+                    <th class="sticky left-0 bg-gray-50 z-10 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]"></th>
+                    <th></th>
+                    <th></th>
+                    <th class="text-right px-2 py-1 border-l border-gray-200">F</th><th class="text-right px-2 py-1">P</th><th class="text-right px-2 py-1">Bal</th>
+                    <th class="text-right px-2 py-1 border-l border-gray-200">F</th><th class="text-right px-2 py-1">P</th><th class="text-right px-2 py-1">Bal</th>
+                    <th class="text-right px-2 py-1 border-l border-gray-200">F</th><th class="text-right px-2 py-1">P</th><th class="text-right px-2 py-1">Bal</th>
+                    <th class="text-right px-2 py-1 border-l border-gray-200">F</th><th class="text-right px-2 py-1">P</th><th class="text-right px-2 py-1">Bal</th>
+                    <th class="text-right px-2 py-1 border-l border-gray-200">F</th><th class="text-right px-2 py-1">P</th><th class="text-right px-2 py-1">Bal</th>
+                    <th class="text-right px-2 py-1 border-l border-gray-200">F</th><th class="text-right px-2 py-1">P</th><th class="text-right px-2 py-1">Bal</th>
+                  </tr>
+                </thead>
+                <tbody class="tabular-nums divide-y divide-gray-100">
+                  <!-- Row 1 -->
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 sticky left-0 bg-white z-10 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">
+                      <div class="font-mono text-[11px] text-gray-500">ODI-BABY-PURE-BROC-SACHET-20G</div>
+                      <div class="font-medium text-sm">Odi Baby Puree Powder Organic Broccoli</div>
+                    </td>
+                    <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px]">Brand Nation</span></td>
+                    <td class="px-3 py-2 text-right text-gray-700">2,500</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">6,000</td><td class="px-2 py-2 text-right">6,000</td><td class="px-2 py-2 text-right">2,500</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">5,497</td><td class="px-2 py-2 text-right">7,000</td><td class="px-2 py-2 text-right">4,003</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">3,449</td><td class="px-2 py-2 text-right">0</td><td class="px-2 py-2 text-right">554</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">2,806</td><td class="px-2 py-2 text-right">5,000</td><td class="px-2 py-2 text-right">2,748</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">1,898</td><td class="px-2 py-2 text-right">0</td><td class="px-2 py-2 text-right">850</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 bg-red-50">2,115</td><td class="px-2 py-2 text-right bg-red-50">0</td><td class="px-2 py-2 text-right bg-red-50 neg font-semibold">-1,265</td>
+                  </tr>
+                  <!-- Row 2 -->
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 sticky left-0 bg-white z-10 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">
+                      <div class="font-mono text-[11px] text-gray-500">ODI-BABY-PURE-BLUE-SACHET-20G</div>
+                      <div class="font-medium text-sm">Odi Baby Puree Powder Organic Blueberry</div>
+                    </td>
+                    <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px]">Brand Nation</span></td>
+                    <td class="px-3 py-2 text-right text-gray-700">1,200</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">6,100</td><td class="px-2 py-2 text-right">6,100</td><td class="px-2 py-2 text-right">1,200</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">6,882</td><td class="px-2 py-2 text-right">7,500</td><td class="px-2 py-2 text-right">1,818</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">3,561</td><td class="px-2 py-2 text-right">1,250</td><td class="px-2 py-2 text-right neg">-493</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 bg-red-50">2,940</td><td class="px-2 py-2 text-right bg-red-50">0</td><td class="px-2 py-2 text-right bg-red-50 neg font-semibold">-3,433</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 bg-red-50">2,038</td><td class="px-2 py-2 text-right bg-red-50">5,000</td><td class="px-2 py-2 text-right bg-red-50 neg font-semibold">-471</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">2,270</td><td class="px-2 py-2 text-right">3,000</td><td class="px-2 py-2 text-right">259</td>
+                  </tr>
+                  <!-- Row 3 -->
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 sticky left-0 bg-white z-10 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">
+                      <div class="font-mono text-[11px] text-gray-500">ODI-ODI-ORGA-SMOO-TUB-125G</div>
+                      <div class="font-medium text-sm">Odi Organic Smoothie Booster</div>
+                    </td>
+                    <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px]">Brand Nation</span></td>
+                    <td class="px-3 py-2 text-right text-gray-700">420</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">1,000</td><td class="px-2 py-2 text-right">1,000</td><td class="px-2 py-2 text-right">420</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">487</td><td class="px-2 py-2 text-right">0</td><td class="px-2 py-2 text-right neg">-67</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">1,196</td><td class="px-2 py-2 text-right">2,750</td><td class="px-2 py-2 text-right">1,487</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">956</td><td class="px-2 py-2 text-right">1,500</td><td class="px-2 py-2 text-right">2,031</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">812</td><td class="px-2 py-2 text-right">0</td><td class="px-2 py-2 text-right">1,219</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">912</td><td class="px-2 py-2 text-right">1,000</td><td class="px-2 py-2 text-right">1,307</td>
+                  </tr>
+                  <!-- Row 4 -->
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 sticky left-0 bg-white z-10 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">
+                      <div class="font-mono text-[11px] text-gray-500">ODI-ODI-ORGA-BROW-SNACK4-30G</div>
+                      <div class="font-medium text-sm">Odi Organic Brownie</div>
+                    </td>
+                    <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px]">I Eat Fresh</span></td>
+                    <td class="px-3 py-2 text-right text-gray-700">800</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">1,288</td><td class="px-2 py-2 text-right">2,094</td><td class="px-2 py-2 text-right">1,606</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">2,964</td><td class="px-2 py-2 text-right">3,500</td><td class="px-2 py-2 text-right">2,142</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">4,108</td><td class="px-2 py-2 text-right">4,000</td><td class="px-2 py-2 text-right">2,034</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">3,318</td><td class="px-2 py-2 text-right">3,000</td><td class="px-2 py-2 text-right">1,716</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">2,230</td><td class="px-2 py-2 text-right">2,500</td><td class="px-2 py-2 text-right">1,986</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">2,486</td><td class="px-2 py-2 text-right">2,500</td><td class="px-2 py-2 text-right">2,000</td>
+                  </tr>
+                  <!-- Row 5 -->
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 sticky left-0 bg-white z-10 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">
+                      <div class="font-mono text-[11px] text-gray-500">ODI-BABY-PURE-CHIC-POUCH-120G</div>
+                      <div class="font-medium text-sm">Odi Baby Puree Organic Chicken</div>
+                    </td>
+                    <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 text-[10px]">Flavour Makers</span></td>
+                    <td class="px-3 py-2 text-right text-gray-700">1,500</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">5,454</td><td class="px-2 py-2 text-right">5,454</td><td class="px-2 py-2 text-right">1,500</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 bg-red-50">7,077</td><td class="px-2 py-2 text-right bg-red-50">0</td><td class="px-2 py-2 text-right bg-red-50 neg font-semibold">-5,577</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200 bg-red-50">30,000</td><td class="px-2 py-2 text-right bg-red-50">21,867</td><td class="px-2 py-2 text-right bg-red-50 neg font-semibold">-13,710</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">8,059</td><td class="px-2 py-2 text-right">15,000</td><td class="px-2 py-2 text-right">-6,769</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">6,490</td><td class="px-2 py-2 text-right">10,000</td><td class="px-2 py-2 text-right">-3,259</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">5,940</td><td class="px-2 py-2 text-right">8,000</td><td class="px-2 py-2 text-right">-1,199</td>
+                  </tr>
+                  <!-- Row 6 — unassigned manufacturer -->
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 sticky left-0 bg-white z-10 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">
+                      <div class="font-mono text-[11px] text-gray-500">ODI-ODI-ORGA-VITD-TBC</div>
+                      <div class="font-medium text-sm">Odi Organic Vitamin D <span class="ml-1 text-[10px] px-1 py-0.5 bg-gray-100 rounded">Inactive</span></div>
+                    </td>
+                    <td class="px-3 py-2"><span class="text-gray-400 text-[10px]">Not set</span></td>
+                    <td class="px-3 py-2 text-right text-gray-400">—</td>
+                    <td class="px-2 py-2 text-right text-gray-400 border-l border-gray-200">0</td><td class="px-2 py-2 text-right text-gray-400">—</td><td class="px-2 py-2 text-right text-gray-400">—</td>
+                    <td class="px-2 py-2 text-right text-gray-400 border-l border-gray-200">0</td><td class="px-2 py-2 text-right text-gray-400">—</td><td class="px-2 py-2 text-right text-gray-400">—</td>
+                    <td class="px-2 py-2 text-right text-gray-400 border-l border-gray-200">0</td><td class="px-2 py-2 text-right text-gray-400">—</td><td class="px-2 py-2 text-right text-gray-400">—</td>
+                    <td class="px-2 py-2 text-right text-gray-400 border-l border-gray-200">0</td><td class="px-2 py-2 text-right text-gray-400">—</td><td class="px-2 py-2 text-right text-gray-400">—</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">513</td><td class="px-2 py-2 text-right text-gray-400">—</td><td class="px-2 py-2 text-right text-gray-400">—</td>
+                    <td class="px-2 py-2 text-right text-gray-600 border-l border-gray-200">571</td><td class="px-2 py-2 text-right text-gray-400">—</td><td class="px-2 py-2 text-right text-gray-400">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="px-4 py-2 border-t border-gray-100 text-[11px] text-gray-500 flex justify-between">
+              <span>Showing 6 of 20 products · scroll right for Oct–Mar</span>
+              <span>Forecast (F) from Demand · Production (P) editable · Balance (Bal) rolling</span>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+
+<!-- =================================================================== -->
+<!-- SCREEN 3 · IMPORT                                                   -->
+<!-- =================================================================== -->
+<section id="import" class="max-w-[1560px] mx-auto mb-16 px-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="tag px-2 py-0.5 rounded bg-gray-900 text-white font-semibold uppercase">Screen 3</span>
+    <h2 class="text-base font-semibold">Demand import — /demand/import</h2>
+    <span class="text-sm text-gray-500">Parses the Units tab · preview before commit · unmatched names → inactive placeholders</span>
+  </div>
+  <div class="screen-frame rounded-lg overflow-hidden border border-gray-200 bg-white p-8">
+    <div class="max-w-4xl mx-auto space-y-5">
+      <div class="flex items-center gap-4 p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+        <div class="flex-1">
+          <div class="font-medium">Odi – FY26 Budget – Revised Apr 26 - Claude.xlsx</div>
+          <div class="text-xs text-gray-500 mt-0.5">Units tab · 12 months (Apr 2026 → Mar 2027) · 4 channels</div>
+        </div>
+        <button class="text-xs text-gray-600 underline">Choose different file</button>
+      </div>
+
+      <div class="grid grid-cols-4 gap-3 text-center">
+        <div class="p-3 bg-gray-50 rounded-md">
+          <div class="text-[11px] uppercase text-gray-500 font-semibold">Rows parsed</div>
+          <div class="text-lg font-semibold">160</div>
+        </div>
+        <div class="p-3 bg-green-50 rounded-md">
+          <div class="text-[11px] uppercase text-green-700 font-semibold">Matched to SKU</div>
+          <div class="text-lg font-semibold text-green-800">22</div>
+        </div>
+        <div class="p-3 bg-amber-50 rounded-md">
+          <div class="text-[11px] uppercase text-amber-700 font-semibold">New placeholders</div>
+          <div class="text-lg font-semibold text-amber-800">11</div>
+        </div>
+        <div class="p-3 bg-blue-50 rounded-md">
+          <div class="text-[11px] uppercase text-blue-700 font-semibold">Demand rows</div>
+          <div class="text-lg font-semibold text-blue-800">1,584</div>
+        </div>
+      </div>
+
+      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-gray-100 text-xs text-gray-600 bg-gray-50">
+          Review matches — unmatched names will be created as inactive placeholder products
+        </div>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-[11px] uppercase tracking-wider text-gray-500 bg-gray-50">
+              <th class="text-left font-medium px-4 py-2">Sheet name</th>
+              <th class="text-left font-medium px-4 py-2">Group</th>
+              <th class="text-left font-medium px-4 py-2">Matched SKU</th>
+              <th class="text-right font-medium px-4 py-2">Yr units</th>
+              <th class="text-left font-medium px-4 py-2">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr>
+              <td class="px-4 py-1.5">Odi Organic Brownie</td>
+              <td class="px-4 py-1.5 text-gray-500">Snacks</td>
+              <td class="px-4 py-1.5 font-mono text-[11px]">ODI-ODI-ORGA-BROW-SNACK4-30G</td>
+              <td class="px-4 py-1.5 text-right tabular-nums">7,347</td>
+              <td class="px-4 py-1.5"><span class="text-[11px] px-1.5 py-0.5 rounded bg-green-50 text-green-700">Matched</span></td>
+            </tr>
+            <tr>
+              <td class="px-4 py-1.5">Odi Baby Puree Powder Organic Broccoli</td>
+              <td class="px-4 py-1.5 text-gray-500">Sachets</td>
+              <td class="px-4 py-1.5 font-mono text-[11px]">ODI-BABY-PURE-BROC-SACHET-20G</td>
+              <td class="px-4 py-1.5 text-right tabular-nums">10,200</td>
+              <td class="px-4 py-1.5"><span class="text-[11px] px-1.5 py-0.5 rounded bg-green-50 text-green-700">Matched</span></td>
+            </tr>
+            <tr>
+              <td class="px-4 py-1.5">Odi Organic Vitamin D</td>
+              <td class="px-4 py-1.5 text-gray-500">Vitamin D</td>
+              <td class="px-4 py-1.5 text-gray-400">—</td>
+              <td class="px-4 py-1.5 text-right tabular-nums">5,050</td>
+              <td class="px-4 py-1.5"><span class="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Will create (inactive)</span></td>
+            </tr>
+            <tr>
+              <td class="px-4 py-1.5">Odi Baby Puree NEW # 1</td>
+              <td class="px-4 py-1.5 text-gray-500">Pouches</td>
+              <td class="px-4 py-1.5 text-gray-400">—</td>
+              <td class="px-4 py-1.5 text-right tabular-nums">0</td>
+              <td class="px-4 py-1.5"><span class="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Skip (all zeros)</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
+        <div>
+          <strong>Re-import behaviour:</strong> cells you've manually edited (amber) are kept. Import only overwrites untouched cells. Pipefill is never overwritten.
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2">
+        <button class="px-3 py-1.5 text-sm border border-gray-300 bg-white rounded-md">Cancel</button>
+        <button class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md">Import 1,584 demand rows</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="max-w-[1560px] mx-auto px-6 text-xs text-gray-500 text-center pb-8">
+  Static mockup · no data is real · approve and I'll build the migration + pages.
+</div>
+
+</body>
+</html>

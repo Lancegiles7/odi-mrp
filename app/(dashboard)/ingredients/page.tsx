@@ -124,10 +124,14 @@ export default async function IngredientsPage({ searchParams }: PageProps) {
                 {ingredients.map((ing) => (
                   <tr key={ing.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">
-                      {ing.sku_code}
+                      <Link href={`/ingredients/${ing.id}`} className="hover:underline">
+                        {ing.sku_code}
+                      </Link>
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {ing.name}
+                      <Link href={`/ingredients/${ing.id}`} className="hover:underline">
+                        {ing.name}
+                      </Link>
                     </td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                       {ing.confirmed_supplier ?? <span className="text-gray-300">—</span>}
@@ -157,6 +161,12 @@ export default async function IngredientsPage({ searchParams }: PageProps) {
                         : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/ingredients/${ing.id}`}
+                        className="text-xs text-gray-500 hover:text-gray-900 font-medium mr-3"
+                      >
+                        View
+                      </Link>
                       <Link
                         href={`/ingredients/${ing.id}/edit`}
                         className="text-xs text-gray-500 hover:text-gray-900 font-medium"

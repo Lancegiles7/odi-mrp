@@ -6,26 +6,34 @@ import {
   LayoutDashboard,
   Package,
   FlaskConical,
-  ListTree,
   Truck,
   ShoppingCart,
   Warehouse,
   ArrowLeftRight,
   Users,
+  Settings as SettingsIcon,
+  Trash2,
+  TrendingUp,
+  Factory,
+  Leaf,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROLES } from '@/lib/constants'
 
 const ICON_MAP = {
-  '/':               LayoutDashboard,
-  '/products':       Package,
-  '/ingredients':    FlaskConical,
-  '/boms':           ListTree,
-  '/suppliers':      Truck,
+  '/':                LayoutDashboard,
+  '/demand':          TrendingUp,
+  '/production':      Factory,
+  '/products':        Package,
+  '/products/trash':  Trash2,
+  '/ingredients':     FlaskConical,
+  '/ingredients/demand': Leaf,
+  '/suppliers':       Truck,
   '/purchase-orders': ShoppingCart,
-  '/inventory':      Warehouse,
+  '/inventory':       Warehouse,
   '/stock-movements': ArrowLeftRight,
-  '/users':          Users,
+  '/settings':        SettingsIcon,
+  '/users':           Users,
 } as const
 
 const NAV_GROUPS = [
@@ -36,9 +44,11 @@ const NAV_GROUPS = [
   {
     label: 'Planning',
     items: [
-      { name: 'Products',           href: '/products' },
+      { name: 'Demand',             href: '/demand' },
+      { name: 'Production',         href: '/production' },
+      { name: 'Ingredient demand',  href: '/ingredients/demand' },
+      { name: 'Products / BOMs',    href: '/products' },
       { name: 'Ingredients',        href: '/ingredients' },
-      { name: 'Bills of Materials', href: '/boms' },
     ],
   },
   {
@@ -59,7 +69,11 @@ const NAV_GROUPS = [
 
 const ADMIN_GROUP = {
   label: 'Admin',
-  items: [{ name: 'Users', href: '/users' }],
+  items: [
+    { name: 'Settings',       href: '/settings' },
+    { name: 'Product trash',  href: '/products/trash' },
+    { name: 'Users',          href: '/users' },
+  ],
 }
 
 interface SidebarProps {
@@ -69,19 +83,22 @@ interface SidebarProps {
 export function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname()
 
-  const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
-    return pathname.startsWith(href)
-  }
-
   const groups =
     userRole === ROLES.ADMIN
       ? [...NAV_GROUPS, ADMIN_GROUP]
       : NAV_GROUPS
 
+  // Pick the single nav item whose href is the longest prefix of the
+  // current path — avoids "/ingredients" lighting up on "/ingredients/demand".
+  const allHrefs = groups.flatMap((g) => g.items.map((i) => i.href))
+  const activeHref = allHrefs
+    .filter((h) => (h === '/' ? pathname === '/' : pathname === h || pathname.startsWith(h + '/')))
+    .sort((a, b) => b.length - a.length)[0] ?? null
+
+  const isActive = (href: string) => href === activeHref
+
   return (
     <aside className="w-60 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
-      {/* Logo */}
       <div className="h-14 flex items-center gap-2.5 px-5 border-b border-gray-200 flex-shrink-0">
         <div className="h-7 w-7 rounded-md bg-gray-900 flex items-center justify-center">
           <span className="text-white text-xs font-bold">O</span>
@@ -91,7 +108,6 @@ export function Sidebar({ userRole }: SidebarProps) {
         </span>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 scrollbar-thin">
         {groups.map((group, idx) => (
           <div key={idx} className={idx > 0 ? 'mt-5' : ''}>

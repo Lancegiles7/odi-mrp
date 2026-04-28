@@ -24,29 +24,36 @@ interface PageProps {
 export default async function EditIngredientPage({ params, searchParams }: PageProps) {
   const supabase = createClient()
 
-  const { data: ingredient } = await supabase
-    .from('ingredients')
-    .select('*')
-    .eq('id', params.id)
-    .single() as { data: Ingredient | null; error: unknown }
+  const [{ data: ingredient }, { data: suppliers }] = await Promise.all([
+    supabase
+      .from('ingredients')
+      .select('*')
+      .eq('id', params.id)
+      .single() as unknown as Promise<{ data: Ingredient | null }>,
+    supabase
+      .from('suppliers')
+      .select('id, code, name, contact_name, email, phone, country_of_origin, country_of_purchase, currency')
+      .eq('is_active', true)
+      .order('name', { ascending: true }),
+  ])
 
   if (!ingredient) notFound()
 
   const errorKey = searchParams.error
   const errorMessage = errorKey ? ERROR_MESSAGES[errorKey] ?? 'An error occurred.' : null
 
-  // Bind the ingredient id into the server action
   const updateWithId = updateIngredient.bind(null, params.id)
 
   return (
     <div className="max-w-2xl">
-      {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link href="/ingredients" className="hover:text-gray-900">
-          Ingredients
+        <Link href="/ingredients" className="hover:text-gray-900">Ingredients</Link>
+        <span>/</span>
+        <Link href={`/ingredients/${ingredient.id}`} className="hover:text-gray-900 truncate max-w-xs">
+          {ingredient.name}
         </Link>
         <span>/</span>
-        <span className="text-gray-900 truncate max-w-xs">{ingredient.name}</span>
+        <span className="text-gray-900">Edit</span>
       </nav>
 
       <div className="mb-6">
@@ -56,6 +63,7 @@ export default async function EditIngredientPage({ params, searchParams }: PageP
 
       <IngredientForm
         ingredient={ingredient}
+        suppliers={suppliers ?? []}
         action={updateWithId}
         errorMessage={errorMessage}
       />

@@ -125,9 +125,8 @@ export const NAV_GROUPS = [
   {
     label: 'Planning',
     items: [
-      { name: 'Products',          href: '/products' },
-      { name: 'Ingredients',       href: '/ingredients' },
-      { name: 'Bills of Materials', href: '/boms' },
+      { name: 'Products / BOMs', href: '/products' },
+      { name: 'Ingredients',     href: '/ingredients' },
     ],
   },
   {
@@ -149,12 +148,78 @@ export const NAV_GROUPS = [
 export const ADMIN_NAV_GROUP = {
   label: 'Admin',
   items: [
+    { name: 'Settings', href: '/settings' },
     { name: 'Users',    href: '/users' },
   ],
 } as const
 
 
 // ============================================================
+// PRODUCT GROUPS (enum + display order)
+// ============================================================
+export const PRODUCT_GROUPS = [
+  { value: 'pouches',     label: 'Pouches' },
+  { value: 'snacks_4bs',  label: "Snacks (4B's)" },
+  { value: 'puffs_melts', label: 'Puffs & Melts' },
+  { value: 'tubs',        label: 'Tubs' },
+  { value: 'sachets',     label: 'Sachets' },
+  { value: 'noodles',     label: 'Noodles' },
+  { value: 'vitamin_d',   label: 'Vitamin D' },
+] as const
+
+export const PRODUCT_GROUP_LABELS: Record<string, string> = Object.fromEntries(
+  PRODUCT_GROUPS.map((g) => [g.value, g.label])
+)
+
+
+// ============================================================
 // PAGINATION
 // ============================================================
 export const DEFAULT_PAGE_SIZE = 50
+
+
+// ============================================================
+// SOFT DELETE
+// Days a soft-deleted product stays in the trash before it's
+// automatically purged.
+// ============================================================
+export const SOFT_DELETE_WINDOW_DAYS = 30
+
+
+// ============================================================
+// DEMAND CHANNELS (order = display order on the demand page)
+// ============================================================
+export const DEMAND_CHANNELS = [
+  { value: 'ecomm_nz',  label: 'Ecomm NZ'  },
+  { value: 'retail_nz', label: 'Retail NZ' },
+  { value: 'ecomm_au',  label: 'Ecomm AU'  },
+  { value: 'retail_au', label: 'Retail AU' },
+  { value: 'pipefill',  label: 'Pipefill'  },
+] as const
+
+export const DEMAND_CHANNEL_LABELS: Record<string, string> = Object.fromEntries(
+  DEMAND_CHANNELS.map((c) => [c.value, c.label])
+)
+
+
+// ============================================================
+// MANUFACTURERS (suggested list — products.manufacturer is free text)
+// ============================================================
+export const MANUFACTURERS = [
+  'Brand Nation',
+  'I Eat Fresh',
+  'Flavour Makers',
+] as const
+
+// Colour chips for the production page "view all" table
+export const MANUFACTURER_CHIP_COLOURS: Record<string, string> = {
+  'Brand Nation':   'bg-indigo-50 text-indigo-700',
+  'I Eat Fresh':    'bg-emerald-50 text-emerald-700',
+  'Flavour Makers': 'bg-sky-50 text-sky-700',
+}
+
+
+// ============================================================
+// PLANNING HORIZON — rolling N months on Demand + Production
+// ============================================================
+export const PLANNING_MONTHS = 12

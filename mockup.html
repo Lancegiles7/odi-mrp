@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1320" />
+<title>Odi MRP — UI Mockup (for review)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .screen-frame { box-shadow: 0 10px 40px -15px rgba(0,0,0,0.2); }
+  .spark path { fill: none; stroke: #111827; stroke-width: 1.5; }
+  .spark .area { fill: #11182710; stroke: none; }
+  .tag { font-size: 10.5px; letter-spacing: 0.04em; }
+  [data-tip] { position: relative; }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900 py-12">
+
+<!-- ============================================================ -->
+<!-- Page header -->
+<!-- ============================================================ -->
+<div class="max-w-[1260px] mx-auto px-6 mb-10">
+  <div class="flex items-baseline justify-between">
+    <div>
+      <div class="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-1">Odi MRP · Static UI Preview</div>
+      <h1 class="text-2xl font-bold text-gray-900">Ingredients + Products / BOMs — proposed redesign</h1>
+      <p class="text-sm text-gray-600 mt-1">Non-functional mockup for layout review. Numbers are illustrative. Scroll through the 5 screens below.</p>
+    </div>
+    <div class="text-right text-xs text-gray-500 leading-relaxed">
+      <div>Norish Limited</div>
+      <div>Trading: Odi Nutrition</div>
+      <div>odinutrition.com</div>
+    </div>
+  </div>
+  <div class="mt-6 flex flex-wrap gap-2 text-xs">
+    <a href="#screen-1" class="px-3 py-1.5 rounded-full bg-gray-900 text-white font-medium">1. Products list</a>
+    <a href="#screen-2" class="px-3 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">2. Product detail</a>
+    <a href="#screen-3" class="px-3 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">3. Product edit</a>
+    <a href="#screen-4" class="px-3 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">4. Ingredient detail (price history)</a>
+    <a href="#screen-5" class="px-3 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">5. Settings</a>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Reusable sidebar + header markup -->
+<!-- Rendered inline per screen for simplicity -->
+<!-- ============================================================ -->
+
+<!-- =========================================================================================== -->
+<!-- SCREEN 1 · PRODUCTS / BOMs — GROUPED LIST                                                    -->
+<!-- =========================================================================================== -->
+<section id="screen-1" class="max-w-[1260px] mx-auto mb-16 px-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="tag px-2 py-0.5 rounded bg-gray-900 text-white font-semibold uppercase">Screen 1</span>
+    <h2 class="text-base font-semibold text-gray-900">Products / BOMs — grouped list</h2>
+    <span class="text-sm text-gray-500">Collapsible by group. One row per product. Replaces the current flat list.</span>
+  </div>
+  <div class="screen-frame rounded-lg overflow-hidden border border-gray-200 bg-white">
+    <div class="flex min-h-[720px]">
+      <!-- Sidebar -->
+      <aside class="w-60 bg-white border-r border-gray-200 flex flex-col">
+        <div class="h-14 flex items-center gap-2.5 px-5 border-b border-gray-200">
+          <div class="h-7 w-7 rounded-md bg-gray-900 flex items-center justify-center text-white text-xs font-bold">O</div>
+          <span class="text-sm font-semibold tracking-tight">Odi MRP</span>
+        </div>
+        <nav class="flex-1 py-3 px-2 text-sm">
+          <ul class="space-y-0.5">
+            <li><a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100">● Dashboard</a></li>
+          </ul>
+          <p class="mt-5 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Planning</p>
+          <ul class="space-y-0.5">
+            <li><a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md bg-gray-900 text-white font-medium">▣ Products / BOMs</a></li>
+            <li><a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100">◈ Ingredients</a></li>
+          </ul>
+          <p class="mt-5 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Procurement</p>
+          <ul class="space-y-0.5">
+            <li><a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100">⛟ Suppliers</a></li>
+            <li><a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100">⇅ Purchase Orders</a></li>
+          </ul>
+          <p class="mt-5 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Inventory</p>
+          <ul class="space-y-0.5">
+            <li><a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100">▨ Stock Levels</a></li>
+            <li><a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100">↔ Stock Movements</a></li>
+          </ul>
+          <p class="mt-5 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Admin</p>
+          <ul class="space-y-0.5">
+            <li><a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100">⚙ Settings</a></li>
+            <li><a class="flex items-center gap-2.5 px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100">◐ Users</a></li>
+          </ul>
+        </nav>
+      </aside>
+      <!-- Main -->
+      <main class="flex-1 bg-gray-50">
+        <div class="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-6">
+          <div class="text-sm text-gray-500">Planning · <span class="text-gray-900 font-medium">Products / BOMs</span></div>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-gray-500">Lance Giles · Admin</span>
+            <div class="h-7 w-7 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-semibold">LG</div>
+          </div>
+        </div>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h1 class="text-xl font-semibold">Products / BOMs</h1>
+              <p class="text-sm text-gray-500">21 products across 7 groups</p>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Import</button>
+              <button class="px-3 py-1.5 text-sm rounded-md bg-gray-900 text-white hover:bg-gray-800">+ New product</button>
+            </div>
+          </div>
+
+          <div class="flex gap-2 mb-5">
+            <input class="flex-1 max-w-xs px-3 py-1.5 text-sm border border-gray-300 rounded-md" placeholder="Search products…" value=""/>
+            <select class="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white">
+              <option>All groups</option>
+            </select>
+            <select class="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white">
+              <option>Active only</option>
+            </select>
+          </div>
+
+          <!-- Group card template -->
+          <div class="space-y-3">
+
+            <!-- Pouches (expanded) -->
+            <div class="bg-white rounded-lg border border-gray-200">
+              <button class="w-full flex items-center justify-between px-5 py-3 text-left">
+                <div class="flex items-center gap-3">
+                  <span class="text-gray-400">▼</span>
+                  <span class="font-semibold text-sm">Pouches</span>
+                  <span class="text-xs text-gray-500">5 products</span>
+                </div>
+                <div class="text-xs text-gray-500">Avg COS (NZ) 37.2%</div>
+              </button>
+              <div class="border-t border-gray-100">
+                <table class="w-full text-sm">
+                  <thead class="text-xs text-gray-500 uppercase tracking-wider">
+                    <tr class="border-b border-gray-100">
+                      <th class="text-left font-medium px-5 py-2">SKU</th>
+                      <th class="text-left font-medium px-5 py-2">Name</th>
+                      <th class="text-right font-medium px-5 py-2">Size</th>
+                      <th class="text-right font-medium px-5 py-2">RRP</th>
+                      <th class="text-right font-medium px-5 py-2">NZ total</th>
+                      <th class="text-right font-medium px-5 py-2">AU total</th>
+                      <th class="text-right font-medium px-5 py-2">COS NZ</th>
+                      <th class="text-right font-medium px-5 py-2">COS AU</th>
+                      <th class="px-5 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-5 py-2.5 font-mono text-xs text-gray-700">ODI-P-CHIA-250</td>
+                      <td class="px-5 py-2.5 font-medium">Organic Chia Pouch</td>
+                      <td class="px-5 py-2.5 text-right">250 g</td>
+                      <td class="px-5 py-2.5 text-right">$14.99</td>
+                      <td class="px-5 py-2.5 text-right font-semibold">$4.82</td>
+                      <td class="px-5 py-2.5 text-right text-gray-500">$4.02</td>
+                      <td class="px-5 py-2.5 text-right"><span class="inline-block px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-medium text-xs">37.0%</span></td>
+                      <td class="px-5 py-2.5 text-right text-xs text-gray-500">29.5%</td>
+                      <td class="px-5 py-2.5 text-right"><a href="#screen-2" class="text-xs text-gray-700 underline">View →</a></td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-5 py-2.5 font-mono text-xs text-gray-700">ODI-P-TURM-250</td>
+                      <td class="px-5 py-2.5 font-medium">Organic Turmeric Pouch</td>
+                      <td class="px-5 py-2.5 text-right">250 g</td>
+                      <td class="px-5 py-2.5 text-right">$19.99</td>
+                      <td class="px-5 py-2.5 text-right font-semibold">$7.10</td>
+                      <td class="px-5 py-2.5 text-right text-gray-500">$5.92</td>
+                      <td class="px-5 py-2.5 text-right"><span class="inline-block px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-medium text-xs">40.8%</span></td>
+                      <td class="px-5 py-2.5 text-right text-xs text-gray-500">32.6%</td>
+                      <td class="px-5 py-2.5 text-right"><a class="text-xs text-gray-700 underline">View →</a></td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-5 py-2.5 font-mono text-xs text-gray-700">ODI-P-PROT-400</td>
+                      <td class="px-5 py-2.5 font-medium">Plant Protein Pouch — Vanilla</td>
+                      <td class="px-5 py-2.5 text-right">400 g</td>
+                      <td class="px-5 py-2.5 text-right">$39.99</td>
+                      <td class="px-5 py-2.5 text-right font-semibold">$13.26</td>
+                      <td class="px-5 py-2.5 text-right text-gray-500">$11.05</td>
+                      <td class="px-5 py-2.5 text-right"><span class="inline-block px-2 py-0.5 rounded bg-green-50 text-green-700 font-medium text-xs">38.1%</span></td>
+                      <td class="px-5 py-2.5 text-right text-xs text-gray-500">30.4%</td>
+                      <td class="px-5 py-2.5 text-right"><a class="text-xs text-gray-700 underline">View →</a></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Snacks (collapsed) -->
+            <div class="bg-white rounded-lg border border-gray-200">
+              <button class="w-full flex items-center justify-between px-5 py-3 text-left">
+                <div class="flex items-center gap-3">
+                  <span class="text-gray-400">▶</span>
+                  <span class="font-semibold text-sm">Snacks (4B's)</span>
+                  <span class="text-xs text-gray-500">3 products</span>
+                </div>
+                <div class="text-xs text-gray-500">Avg COS (NZ) 34.1%</div>
+              </button>
+            </div>
+
+            <div class="bg-white rounded-lg border border-gray-200">
+              <button class="w-full flex items-center justify-between px-5 py-3 text-left">
+                <div class="flex items-center gap-3"><span class="text-gray-400">▶</span><span class="font-semibold text-sm">Puffs &amp; Melts</span><span class="text-xs text-gray-500">2 products</span></div>
+                <div class="text-xs text-gray-500">Avg COS (NZ) 28.9%</div>
+              </button>
+            </div>
+            <div class="bg-white rounded-lg border border-gray-200">
+              <button class="w-full flex items-center justify-between px-5 py-3 text-left">
+                <div class="flex items-center gap-3"><span class="text-gray-400">▶</span><span class="font-semibold text-sm">Tubs</span><span class="text-xs text-gray-500">4 products</span></div>
+                <div class="text-xs text-gray-500">Avg COS (NZ) 41.3%</div>
+              </button>
+            </div>
+            <div class="bg-white rounded-lg border border-gray-200">
+              <button class="w-full flex items-center justify-between px-5 py-3 text-left">
+                <div class="flex items-center gap-3"><span class="text-gray-400">▶</span><span class="font-semibold text-sm">Sachets</span><span class="text-xs text-gray-500">3 products</span></div>
+                <div class="text-xs text-gray-500">Avg COS (NZ) 32.6%</div>
+              </button>
+            </div>
+            <div class="bg-white rounded-lg border border-gray-200">
+              <button class="w-full flex items-center justify-between px-5 py-3 text-left">
+                <div class="flex items-center gap-3"><span class="text-gray-400">▶</span><span class="font-semibold text-sm">Noodles</span><span class="text-xs text-gray-500">3 products</span></div>
+                <div class="text-xs text-gray-500">Avg COS (NZ) 45.1%</div>
+              </button>
+            </div>
+            <div class="bg-white rounded-lg border border-gray-200">
+              <button class="w-full flex items-center justify-between px-5 py-3 text-left">
+                <div class="flex items-center gap-3"><span class="text-gray-400">▶</span><span class="font-semibold text-sm">Vitamin D</span><span class="text-xs text-gray-500">1 product</span></div>
+                <div class="text-xs text-gray-500">Avg COS (NZ) 24.8%</div>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+
+<!-- =========================================================================================== -->
+<!-- SCREEN 2 · PRODUCT DETAIL                                                                    -->
+<!-- =========================================================================================== -->
+<section id="screen-2" class="max-w-[1260px] mx-auto mb-16 px-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="tag px-2 py-0.5 rounded bg-gray-900 text-white font-semibold uppercase">Screen 2</span>
+    <h2 class="text-base font-semibold">Product detail — overview + cost + BOM</h2>
+    <span class="text-sm text-gray-500">SKU code lives in its own visual tile. COS split NZ / AU.</span>
+  </div>
+  <div class="screen-frame rounded-lg overflow-hidden border border-gray-200 bg-white">
+    <div class="flex min-h-[980px]">
+      <aside class="w-60 bg-white border-r border-gray-200 flex-shrink-0">
+        <div class="h-14 flex items-center gap-2.5 px-5 border-b border-gray-200">
+          <div class="h-7 w-7 rounded-md bg-gray-900 flex items-center justify-center text-white text-xs font-bold">O</div>
+          <span class="text-sm font-semibold">Odi MRP</span>
+        </div>
+        <nav class="py-3 px-2 text-sm text-gray-600">
+          <div class="px-3 py-1.5">Dashboard</div>
+          <p class="mt-4 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Planning</p>
+          <div class="px-3 py-1.5 rounded-md bg-gray-900 text-white font-medium">Products / BOMs</div>
+          <div class="px-3 py-1.5">Ingredients</div>
+          <p class="mt-4 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Procurement</p>
+          <div class="px-3 py-1.5">Suppliers</div>
+          <div class="px-3 py-1.5">Purchase Orders</div>
+        </nav>
+      </aside>
+      <main class="flex-1 bg-gray-50">
+        <div class="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-6">
+          <div class="text-sm text-gray-500"><a class="hover:underline">Products / BOMs</a> · <span class="text-gray-900 font-medium">Organic Chia Pouch</span></div>
+        </div>
+        <div class="p-6 space-y-6">
+
+          <!-- Header actions -->
+          <div class="flex items-start justify-between">
+            <div>
+              <a class="text-sm text-gray-500 hover:underline">← Back to products</a>
+              <h1 class="mt-2 text-2xl font-semibold">Organic Chia Pouch</h1>
+              <div class="mt-1 flex items-center gap-2 text-xs">
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700">Pouches</span>
+                <span class="px-2 py-0.5 rounded bg-green-50 text-green-700">Active</span>
+                <span class="text-gray-500">Last edited 2026-04-20 by Lance</span>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1.5 text-sm border border-gray-300 bg-white rounded-md hover:bg-gray-50">Duplicate</button>
+              <a href="#screen-3" class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800">Edit</a>
+            </div>
+          </div>
+
+          <!-- Overview -->
+          <div class="grid grid-cols-3 gap-4">
+            <div class="col-span-2 bg-white rounded-lg border border-gray-200 p-5">
+              <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Overview</h3>
+              <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <dt class="text-xs text-gray-500">Product type</dt>
+                  <dd class="font-medium">Pouches</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-500">Size</dt>
+                  <dd class="font-medium">250 g</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-500">Serving size</dt>
+                  <dd class="font-medium">30 g</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-500">RRP (inc GST)</dt>
+                  <dd class="font-medium">NZ$ 14.99</dd>
+                </div>
+                <div class="col-span-2">
+                  <dt class="text-xs text-gray-500">Hero callout</dt>
+                  <dd class="font-medium italic">"High Omega-3 Superfood"</dd>
+                </div>
+                <div class="col-span-2">
+                  <dt class="text-xs text-gray-500">Back of pack</dt>
+                  <dd class="text-sm leading-relaxed">Organic chia seeds sourced from Paraguay, small-batch milled in Auckland. Ideal for smoothies, porridge, and baking. Certified organic, gluten-free, non-GMO.</dd>
+                </div>
+              </dl>
+            </div>
+            <!-- SKU code tile (separate box per spec) -->
+            <div class="bg-white rounded-lg border-2 border-gray-900 p-5 flex flex-col justify-between">
+              <div>
+                <div class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">SKU code</div>
+                <div class="font-mono text-lg font-bold tracking-tight">ODI-P-CHIA-250</div>
+                <div class="mt-2 inline-block bg-gray-100 px-2 py-0.5 rounded text-[10px] font-mono">EAN 9421909123456</div>
+              </div>
+              <div class="mt-4 text-xs text-gray-500">Ingredients SKU codes auto-link to ingredient master list ↓</div>
+            </div>
+          </div>
+
+          <!-- Cost summary -->
+          <div class="bg-white rounded-lg border border-gray-200 p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Cost summary</h3>
+              <div class="text-xs text-gray-500">FX rate <span class="font-mono font-semibold">1.2000</span> · <span class="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">Applied (AUD→NZD)</span></div>
+            </div>
+            <div class="grid grid-cols-6 gap-3">
+              <div class="p-3 rounded-md bg-gray-50">
+                <div class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Ingredient total</div>
+                <div class="mt-1 text-lg font-semibold">$2.14</div>
+                <div class="text-[11px] text-gray-500">+ 3% wastage applied</div>
+              </div>
+              <div class="p-3 rounded-md bg-gray-50">
+                <div class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Base cost</div>
+                <div class="mt-1 text-lg font-semibold">$4.02</div>
+                <div class="text-[11px] text-gray-500">Ing + pkg + toll + …</div>
+              </div>
+              <div class="p-3 rounded-md bg-gray-900 text-white">
+                <div class="text-[11px] uppercase tracking-wider text-white/70 font-semibold">NZ grand total</div>
+                <div class="mt-1 text-lg font-semibold">$4.82</div>
+                <div class="text-[11px] text-white/70">×1.20 FX</div>
+              </div>
+              <div class="p-3 rounded-md bg-gray-50">
+                <div class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">AU grand total</div>
+                <div class="mt-1 text-lg font-semibold">$4.02</div>
+                <div class="text-[11px] text-gray-500">No FX applied</div>
+              </div>
+              <div class="p-3 rounded-md bg-amber-50">
+                <div class="text-[11px] uppercase tracking-wider text-amber-700 font-semibold">COS NZ</div>
+                <div class="mt-1 text-lg font-semibold text-amber-800">37.0%</div>
+                <div class="text-[11px] text-amber-700">GP 63.0%</div>
+              </div>
+              <div class="p-3 rounded-md bg-amber-50">
+                <div class="text-[11px] uppercase tracking-wider text-amber-700 font-semibold">COS AU</div>
+                <div class="mt-1 text-lg font-semibold text-amber-800">29.5%</div>
+                <div class="text-[11px] text-amber-700">GP 70.5%</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOM table -->
+          <div class="bg-white rounded-lg border border-gray-200">
+            <div class="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Bill of materials</h3>
+              <div class="text-xs text-gray-500">3 ingredients · Version 4 (active)</div>
+            </div>
+            <table class="w-full text-sm">
+              <thead class="text-xs text-gray-500 uppercase tracking-wider bg-gray-50">
+                <tr>
+                  <th class="text-left font-medium px-5 py-2">Ingredient</th>
+                  <th class="text-left font-medium px-5 py-2">Ing. SKU</th>
+                  <th class="text-right font-medium px-5 py-2">g</th>
+                  <th class="text-right font-medium px-5 py-2">kg</th>
+                  <th class="text-right font-medium px-5 py-2">% of wt</th>
+                  <th class="text-right font-medium px-5 py-2">Serve (g)</th>
+                  <th class="text-right font-medium px-5 py-2">$/kg</th>
+                  <th class="text-right font-medium px-5 py-2">$/unit</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr>
+                  <td class="px-5 py-2.5"><a href="#screen-4" class="font-medium text-gray-900 hover:underline">Organic Chia Powder</a> <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-green-700">Organic</span></td>
+                  <td class="px-5 py-2.5 font-mono text-xs text-gray-600">ING-ORG-CHIA-POW</td>
+                  <td class="px-5 py-2.5 text-right">240</td>
+                  <td class="px-5 py-2.5 text-right">0.2400</td>
+                  <td class="px-5 py-2.5 text-right">96.0%</td>
+                  <td class="px-5 py-2.5 text-right">28.80</td>
+                  <td class="px-5 py-2.5 text-right">$8.50</td>
+                  <td class="px-5 py-2.5 text-right font-medium">$2.04</td>
+                </tr>
+                <tr>
+                  <td class="px-5 py-2.5"><span class="font-medium">Sea Salt (fine)</span></td>
+                  <td class="px-5 py-2.5 font-mono text-xs text-gray-600">ING-SEA-SALT-F</td>
+                  <td class="px-5 py-2.5 text-right">7</td>
+                  <td class="px-5 py-2.5 text-right">0.0070</td>
+                  <td class="px-5 py-2.5 text-right">2.8%</td>
+                  <td class="px-5 py-2.5 text-right">0.84</td>
+                  <td class="px-5 py-2.5 text-right">$1.20</td>
+                  <td class="px-5 py-2.5 text-right font-medium">$0.01</td>
+                </tr>
+                <tr>
+                  <td class="px-5 py-2.5"><span class="font-medium">Natural Vanilla</span></td>
+                  <td class="px-5 py-2.5 font-mono text-xs text-gray-600">ING-VAN-NAT</td>
+                  <td class="px-5 py-2.5 text-right">3</td>
+                  <td class="px-5 py-2.5 text-right">0.0030</td>
+                  <td class="px-5 py-2.5 text-right">1.2%</td>
+                  <td class="px-5 py-2.5 text-right">0.36</td>
+                  <td class="px-5 py-2.5 text-right">$24.50</td>
+                  <td class="px-5 py-2.5 text-right font-medium">$0.07</td>
+                </tr>
+              </tbody>
+              <tfoot class="bg-gray-50 text-sm">
+                <tr class="border-t border-gray-200">
+                  <td colspan="2" class="px-5 py-2 font-medium">Ingredients subtotal</td>
+                  <td class="px-5 py-2 text-right">250</td>
+                  <td class="px-5 py-2 text-right">0.2500</td>
+                  <td class="px-5 py-2 text-right">100%</td>
+                  <td class="px-5 py-2 text-right">30.00</td>
+                  <td></td>
+                  <td class="px-5 py-2 text-right font-semibold">$2.12</td>
+                </tr>
+                <tr>
+                  <td colspan="7" class="px-5 py-2 text-xs text-gray-500">+ Wastage (3%)</td>
+                  <td class="px-5 py-2 text-right text-xs">$0.06</td>
+                </tr>
+                <tr>
+                  <td colspan="7" class="px-5 py-2 font-medium">Ingredient total (with wastage)</td>
+                  <td class="px-5 py-2 text-right font-semibold">$2.18</td>
+                </tr>
+              </tfoot>
+            </table>
+
+            <!-- Other costs block -->
+            <div class="grid grid-cols-2 gap-x-10 gap-y-1 px-5 py-4 text-sm border-t border-gray-100 bg-gray-50/50">
+              <div class="flex justify-between"><span class="text-gray-600">Packaging</span><span class="font-medium">$0.50</span></div>
+              <div class="flex justify-between"><span class="text-gray-600">Toll</span><span class="font-medium">$0.40</span></div>
+              <div class="flex justify-between"><span class="text-gray-600">Margin</span><span class="font-medium">$0.80</span></div>
+              <div class="flex justify-between"><span class="text-gray-600">Task / other</span><span class="font-medium">$0.10</span></div>
+              <div class="flex justify-between col-span-2"><span class="text-gray-600">Freight</span><span class="font-medium">$0.04</span></div>
+              <div class="flex justify-between col-span-2 pt-2 mt-1 border-t border-gray-200 text-base">
+                <span class="font-semibold">Base cost (AU total)</span><span class="font-semibold">$4.02</span>
+              </div>
+              <div class="flex justify-between col-span-2 text-base">
+                <span class="font-semibold">+ FX × 1.20 → NZ total</span><span class="font-semibold">$4.82</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+
+<!-- =========================================================================================== -->
+<!-- SCREEN 3 · PRODUCT EDIT                                                                      -->
+<!-- =========================================================================================== -->
+<section id="screen-3" class="max-w-[1260px] mx-auto mb-16 px-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="tag px-2 py-0.5 rounded bg-gray-900 text-white font-semibold uppercase">Screen 3</span>
+    <h2 class="text-base font-semibold">Product edit — all editable inputs + BOM editor</h2>
+    <span class="text-sm text-gray-500">"Apply FX" toggle (not $ amount). "+ Add new ingredient" jumps to ingredient form &amp; returns.</span>
+  </div>
+  <div class="screen-frame rounded-lg overflow-hidden border border-gray-200 bg-white">
+    <div class="flex min-h-[1040px]">
+      <aside class="w-60 bg-white border-r border-gray-200 flex-shrink-0">
+        <div class="h-14 flex items-center gap-2.5 px-5 border-b border-gray-200">
+          <div class="h-7 w-7 rounded-md bg-gray-900 flex items-center justify-center text-white text-xs font-bold">O</div>
+          <span class="text-sm font-semibold">Odi MRP</span>
+        </div>
+        <nav class="py-3 px-2 text-sm text-gray-600">
+          <div class="px-3 py-1.5">Dashboard</div>
+          <p class="mt-4 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Planning</p>
+          <div class="px-3 py-1.5 rounded-md bg-gray-900 text-white font-medium">Products / BOMs</div>
+          <div class="px-3 py-1.5">Ingredients</div>
+        </nav>
+      </aside>
+      <main class="flex-1 bg-gray-50">
+        <div class="h-14 border-b border-gray-200 bg-white flex items-center px-6 text-sm text-gray-500">
+          Products / BOMs · Organic Chia Pouch · <span class="text-gray-900 font-medium">Edit</span>
+        </div>
+        <div class="p-6 space-y-6">
+          <div class="flex items-start justify-between">
+            <h1 class="text-2xl font-semibold">Edit product</h1>
+            <div class="flex gap-2">
+              <button class="px-3 py-1.5 text-sm border border-gray-300 bg-white rounded-md">Cancel</button>
+              <button class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md">Save changes</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-6">
+            <!-- Details column -->
+            <div class="bg-white rounded-lg border border-gray-200 p-5">
+              <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-4">Product details</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Product type</span>
+                  <select class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white">
+                    <option>Pouches</option><option>Snacks (4B's)</option><option>Puffs &amp; Melts</option><option>Tubs</option><option>Sachets</option><option>Noodles</option><option>Vitamin D</option>
+                  </select>
+                </label>
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">SKU code</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm font-mono" value="ODI-P-CHIA-250"/>
+                </label>
+                <label class="col-span-2 block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Product name</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value="Organic Chia Pouch"/>
+                </label>
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Size (g)</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value="250"/>
+                </label>
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Serving size (g)</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value="30"/>
+                </label>
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">RRP (inc GST)</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value="14.99"/>
+                </label>
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Status</span>
+                  <select class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white">
+                    <option>Active</option><option>Inactive</option>
+                  </select>
+                </label>
+                <label class="col-span-2 block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Hero callout</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value='High Omega-3 Superfood'/>
+                </label>
+                <label class="col-span-2 block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Back of pack</span>
+                  <textarea rows="3" class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm">Organic chia seeds sourced from Paraguay, small-batch milled in Auckland. Ideal for smoothies, porridge, and baking. Certified organic, gluten-free, non-GMO.</textarea>
+                </label>
+              </div>
+            </div>
+
+            <!-- Costs column -->
+            <div class="bg-white rounded-lg border border-gray-200 p-5">
+              <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-4">Cost inputs</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Packaging ($)</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value="0.50"/>
+                </label>
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Toll ($)</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value="0.40"/>
+                </label>
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Margin ($)</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value="0.80"/>
+                </label>
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Task / other ($)</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value="0.10"/>
+                </label>
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Freight ($)</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value="0.04"/>
+                </label>
+                <label class="block text-sm">
+                  <span class="text-gray-600 text-xs font-medium">Contingency / wastage (%)</span>
+                  <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" value="3.0"/>
+                </label>
+
+                <div class="col-span-2 mt-2 p-3 rounded-md border border-gray-200 bg-gray-50">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-sm font-medium">Apply currency exchange (AUD → NZD)</div>
+                      <div class="text-xs text-gray-500 mt-0.5">When ON, NZ grand total = base × FX rate. AU grand total is always base.</div>
+                    </div>
+                    <!-- Toggle -->
+                    <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-sm">
+                      <span class="px-3 py-1 bg-gray-900 text-white font-medium">Yes</span>
+                      <span class="px-3 py-1 bg-white text-gray-600">No</span>
+                    </div>
+                  </div>
+                  <div class="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                    <span>Current rate:</span>
+                    <span class="font-mono font-semibold text-gray-900">1.2000</span>
+                    <a href="#screen-5" class="underline">Edit in Settings →</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOM editor -->
+          <div class="bg-white rounded-lg border border-gray-200 p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Ingredients / BOM</h3>
+              <div class="flex gap-2 text-sm">
+                <button class="px-2.5 py-1 border border-gray-300 rounded-md bg-white">+ Add existing ingredient</button>
+                <button class="px-2.5 py-1 border border-gray-900 bg-gray-900 text-white rounded-md">+ Create new ingredient</button>
+              </div>
+            </div>
+
+            <table class="w-full text-sm">
+              <thead class="text-xs text-gray-500 uppercase tracking-wider">
+                <tr class="border-b border-gray-100">
+                  <th class="text-left px-2 py-2 w-10"></th>
+                  <th class="text-left px-2 py-2">Ingredient</th>
+                  <th class="text-left px-2 py-2">SKU (auto)</th>
+                  <th class="text-right px-2 py-2 w-24">g per unit</th>
+                  <th class="text-right px-2 py-2 w-28">$/kg override</th>
+                  <th class="text-right px-2 py-2 w-28">Current $/kg</th>
+                  <th class="text-right px-2 py-2 w-24">$/unit (preview)</th>
+                  <th class="w-8"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr>
+                  <td class="px-2 py-2 text-gray-400 text-center cursor-grab">⋮⋮</td>
+                  <td class="px-2 py-2"><select class="w-full border border-gray-300 rounded-md px-2 py-1 text-sm bg-white"><option>Organic Chia Powder</option></select></td>
+                  <td class="px-2 py-2 font-mono text-xs text-gray-500">ING-ORG-CHIA-POW</td>
+                  <td class="px-2 py-2"><input class="w-full border border-gray-300 rounded-md px-2 py-1 text-sm text-right" value="240"/></td>
+                  <td class="px-2 py-2"><input class="w-full border border-gray-300 rounded-md px-2 py-1 text-sm text-right" placeholder="—"/></td>
+                  <td class="px-2 py-2 text-right text-gray-500">$8.50</td>
+                  <td class="px-2 py-2 text-right font-medium">$2.04</td>
+                  <td class="px-2 py-2 text-right text-gray-400">✕</td>
+                </tr>
+                <tr>
+                  <td class="px-2 py-2 text-gray-400 text-center cursor-grab">⋮⋮</td>
+                  <td class="px-2 py-2"><select class="w-full border border-gray-300 rounded-md px-2 py-1 text-sm bg-white"><option>Sea Salt (fine)</option></select></td>
+                  <td class="px-2 py-2 font-mono text-xs text-gray-500">ING-SEA-SALT-F</td>
+                  <td class="px-2 py-2"><input class="w-full border border-gray-300 rounded-md px-2 py-1 text-sm text-right" value="7"/></td>
+                  <td class="px-2 py-2"><input class="w-full border border-gray-300 rounded-md px-2 py-1 text-sm text-right" placeholder="—"/></td>
+                  <td class="px-2 py-2 text-right text-gray-500">$1.20</td>
+                  <td class="px-2 py-2 text-right font-medium">$0.01</td>
+                  <td class="px-2 py-2 text-right text-gray-400">✕</td>
+                </tr>
+                <tr>
+                  <td class="px-2 py-2 text-gray-400 text-center cursor-grab">⋮⋮</td>
+                  <td class="px-2 py-2"><select class="w-full border border-gray-300 rounded-md px-2 py-1 text-sm bg-white"><option>Natural Vanilla</option></select></td>
+                  <td class="px-2 py-2 font-mono text-xs text-gray-500">ING-VAN-NAT</td>
+                  <td class="px-2 py-2"><input class="w-full border border-gray-300 rounded-md px-2 py-1 text-sm text-right" value="3"/></td>
+                  <td class="px-2 py-2"><input class="w-full border border-gray-300 rounded-md px-2 py-1 text-sm text-right" placeholder="—"/></td>
+                  <td class="px-2 py-2 text-right text-gray-500">$24.50</td>
+                  <td class="px-2 py-2 text-right font-medium">$0.07</td>
+                  <td class="px-2 py-2 text-right text-gray-400">✕</td>
+                </tr>
+              </tbody>
+              <tfoot class="text-sm">
+                <tr class="border-t-2 border-gray-900">
+                  <td colspan="3" class="px-2 py-2 text-right text-gray-600">Totals</td>
+                  <td class="px-2 py-2 text-right font-semibold">250 g</td>
+                  <td></td>
+                  <td></td>
+                  <td class="px-2 py-2 text-right font-semibold">$2.12</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td colspan="6" class="px-2 py-1 text-right text-xs text-gray-500">+ 3.0% wastage</td>
+                  <td class="px-2 py-1 text-right text-xs">$0.06</td>
+                  <td></td>
+                </tr>
+                <tr class="bg-gray-50">
+                  <td colspan="6" class="px-2 py-2 text-right font-medium">Ingredient total (with wastage)</td>
+                  <td class="px-2 py-2 text-right font-bold">$2.18</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Live preview -->
+          <div class="bg-white rounded-lg border border-dashed border-gray-300 p-5">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Live cost preview</h3>
+              <span class="text-[11px] text-gray-500">Recalculates as you type</span>
+            </div>
+            <div class="grid grid-cols-6 gap-3 text-sm">
+              <div><div class="text-xs text-gray-500">Ing total</div><div class="font-semibold">$2.18</div></div>
+              <div><div class="text-xs text-gray-500">Base</div><div class="font-semibold">$4.02</div></div>
+              <div><div class="text-xs text-gray-500">NZ total</div><div class="font-semibold">$4.82</div></div>
+              <div><div class="text-xs text-gray-500">AU total</div><div class="font-semibold">$4.02</div></div>
+              <div><div class="text-xs text-gray-500">COS NZ</div><div class="font-semibold">37.0%</div></div>
+              <div><div class="text-xs text-gray-500">COS AU</div><div class="font-semibold">29.5%</div></div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+
+<!-- =========================================================================================== -->
+<!-- SCREEN 4 · INGREDIENT DETAIL                                                                 -->
+<!-- =========================================================================================== -->
+<section id="screen-4" class="max-w-[1260px] mx-auto mb-16 px-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="tag px-2 py-0.5 rounded bg-gray-900 text-white font-semibold uppercase">Screen 4</span>
+    <h2 class="text-base font-semibold">Ingredient detail — supplier + price history</h2>
+    <span class="text-sm text-gray-500">Supplier block auto-populates when a supplier is picked (no duplication).</span>
+  </div>
+  <div class="screen-frame rounded-lg overflow-hidden border border-gray-200 bg-white">
+    <div class="flex min-h-[920px]">
+      <aside class="w-60 bg-white border-r border-gray-200 flex-shrink-0">
+        <div class="h-14 flex items-center gap-2.5 px-5 border-b border-gray-200">
+          <div class="h-7 w-7 rounded-md bg-gray-900 flex items-center justify-center text-white text-xs font-bold">O</div>
+          <span class="text-sm font-semibold">Odi MRP</span>
+        </div>
+        <nav class="py-3 px-2 text-sm text-gray-600">
+          <div class="px-3 py-1.5">Dashboard</div>
+          <p class="mt-4 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Planning</p>
+          <div class="px-3 py-1.5">Products / BOMs</div>
+          <div class="px-3 py-1.5 rounded-md bg-gray-900 text-white font-medium">Ingredients</div>
+        </nav>
+      </aside>
+      <main class="flex-1 bg-gray-50">
+        <div class="h-14 border-b border-gray-200 bg-white flex items-center px-6 text-sm text-gray-500">
+          Ingredients · <span class="text-gray-900 font-medium">Organic Chia Powder</span>
+        </div>
+        <div class="p-6 space-y-6">
+
+          <div class="flex items-start justify-between">
+            <div>
+              <a class="text-sm text-gray-500 hover:underline">← Back to ingredients</a>
+              <div class="mt-2 flex items-center gap-3">
+                <h1 class="text-2xl font-semibold">Organic Chia Powder</h1>
+                <span class="px-2 py-0.5 text-xs rounded bg-green-50 text-green-700">Confirmed</span>
+                <span class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-700">Organic</span>
+              </div>
+              <div class="mt-1 text-xs font-mono text-gray-600">ING-ORG-CHIA-POW</div>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1.5 text-sm border border-gray-300 bg-white rounded-md">Edit</button>
+              <button class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md">Update price</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4">
+            <div class="bg-white rounded-lg border border-gray-200 p-5">
+              <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Basics</h3>
+              <dl class="space-y-2 text-sm">
+                <div class="flex justify-between"><dt class="text-gray-500">Unit of measure</dt><dd class="font-medium">kg</dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Lead time</dt><dd class="font-medium">2 weeks</dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Used in</dt><dd class="font-medium">4 products</dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Reorder point</dt><dd class="font-medium">25 kg</dd></div>
+              </dl>
+            </div>
+
+            <div class="bg-white rounded-lg border border-gray-200 p-5 col-span-2">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Supplier</h3>
+                <a class="text-xs text-gray-500 hover:underline">Change supplier</a>
+              </div>
+              <div class="grid grid-cols-3 gap-x-6 gap-y-2 text-sm">
+                <div>
+                  <div class="text-xs text-gray-500">Supplier</div>
+                  <div class="font-medium">Paraguayan Organics Ltd</div>
+                </div>
+                <div>
+                  <div class="text-xs text-gray-500">Country of origin</div>
+                  <div class="font-medium">🇵🇾 Paraguay</div>
+                </div>
+                <div>
+                  <div class="text-xs text-gray-500">Country of purchase</div>
+                  <div class="font-medium">🇦🇺 Australia <span class="text-xs text-gray-500">(AUD)</span></div>
+                </div>
+                <div>
+                  <div class="text-xs text-gray-500">Contact name</div>
+                  <div class="font-medium">Maria Torres</div>
+                </div>
+                <div>
+                  <div class="text-xs text-gray-500">Phone</div>
+                  <div class="font-medium">+61 2 9122 8844</div>
+                </div>
+                <div>
+                  <div class="text-xs text-gray-500">Email</div>
+                  <div class="font-medium">maria@paraorganics.com.au</div>
+                </div>
+              </div>
+              <div class="mt-3 text-[11px] text-gray-500 bg-gray-50 rounded p-2">
+                This supplier is shared with <span class="font-medium">3 other ingredients</span>. Editing their contact details updates all linked ingredients.
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4">
+            <div class="bg-white rounded-lg border border-gray-200 p-5">
+              <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Current pricing</h3>
+              <div class="space-y-2">
+                <div class="flex justify-between items-baseline"><span class="text-sm text-gray-500">Price</span><span class="font-semibold">$8.10 /kg</span></div>
+                <div class="flex justify-between items-baseline"><span class="text-sm text-gray-500">Freight</span><span class="font-semibold">$0.40 /kg</span></div>
+                <div class="flex justify-between items-baseline pt-2 mt-2 border-t border-gray-100"><span class="font-medium">Total loaded cost</span><span class="text-xl font-bold">$8.50 /kg</span></div>
+                <div class="text-[11px] text-gray-500">As of 2026-04-20. Latest price always flows into active BOMs.</div>
+              </div>
+            </div>
+            <div class="bg-white rounded-lg border border-gray-200 p-5 col-span-2">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Price trend (24 mo)</h3>
+                <div class="text-xs"><span class="px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium">+6.9% YoY</span></div>
+              </div>
+              <!-- Sparkline / area chart placeholder -->
+              <svg viewBox="0 0 400 90" class="spark w-full h-[90px]" preserveAspectRatio="none">
+                <path class="area" d="M0,60 L20,62 L40,58 L60,60 L80,55 L100,50 L120,52 L140,48 L160,46 L180,42 L200,45 L220,40 L240,38 L260,35 L280,30 L300,32 L320,28 L340,24 L360,20 L380,16 L400,12 L400,90 L0,90 Z"/>
+                <path d="M0,60 L20,62 L40,58 L60,60 L80,55 L100,50 L120,52 L140,48 L160,46 L180,42 L200,45 L220,40 L240,38 L260,35 L280,30 L300,32 L320,28 L340,24 L360,20 L380,16 L400,12"/>
+              </svg>
+              <div class="grid grid-cols-6 text-[11px] text-gray-500 mt-1">
+                <span>Apr '24</span><span>Aug '24</span><span>Dec '24</span><span>Apr '25</span><span>Aug '25</span><span class="text-right">Apr '26</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Price history ledger -->
+          <div class="bg-white rounded-lg border border-gray-200">
+            <div class="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 class="text-xs uppercase tracking-wider text-gray-500 font-semibold">Price history (append-only)</h3>
+              <button class="text-xs text-gray-600 hover:underline">Export CSV</button>
+            </div>
+            <table class="w-full text-sm">
+              <thead class="text-xs text-gray-500 uppercase tracking-wider bg-gray-50">
+                <tr>
+                  <th class="text-left px-5 py-2 font-medium">Date</th>
+                  <th class="text-right px-5 py-2 font-medium">Price</th>
+                  <th class="text-right px-5 py-2 font-medium">Freight</th>
+                  <th class="text-right px-5 py-2 font-medium">Total loaded</th>
+                  <th class="text-right px-5 py-2 font-medium">Δ vs prev</th>
+                  <th class="text-left px-5 py-2 font-medium">Reason</th>
+                  <th class="text-left px-5 py-2 font-medium">Changed by</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr class="bg-amber-50/30">
+                  <td class="px-5 py-2.5">2026-04-20</td>
+                  <td class="px-5 py-2.5 text-right font-semibold">$8.10</td>
+                  <td class="px-5 py-2.5 text-right">$0.40</td>
+                  <td class="px-5 py-2.5 text-right font-semibold">$8.50</td>
+                  <td class="px-5 py-2.5 text-right text-red-700 font-medium">+$0.30 (+3.7%)</td>
+                  <td class="px-5 py-2.5">Manual update</td>
+                  <td class="px-5 py-2.5 text-gray-500">Lance Giles</td>
+                </tr>
+                <tr>
+                  <td class="px-5 py-2.5">2026-02-14</td>
+                  <td class="px-5 py-2.5 text-right">$7.80</td>
+                  <td class="px-5 py-2.5 text-right">$0.40</td>
+                  <td class="px-5 py-2.5 text-right">$8.20</td>
+                  <td class="px-5 py-2.5 text-right text-red-700">+$0.25 (+3.1%)</td>
+                  <td class="px-5 py-2.5">PO receipt (PO-2026-018)</td>
+                  <td class="px-5 py-2.5 text-gray-500">System</td>
+                </tr>
+                <tr>
+                  <td class="px-5 py-2.5">2025-11-03</td>
+                  <td class="px-5 py-2.5 text-right">$7.60</td>
+                  <td class="px-5 py-2.5 text-right">$0.35</td>
+                  <td class="px-5 py-2.5 text-right">$7.95</td>
+                  <td class="px-5 py-2.5 text-right text-green-700">−$0.15 (−1.9%)</td>
+                  <td class="px-5 py-2.5">Freight renegotiated</td>
+                  <td class="px-5 py-2.5 text-gray-500">Lance Giles</td>
+                </tr>
+                <tr>
+                  <td class="px-5 py-2.5">2025-06-12</td>
+                  <td class="px-5 py-2.5 text-right">$7.70</td>
+                  <td class="px-5 py-2.5 text-right">$0.40</td>
+                  <td class="px-5 py-2.5 text-right">$8.10</td>
+                  <td class="px-5 py-2.5 text-right text-red-700">+$0.20 (+2.5%)</td>
+                  <td class="px-5 py-2.5">Manual update</td>
+                  <td class="px-5 py-2.5 text-gray-500">Lance Giles</td>
+                </tr>
+                <tr>
+                  <td class="px-5 py-2.5">2025-01-07</td>
+                  <td class="px-5 py-2.5 text-right">$7.50</td>
+                  <td class="px-5 py-2.5 text-right">$0.40</td>
+                  <td class="px-5 py-2.5 text-right">$7.90</td>
+                  <td class="px-5 py-2.5 text-right text-gray-400">Initial</td>
+                  <td class="px-5 py-2.5">Import from spreadsheet</td>
+                  <td class="px-5 py-2.5 text-gray-500">System</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+
+<!-- =========================================================================================== -->
+<!-- SCREEN 5 · SETTINGS                                                                          -->
+<!-- =========================================================================================== -->
+<section id="screen-5" class="max-w-[1260px] mx-auto mb-16 px-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="tag px-2 py-0.5 rounded bg-gray-900 text-white font-semibold uppercase">Screen 5</span>
+    <h2 class="text-base font-semibold">Settings — global FX + GST (admin only)</h2>
+    <span class="text-sm text-gray-500">Changing FX updates every product's NZ total live. Warning shown before save.</span>
+  </div>
+  <div class="screen-frame rounded-lg overflow-hidden border border-gray-200 bg-white">
+    <div class="flex min-h-[680px]">
+      <aside class="w-60 bg-white border-r border-gray-200 flex-shrink-0">
+        <div class="h-14 flex items-center gap-2.5 px-5 border-b border-gray-200">
+          <div class="h-7 w-7 rounded-md bg-gray-900 flex items-center justify-center text-white text-xs font-bold">O</div>
+          <span class="text-sm font-semibold">Odi MRP</span>
+        </div>
+        <nav class="py-3 px-2 text-sm text-gray-600">
+          <div class="px-3 py-1.5">Dashboard</div>
+          <p class="mt-4 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Planning</p>
+          <div class="px-3 py-1.5">Products / BOMs</div>
+          <div class="px-3 py-1.5">Ingredients</div>
+          <p class="mt-4 px-3 mb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-widest">Admin</p>
+          <div class="px-3 py-1.5 rounded-md bg-gray-900 text-white font-medium">Settings</div>
+          <div class="px-3 py-1.5">Users</div>
+        </nav>
+      </aside>
+      <main class="flex-1 bg-gray-50">
+        <div class="h-14 border-b border-gray-200 bg-white flex items-center px-6 text-sm text-gray-500">
+          Admin · <span class="text-gray-900 font-medium">Settings</span>
+        </div>
+        <div class="p-6 space-y-6 max-w-3xl">
+          <div>
+            <h1 class="text-2xl font-semibold">Global settings</h1>
+            <p class="text-sm text-gray-500 mt-1">These values affect every product and BOM calculation. Admin-only.</p>
+          </div>
+
+          <div class="bg-white rounded-lg border border-gray-200">
+            <div class="p-5 border-b border-gray-100">
+              <h3 class="text-sm font-semibold">Currency exchange</h3>
+              <p class="text-xs text-gray-500 mt-1">Applied when a product has "Apply FX" set to Yes.</p>
+            </div>
+            <div class="p-5 grid grid-cols-2 gap-4">
+              <label class="block text-sm">
+                <span class="text-gray-600 text-xs font-medium">FX rate (AUD → NZD)</span>
+                <input class="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm font-mono" value="1.2000"/>
+              </label>
+              <div class="text-xs text-gray-500 self-end pb-2">
+                Last updated 2026-04-20 by Lance Giles.<br/>
+                <a class="underline">View change history (12 entries)</a>
+              </div>
+            </div>
+            <div class="px-5 pb-4 -mt-2 text-xs text-amber-700 bg-amber-50 rounded mx-5 mb-5 p-3">
+              <span class="font-semibold">Heads up:</span> 12 products currently have "Apply FX" enabled. Saving will recalculate their NZ grand total and COS NZ.
+            </div>
+          </div>
+
+          <div class="bg-white rounded-lg border border-gray-200">
+            <div class="p-5 border-b border-gray-100">
+              <h3 class="text-sm font-semibold">Tax / GST</h3>
+              <p class="text-xs text-gray-500 mt-1">Used to strip GST from RRP when calculating COS %.</p>
+            </div>
+            <div class="p-5 grid grid-cols-2 gap-4">
+              <label class="block text-sm">
+                <span class="text-gray-600 text-xs font-medium">NZ GST rate</span>
+                <div class="mt-1 flex">
+                  <input class="w-full border border-gray-300 rounded-l-md px-3 py-1.5 text-sm" value="15.00"/>
+                  <span class="px-3 py-1.5 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-sm text-gray-500">%</span>
+                </div>
+              </label>
+              <label class="block text-sm">
+                <span class="text-gray-600 text-xs font-medium">AU GST rate</span>
+                <div class="mt-1 flex">
+                  <input class="w-full border border-gray-300 rounded-l-md px-3 py-1.5 text-sm" value="10.00"/>
+                  <span class="px-3 py-1.5 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-sm text-gray-500">%</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <button class="px-3 py-1.5 text-sm border border-gray-300 bg-white rounded-md">Cancel</button>
+            <button class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md">Save changes</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</section>
+
+
+<!-- Footer -->
+<div class="max-w-[1260px] mx-auto px-6 text-xs text-gray-500 text-center pb-8">
+  Static mockup · no data is real · open a conversation to request layout tweaks before implementation.
+</div>
+
+</body>
+</html>
