@@ -42,8 +42,16 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // Routes that don't require an existing session — login, the email-link
+  // callback (which establishes the session), and the post-callback
+  // password setup page (which uses the just-established session).
+  const isPublicAuthRoute =
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/auth/callback') ||
+    pathname.startsWith('/reset-password')
+
   // Redirect unauthenticated users to login
-  if (!user && !pathname.startsWith('/login')) {
+  if (!user && !isPublicAuthRoute) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/login'
     return NextResponse.redirect(loginUrl)
