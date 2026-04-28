@@ -5,6 +5,7 @@ import {
   rollingMonths, indexDemand, indexProduction,
   getGrandTotal, getProductionCell, monthLabel,
 } from '@/lib/demand'
+import { getPlanningAnchor } from '@/lib/settings'
 import {
   aggregateIngredientDemand, hasAnyShortfall, demandUnitLabel,
 } from '@/lib/ingredient-demand'
@@ -18,7 +19,8 @@ interface PageProps {
 
 export default async function IngredientDemandPage({ searchParams }: PageProps) {
   const supabase = createClient()
-  const months = rollingMonths()
+  const anchor = await getPlanningAnchor()
+  const months = rollingMonths(undefined, anchor)
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 

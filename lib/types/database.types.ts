@@ -370,6 +370,7 @@ export type Database = {
           fx_rate: number
           gst_nz_pct: number
           gst_au_pct: number
+          planning_start_month: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -378,6 +379,7 @@ export type Database = {
           fx_rate?: number
           gst_nz_pct?: number
           gst_au_pct?: number
+          planning_start_month?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -386,6 +388,7 @@ export type Database = {
           fx_rate?: number
           gst_nz_pct?: number
           gst_au_pct?: number
+          planning_start_month?: string | null
           updated_at?: string
           updated_by?: string | null
         }

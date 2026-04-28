@@ -61,3 +61,92 @@ export async function updateSettings(formData: FormData) {
   revalidatePath('/products', 'layout')
   redirect('/settings?saved=1')
 }
+
+/**
+ * Advance the planning window by one month. If no anchor is set yet,
+ * we anchor on today's month first (so completing it advances to next).
+ */
+export async function completeCurrentPlanningMonth(): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not_authenticated' }
+
+  const { data: current } = await supabase
+    .from('app_settings')
+    .select('planning_start_month')
+    .eq('id', 1)
+    .maybeSingle() as { data: { planning_start_month: string | null } | null }
+
+  // Resolve the current anchor (UTC date)
+  const anchor: Date = current?.planning_start_month
+    ? (() => {
+        const [y, m] = current.planning_start_month.slice(0, 10).split('-').map(Number)
+        return new Date(Date.UTC(y, m - 1, 1))
+      })()
+    : (() => {
+        const now = new Date()
+        return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+      })()
+
+  // Advance by one month
+  const next = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() + 1, 1))
+  const nextKey = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-01`
+
+  const { error } = await supabase
+    .from('app_settings')
+    .update({ planning_start_month: nextKey })
+    .eq('id', 1)
+
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/demand')
+  revalidatePath('/production')
+  revalidatePath('/ingredients/demand')
+  revalidatePath('/settings')
+  return { ok: true }
+}
+
+/**
+ * Move the planning window back by one month (undo a "complete").
+ * Refuses to roll the anchor before today's calendar month so we can't
+ * surface months that are already in the past from the system clock's view.
+ */
+export async function reopenPreviousPlanningMonth(): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not_authenticated' }
+
+  const { data: current } = await supabase
+    .from('app_settings')
+    .select('planning_start_month')
+    .eq('id', 1)
+    .maybeSingle() as { data: { planning_start_month: string | null } | null }
+
+  if (!current?.planning_start_month) {
+    return { ok: false, error: 'No completed months to reopen.' }
+  }
+
+  const [y, m] = current.planning_start_month.slice(0, 10).split('-').map(Number)
+  const prev = new Date(Date.UTC(y, m - 2, 1))
+
+  const now = new Date()
+  const todayMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+
+  // If reopening would take us at or below today's month, just clear the override.
+  const newValue = prev.getTime() <= todayMonth.getTime()
+    ? null
+    : `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}-01`
+
+  const { error } = await supabase
+    .from('app_settings')
+    .update({ planning_start_month: newValue })
+    .eq('id', 1)
+
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/demand')
+  revalidatePath('/production')
+  revalidatePath('/ingredients/demand')
+  revalidatePath('/settings')
+  return { ok: true }
+}

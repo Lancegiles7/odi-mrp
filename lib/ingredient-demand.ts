@@ -211,8 +211,13 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
 // ============================================================
 
 /**
- * Per-month shortfall flags against opening stock. A month is a shortfall
- * when cumulative demand from month 0..m exceeds opening stock.
+ * Per-month shortfall flags against opening stock.
+ *
+ * A month is flagged only when THAT month has demand AND that demand
+ * exceeds the running stock balance going into the month. Months with
+ * zero demand are never flagged — even if opening stock has already
+ * been consumed by earlier months. (The previous cumulative-comparison
+ * logic was bleeding red into idle months.)
  */
 export function monthShortfalls(
   row: IngredientRow,
@@ -220,10 +225,12 @@ export function monthShortfalls(
   months: string[],
 ): Map<string, boolean> {
   const out = new Map<string, boolean>()
-  let cumulative = 0
+  let consumed = 0
   for (const m of months) {
-    cumulative += row.demandByMonth.get(m) ?? 0
-    out.set(m, cumulative > opening)
+    const demand = row.demandByMonth.get(m) ?? 0
+    const availableBefore = Math.max(0, opening - consumed)
+    out.set(m, demand > 0 && demand > availableBefore)
+    consumed += demand
   }
   return out
 }
@@ -233,10 +240,12 @@ export function hasAnyShortfall(
   opening: number,
   months: string[],
 ): boolean {
-  let cumulative = 0
+  let consumed = 0
   for (const m of months) {
-    cumulative += row.demandByMonth.get(m) ?? 0
-    if (cumulative > opening) return true
+    const demand = row.demandByMonth.get(m) ?? 0
+    const availableBefore = Math.max(0, opening - consumed)
+    if (demand > 0 && demand > availableBefore) return true
+    consumed += demand
   }
   return false
 }

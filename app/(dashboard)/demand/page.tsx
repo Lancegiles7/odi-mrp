@@ -3,7 +3,9 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
 import { rollingMonths, indexDemand, monthLabel } from '@/lib/demand'
+import { getPlanningAnchor } from '@/lib/settings'
 import { DemandProductTable, type DemandProductData } from '@/components/demand/demand-product-table'
+import { CompleteMonthButton } from '@/components/demand/complete-month-button'
 import type { DemandChannel, DemandForecast, ProductGroup } from '@/lib/types/database.types'
 
 export const metadata: Metadata = { title: 'Demand' }
@@ -19,7 +21,8 @@ interface ProductRow {
 export default async function DemandPage() {
   const supabase = createClient()
 
-  const months = rollingMonths()
+  const anchor = await getPlanningAnchor()
+  const months = rollingMonths(undefined, anchor)
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
@@ -98,7 +101,8 @@ export default async function DemandPage() {
             Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)})
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <CompleteMonthButton firstMonth={firstMonth} hasAnchorOverride={anchor.getTime() !== Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)} />
           <Link
             href="/demand/import"
             className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800"

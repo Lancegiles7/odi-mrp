@@ -103,17 +103,23 @@ export default function DemandImportPage() {
       }
       const ws = wb.Sheets[sheetName]
 
-      // Extract the 12 month keys from row 3, cols E..P
+      // The Units tab uses end-of-month dates as column markers, but the
+      // headers are read by COLUMN POSITION (E=month 0, F=month 1, …).
+      // Some cells (e.g. "30 Apr" for May) are off by a day, so we trust
+      // only E3's date as the anchor and derive the rest by incrementing.
+      const anchorRef = colIndexToKey(MONTH_COL_START) + MONTH_ROW
+      const anchorKey = yearMonthFromDate(ws[anchorRef]?.v)
+      if (!anchorKey) {
+        setParseError(`Could not read first month at ${anchorRef}. Expected a date on row 3.`)
+        return
+      }
+      const [anchorY, anchorM] = anchorKey.split('-').map(Number)
       const months: string[] = []
       for (let c = 0; c < 12; c++) {
-        const ref = colIndexToKey(MONTH_COL_START + c) + MONTH_ROW
-        const cell = ws[ref]
-        const mk = yearMonthFromDate(cell?.v)
-        if (!mk) {
-          setParseError(`Could not read month at ${ref}. Expected a date on row 3.`)
-          return
-        }
-        months.push(mk)
+        const d = new Date(anchorY, anchorM - 1 + c, 1)
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        months.push(`${y}-${m}-01`)
       }
 
       const parsed: ParsedRow[] = []

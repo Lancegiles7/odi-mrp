@@ -5,6 +5,7 @@ import {
   rollingMonths, indexDemand, indexProduction,
   getGrandTotal, getProductionCell, resolveOpeningStock, monthLabel,
 } from '@/lib/demand'
+import { getPlanningAnchor } from '@/lib/settings'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
@@ -27,7 +28,8 @@ interface PageProps {
 
 export default async function ProductionPage({ searchParams }: PageProps) {
   const supabase = createClient()
-  const months = rollingMonths()
+  const anchor = await getPlanningAnchor()
+  const months = rollingMonths(undefined, anchor)
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
