@@ -8,6 +8,7 @@ import {
 import { getPlanningAnchor } from '@/lib/settings'
 import {
   aggregateIngredientDemand, hasAnyShortfall, demandUnitLabel,
+  convertGramsToIngredientUom,
 } from '@/lib/ingredient-demand'
 import { IngredientDemandRow } from '@/components/ingredients/ingredient-demand-row'
 
@@ -32,6 +33,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     { data: products }, { data: ingredients }, { data: suppliers },
     { data: boms }, { data: bomItems },
     { data: demand }, { data: production },
+    { data: openPos }, { data: openPoLines },
   ] = await Promise.all([
     supabase.from('products')
       .select('id, sku_code, name')
@@ -55,6 +57,13 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     supabase.from('production_plans')
       .select('product_id, year_month, units_planned')
       .gte('year_month', firstMonth).lte('year_month', lastMonth) as unknown as Promise<{ data: Array<{ product_id: string; year_month: string; units_planned: number }> | null }>,
+    supabase.from('purchase_orders')
+      .select('id, po_number, status, expected_delivery_date')
+      .in('status', ['submitted', 'partially_received'])
+      .not('expected_delivery_date', 'is', null) as unknown as Promise<{ data: Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null }> | null }>,
+    supabase.from('purchase_order_lines')
+      .select('purchase_order_id, ingredient_id, quantity_ordered, quantity_received, unit_of_measure')
+      .not('ingredient_id', 'is', null) as unknown as Promise<{ data: Array<{ purchase_order_id: string; ingredient_id: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string }> | null }>,
   ])
 
   // ── Build source data: month → product → units ─────────────
@@ -89,6 +98,47 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     bomItemsByBom.get(it.bom_id)!.push({ ingredient_id: it.ingredient_id, quantity_g: it.quantity_g })
   }
 
+  // ── Build arrivals map: ingredient_id → [{ po, month, qty }] ──
+  // Only include lines from open POs with a delivery date inside the window.
+  const poById = new Map<string, { po_number: string; expected_delivery_date: string | null }>()
+  for (const p of openPos ?? []) poById.set(p.id, { po_number: p.po_number, expected_delivery_date: p.expected_delivery_date })
+
+  const arrivalsByIngredient = new Map<string, Array<{ po_id: string; po_number: string; month: string; qty: number }>>()
+  const ingredientById = new Map((ingredients ?? []).map((i) => [i.id, i]))
+
+  for (const ln of openPoLines ?? []) {
+    if (!ln.ingredient_id) continue
+    const po = poById.get(ln.purchase_order_id)
+    if (!po?.expected_delivery_date) continue
+    const monthKey = po.expected_delivery_date.slice(0, 7) + '-01'  // 'YYYY-MM-01'
+    if (!months.includes(monthKey)) continue
+
+    const remaining = Math.max(0, Number(ln.quantity_ordered) - Number(ln.quantity_received))
+    if (remaining <= 0) continue
+
+    // Convert PO line UoM into the ingredient's display UoM.
+    // PO lines store UoM as text; if it's 'g' treat as grams (convert to kg
+    // when ingredient is kg). If 'kg' and ingredient is kg, pass through.
+    // Otherwise fall through (best-effort).
+    const ing = ingredientById.get(ln.ingredient_id)
+    const ingUom = (ing?.unit_of_measure ?? '').trim().toLowerCase()
+    const lineUom = (ln.unit_of_measure ?? '').trim().toLowerCase()
+
+    let qty = remaining
+    if ((ingUom === 'kg' || ingUom === 'g' || ingUom === '') && lineUom === 'g') {
+      // Convert PO grams into the ingredient's display unit (kg for weight)
+      qty = convertGramsToIngredientUom(remaining, ing?.unit_of_measure ?? null)
+    }
+    // If line is in 'kg' and ingredient is also kg → no conversion. If
+    // line is in kg but ingredient stored as 'g' (rare), assume the user
+    // means the same unit and pass through.
+
+    if (!arrivalsByIngredient.has(ln.ingredient_id)) arrivalsByIngredient.set(ln.ingredient_id, [])
+    arrivalsByIngredient.get(ln.ingredient_id)!.push({
+      po_id: ln.purchase_order_id, po_number: po.po_number, month: monthKey, qty,
+    })
+  }
+
   // ── Aggregate ──────────────────────────────────────────────
   const groups = aggregateIngredientDemand({
     ingredients: ingredients ?? [],
@@ -98,6 +148,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     products: products ?? [],
     unitsByMonthByProduct,
     months,
+    arrivalsByIngredient,
   })
 
   // ── Derived totals for tiles ───────────────────────────────

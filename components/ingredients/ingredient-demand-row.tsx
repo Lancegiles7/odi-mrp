@@ -45,7 +45,7 @@ export function IngredientDemandRow({ row, months }: Props) {
   }
 
   const unit = demandUnitLabel(row.ingredient.unit_of_measure)
-  const colCount = 3 + months.length + 1  // chevron/name + opening + months + total — rough
+  const hasArrivals = Array.from(row.arrivingByMonth.values()).some((v) => v > 0)
 
   return (
     <>
@@ -114,6 +114,37 @@ export function IngredientDemandRow({ row, months }: Props) {
           {fmt(row.totalDemand)}
         </td>
       </tr>
+
+      {/* Arrivals lane: always shown when there's at least one open PO arriving */}
+      {hasArrivals && (
+        <tr className="border-t border-blue-100 bg-blue-50/30 text-[11px]">
+          <td className="px-4 py-1.5 pl-12 text-blue-700 font-medium">Arriving (POs)</td>
+          <td className="px-3 py-1.5 text-right text-gray-400 tabular-nums">—</td>
+          {months.map((m) => {
+            const v = row.arrivingByMonth.get(m) ?? 0
+            const pos = row.arrivingPosByMonth.get(m) ?? []
+            const title = pos.length ? pos.map((p) => `${p.po_number}: +${fmt(p.qty)}`).join('\n') : ''
+            return (
+              <td
+                key={m}
+                title={title}
+                className={`px-2 py-1.5 text-right tabular-nums border-l border-blue-100/60 ${
+                  v > 0 ? 'text-blue-700 font-semibold' : 'text-gray-300'
+                }`}
+              >
+                {v > 0 ? `+${fmt(v)}` : '—'}
+              </td>
+            )
+          })}
+          <td className="px-3 py-1.5 text-right tabular-nums text-blue-700 border-l border-blue-100/60">
+            {(() => {
+              let s = 0
+              for (const v of row.arrivingByMonth.values()) s += v
+              return s > 0 ? `+${fmt(s)}` : '—'
+            })()}
+          </td>
+        </tr>
+      )}
 
       {open && row.products.length > 0 && (
         <>

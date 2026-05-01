@@ -46,6 +46,19 @@ export interface IngredientDemandInput {
 
   /** rolling month keys in display order (e.g. '2026-04-01') */
   months: string[]
+
+  /**
+   * Open PO arrivals: ingredient_id → array of incoming line items.
+   * Each entry is one PO line still expected to arrive (qty_ordered − qty_received,
+   * in the ingredient's stock UOM), tagged with the PO number and the month
+   * its expected_delivery_date falls in.
+   */
+  arrivalsByIngredient?: Map<string, Array<{
+    po_id: string
+    po_number: string
+    month: string         // first-of-month key
+    qty: number           // remaining-to-arrive in the ingredient's UOM
+  }>>
 }
 
 // ============================================================
@@ -64,6 +77,10 @@ export interface IngredientRow {
   demandByMonth: Map<string, number>
   /** total across the window */
   totalDemand: number
+  /** month → quantity arriving from open POs (in the ingredient's UOM). */
+  arrivingByMonth: Map<string, number>
+  /** PO breakdown per month — for hover/tooltip. */
+  arrivingPosByMonth: Map<string, Array<{ po_number: string; po_id: string; qty: number }>>
   /** product contributions: productId → per-month + total */
   products: Array<{
     id: string
@@ -132,8 +149,23 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
       },
       demandByMonth: new Map(months.map((m) => [m, 0])),
       totalDemand: 0,
+      arrivingByMonth: new Map(months.map((m) => [m, 0])),
+      arrivingPosByMonth: new Map(months.map((m) => [m, []])),
       products: [],
     })
+  }
+
+  // Fold in arrivals (open PO line items) per ingredient
+  if (input.arrivalsByIngredient) {
+    for (const [ingId, entries] of input.arrivalsByIngredient.entries()) {
+      const row = rowsByIngredient.get(ingId)
+      if (!row) continue
+      for (const e of entries) {
+        if (!row.arrivingByMonth.has(e.month)) continue   // outside the window
+        row.arrivingByMonth.set(e.month, (row.arrivingByMonth.get(e.month) ?? 0) + e.qty)
+        row.arrivingPosByMonth.get(e.month)!.push({ po_id: e.po_id, po_number: e.po_number, qty: e.qty })
+      }
+    }
   }
 
   // Walk: for each product with an active BOM, multiply each bom line's
@@ -180,8 +212,9 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
   const groupsBySupplier = new Map<string | null, SupplierGroup>()
   for (const ing of ingredients) {
     const row = rowsByIngredient.get(ing.id)!
-    // Drop ingredients with zero demand and no opening stock — they'd clutter
-    if (row.totalDemand === 0 && row.ingredient.opening_stock_override == null) continue
+    // Drop ingredients with zero demand AND no opening stock AND no arrivals
+    const anyArriving = Array.from(row.arrivingByMonth.values()).some((v) => v > 0)
+    if (row.totalDemand === 0 && row.ingredient.opening_stock_override == null && !anyArriving) continue
 
     const sKey = ing.supplier_id
     if (!groupsBySupplier.has(sKey)) {
@@ -211,13 +244,12 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
 // ============================================================
 
 /**
- * Per-month shortfall flags against opening stock.
+ * Per-month shortfall flags against opening stock + arrivals.
  *
  * A month is flagged only when THAT month has demand AND that demand
- * exceeds the running stock balance going into the month. Months with
- * zero demand are never flagged — even if opening stock has already
- * been consumed by earlier months. (The previous cumulative-comparison
- * logic was bleeding red into idle months.)
+ * exceeds the running stock balance going into the month. The running
+ * balance carries forward each month's net change: previous + arrivals − demand.
+ * Months with zero demand are never flagged.
  */
 export function monthShortfalls(
   row: IngredientRow,
@@ -225,12 +257,13 @@ export function monthShortfalls(
   months: string[],
 ): Map<string, boolean> {
   const out = new Map<string, boolean>()
-  let consumed = 0
+  let balance = opening
   for (const m of months) {
-    const demand = row.demandByMonth.get(m) ?? 0
-    const availableBefore = Math.max(0, opening - consumed)
+    const demand   = row.demandByMonth.get(m)   ?? 0
+    const arriving = row.arrivingByMonth.get(m) ?? 0
+    const availableBefore = Math.max(0, balance) + arriving
     out.set(m, demand > 0 && demand > availableBefore)
-    consumed += demand
+    balance = balance + arriving - demand
   }
   return out
 }
@@ -240,12 +273,13 @@ export function hasAnyShortfall(
   opening: number,
   months: string[],
 ): boolean {
-  let consumed = 0
+  let balance = opening
   for (const m of months) {
-    const demand = row.demandByMonth.get(m) ?? 0
-    const availableBefore = Math.max(0, opening - consumed)
+    const demand   = row.demandByMonth.get(m)   ?? 0
+    const arriving = row.arrivingByMonth.get(m) ?? 0
+    const availableBefore = Math.max(0, balance) + arriving
     if (demand > 0 && demand > availableBefore) return true
-    consumed += demand
+    balance = balance + arriving - demand
   }
   return false
 }
