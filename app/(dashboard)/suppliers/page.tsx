@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { paymentTermsLabel } from '@/lib/constants'
 
 export const metadata: Metadata = { title: 'Suppliers' }
 
@@ -63,7 +64,7 @@ export default async function SuppliersPage() {
                 <td className="px-4 py-2 text-gray-700">{s.contact_name ?? <span className="text-gray-400">—</span>}</td>
                 <td className="px-4 py-2 text-gray-700">{s.email ?? <span className="text-gray-400">—</span>}</td>
                 <td className="px-3 py-2 text-gray-700">{s.phone ?? <span className="text-gray-400">—</span>}</td>
-                <td className="px-3 py-2 text-gray-700">{s.payment_terms ?? <span className="text-gray-400">—</span>}</td>
+                <td className="px-3 py-2 text-gray-700">{s.payment_terms ? paymentTermsLabel(s.payment_terms) : <span className="text-gray-400">—</span>}</td>
                 <td className="px-3 py-2 text-right text-gray-700">{s.lead_time_days != null ? `${s.lead_time_days} days` : <span className="text-gray-400">—</span>}</td>
                 <td className="px-3 py-2">
                   {s.is_active

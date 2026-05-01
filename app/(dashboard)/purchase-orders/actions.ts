@@ -117,11 +117,14 @@ export async function updatePurchaseOrder(input: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
 
-  // Confirm still draft (no editing once submitted)
+  // Allow edits in draft or submitted state. Once any receipt has been
+  // recorded (partially_received) we lock the form to protect receipt history.
   const { data: existing } = await supabase
     .from('purchase_orders').select('status').eq('id', input.id).maybeSingle() as { data: { status: POStatus } | null }
   if (!existing) return { ok: false, error: 'PO not found' }
-  if (existing.status !== 'draft') return { ok: false, error: 'PO can only be edited while in draft.' }
+  if (existing.status !== 'draft' && existing.status !== 'submitted') {
+    return { ok: false, error: `PO is ${existing.status} and can no longer be edited via this form.` }
+  }
 
   const { error: hErr } = await supabase
     .from('purchase_orders')

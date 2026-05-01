@@ -7,6 +7,7 @@ import {
   createPurchaseOrder, updatePurchaseOrder, deleteDraftPo, setPoStatus,
   type POLineInput,
 } from '@/app/(dashboard)/purchase-orders/actions'
+import { paymentTermsLabel } from '@/lib/constants'
 
 interface SupplierOption {
   id: string
@@ -69,8 +70,12 @@ export function POForm(props: POFormProps) {
     props.initialLines.length > 0 ? props.initialLines : [{ ...NEW_LINE }],
   )
 
-  const isDraft   = props.status === 'draft'
-  const isSubmitted = props.status === 'submitted' || props.status === 'partially_received'
+  const isDraft       = props.status === 'draft'
+  const isSubmitted   = props.status === 'submitted' || props.status === 'partially_received'
+  // Editable while draft or submitted-but-untouched. Once anything has been
+  // received (partially_received) we lock to protect receipt history; further
+  // edits go through the receive flow only.
+  const isEditable    = props.status === 'draft' || props.status === 'submitted'
   const supplier  = useMemo(
     () => props.suppliers.find((s) => s.id === supplierId) ?? null,
     [props.suppliers, supplierId],
@@ -85,16 +90,14 @@ export function POForm(props: POFormProps) {
     setLines((prev) => prev.map((l, i) => {
       if (i !== idx) return l
       const next = { ...l, ...patch }
-      // Clear off-target fields when type switches
+      // Clear off-target fields when type switches and reset UoM defaults:
+      // ingredient → kg (always), product → each, other → leave whatever's there.
       if (patch.line_type) {
         next.ingredient_id = patch.line_type === 'ingredient' ? next.ingredient_id : null
         next.product_id    = patch.line_type === 'product'    ? next.product_id    : null
         next.description   = patch.line_type === 'other'      ? next.description   : null
-      }
-      // When ingredient changes, default the UoM
-      if (patch.ingredient_id) {
-        const ing = props.ingredients.find((x) => x.id === patch.ingredient_id)
-        if (ing?.unit_of_measure) next.unit_of_measure = ing.unit_of_measure
+        if (patch.line_type === 'ingredient') next.unit_of_measure = 'kg'
+        if (patch.line_type === 'product')    next.unit_of_measure = 'each'
       }
       return next
     }))
@@ -201,7 +204,7 @@ export function POForm(props: POFormProps) {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <Field label="Supplier">
               <select
-                disabled={!isDraft}
+                disabled={!isEditable}
                 value={supplierId}
                 onChange={(e) => setSupplierId(e.target.value)}
                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
@@ -213,14 +216,14 @@ export function POForm(props: POFormProps) {
               </select>
               {supplier && (
                 <p className="text-[11px] text-gray-500 mt-1">
-                  {supplier.payment_terms ?? 'Payment terms not set'}{supplier.email ? ` · ${supplier.email}` : ''}
+                  {supplier.payment_terms ? paymentTermsLabel(supplier.payment_terms) : 'Payment terms not set'}{supplier.email ? ` · ${supplier.email}` : ''}
                 </p>
               )}
             </Field>
 
             <Field label="PO number">
               <input
-                disabled={!isDraft}
+                disabled={!isEditable}
                 value={poNumber}
                 onChange={(e) => setPoNumber(e.target.value)}
                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm font-mono disabled:bg-gray-50"
@@ -230,7 +233,7 @@ export function POForm(props: POFormProps) {
 
             <Field label="Order date">
               <input
-                disabled={!isDraft}
+                disabled={!isEditable}
                 type="date"
                 value={orderDate}
                 onChange={(e) => setOrderDate(e.target.value)}
@@ -240,7 +243,7 @@ export function POForm(props: POFormProps) {
 
             <Field label="Expected delivery">
               <input
-                disabled={!isDraft}
+                disabled={!isEditable}
                 type="date"
                 value={expected}
                 onChange={(e) => setExpected(e.target.value)}
@@ -252,7 +255,7 @@ export function POForm(props: POFormProps) {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-[11px] uppercase tracking-wider text-gray-500">Line items</label>
-              {isDraft && (
+              {isEditable && (
                 <button onClick={addLine} className="text-xs text-blue-600 hover:underline">+ Add line</button>
               )}
             </div>
@@ -276,15 +279,15 @@ export function POForm(props: POFormProps) {
                       line={l}
                       ingredients={props.ingredients}
                       products={props.products}
-                      readOnly={!isDraft}
+                      readOnly={!isEditable}
                       onChange={(patch) => updateLine(i, patch)}
-                      onRemove={lines.length > 1 ? () => removeLine(i) : undefined}
+                      onRemove={isEditable && lines.length > 1 ? () => removeLine(i) : undefined}
                     />
                   ))}
                   <tr className="border-t-2 border-gray-200 bg-gray-50 text-sm">
                     <td colSpan={5} className="px-3 py-2 text-right font-medium text-gray-700">Subtotal (NZD ex-GST)</td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold">${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    {isDraft && <td></td>}
+                    {isEditable && <td></td>}
                   </tr>
                 </tbody>
               </table>
@@ -293,7 +296,7 @@ export function POForm(props: POFormProps) {
 
           <Field label="Notes (internal)">
             <textarea
-              disabled={!isDraft}
+              disabled={!isEditable}
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -302,22 +305,34 @@ export function POForm(props: POFormProps) {
             />
           </Field>
 
-          {isDraft && (
+          {isEditable && (
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
-              <button
-                disabled={pending}
-                onClick={() => onSave(false)}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                {pending ? 'Saving…' : 'Save draft'}
-              </button>
-              <button
-                disabled={pending}
-                onClick={() => onSave(true)}
-                className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
-              >
-                {pending ? 'Saving…' : 'Save & submit'}
-              </button>
+              {isDraft ? (
+                <>
+                  <button
+                    disabled={pending}
+                    onClick={() => onSave(false)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {pending ? 'Saving…' : 'Save draft'}
+                  </button>
+                  <button
+                    disabled={pending}
+                    onClick={() => onSave(true)}
+                    className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {pending ? 'Saving…' : 'Save & submit'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  disabled={pending}
+                  onClick={() => onSave(false)}
+                  className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {pending ? 'Saving…' : 'Save changes'}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -333,7 +348,7 @@ export function POForm(props: POFormProps) {
                   {supplier.phone && <div className="text-xs text-gray-600">{supplier.phone}</div>}
                   <div className="pt-2 mt-2 border-t border-gray-100 text-xs">
                     <span className="text-gray-500">Payment terms:</span>{' '}
-                    <span className="font-medium">{supplier.payment_terms ?? 'Not set'}</span>
+                    <span className="font-medium">{paymentTermsLabel(supplier.payment_terms)}</span>
                   </div>
                 </>
               ) : (

@@ -52,6 +52,38 @@ export const PO_STATUS_COLOURS: Record<string, string> = {
   cancelled:          'bg-red-100 text-red-700',
 }
 
+// ============================================================
+// PAYMENT TERMS
+// Stored as a code (e.g. 'NET_30') so the future cash-flow model
+// can compute payment dates programmatically. Free-text "Other"
+// values are stored as-is alongside the known codes.
+// ============================================================
+export const PAYMENT_TERMS = [
+  { code: 'PUF',    label: 'Payment up front (PUF)' },
+  { code: 'COD',    label: 'Payment before delivery (COD)' },
+  { code: 'NET_14', label: '14 days' },
+  { code: 'NET_30', label: '30 days' },
+  { code: 'NET_60', label: '60 days' },
+  { code: 'EOM_20', label: '20 days EOM' },
+  { code: 'EOM_30', label: '30 days EOM' },
+] as const
+
+export type PaymentTermsCode = (typeof PAYMENT_TERMS)[number]['code']
+
+const KNOWN_CODES = new Set(PAYMENT_TERMS.map((p) => p.code))
+
+/** Render a stored payment_terms value for display. */
+export function paymentTermsLabel(value: string | null | undefined): string {
+  if (!value) return '—'
+  const t = PAYMENT_TERMS.find((p) => p.code === value)
+  return t ? t.label : value   // unknown codes / custom strings render as-is
+}
+
+/** True when the value is one of the canonical codes. */
+export function isKnownPaymentTermsCode(value: string | null | undefined): boolean {
+  return !!value && KNOWN_CODES.has(value as PaymentTermsCode)
+}
+
 
 // ============================================================
 // STOCK MOVEMENT TYPES

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import { getAppSettings } from '@/lib/settings'
+import { paymentTermsLabel } from '@/lib/constants'
 import { PrintTrigger } from '@/components/purchase-orders/print-trigger'
 
 interface PageProps {
@@ -162,7 +163,7 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
           </div>
           <div>
             <div className="text-[9px] uppercase tracking-wider text-gray-500">Payment terms</div>
-            <div className="text-[12px] font-medium">{supplier?.payment_terms ?? '—'}</div>
+            <div className="text-[12px] font-medium">{paymentTermsLabel(supplier?.payment_terms)}</div>
           </div>
         </div>
 

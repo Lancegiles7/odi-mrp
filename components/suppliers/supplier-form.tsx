@@ -1,3 +1,8 @@
+'use client'
+
+import { useState } from 'react'
+import { PAYMENT_TERMS, isKnownPaymentTermsCode } from '@/lib/constants'
+
 interface Initial {
   id?: string
   code: string
@@ -20,9 +25,22 @@ export function SupplierForm({
   savedAt?: boolean
   error?: string | null
 }) {
+  // Local state so the "Other" custom-text input toggles visibly
+  const initialIsKnown = isKnownPaymentTermsCode(initial.payment_terms)
+  const initialIsEmpty = !initial.payment_terms
+  const [termsCode, setTermsCode] = useState<string>(
+    initialIsEmpty ? '' : initialIsKnown ? initial.payment_terms! : 'OTHER',
+  )
+  const [termsOther, setTermsOther] = useState<string>(
+    !initialIsEmpty && !initialIsKnown ? (initial.payment_terms ?? '') : '',
+  )
+  // Resolve the actual value submitted with the form
+  const resolvedTerms = termsCode === '' ? '' : termsCode === 'OTHER' ? termsOther : termsCode
+
   return (
     <form action={action} className="space-y-5">
       {initial.id && <input type="hidden" name="id" value={initial.id} />}
+      <input type="hidden" name="payment_terms" value={resolvedTerms} />
 
       {savedAt && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md text-sm text-emerald-800">
@@ -53,7 +71,25 @@ export function SupplierForm({
           <input name="address" defaultValue={initial.address ?? ''} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" placeholder="Multi-line allowed (use newlines)" />
         </Field>
         <Field label="Payment terms">
-          <input name="payment_terms" defaultValue={initial.payment_terms ?? ''} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" placeholder="e.g. Net 30, COD, 50% deposit" />
+          <select
+            value={termsCode}
+            onChange={(e) => setTermsCode(e.target.value)}
+            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+          >
+            <option value="">— Select —</option>
+            {PAYMENT_TERMS.map((p) => (
+              <option key={p.code} value={p.code}>{p.label}</option>
+            ))}
+            <option value="OTHER">Other (specify)</option>
+          </select>
+          {termsCode === 'OTHER' && (
+            <input
+              value={termsOther}
+              onChange={(e) => setTermsOther(e.target.value)}
+              placeholder="e.g. 50% deposit, balance on delivery"
+              className="mt-1 w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+            />
+          )}
         </Field>
         <Field label="Lead time (days)">
           <input name="lead_time_days" type="number" min={0} step={1} defaultValue={initial.lead_time_days ?? ''} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
