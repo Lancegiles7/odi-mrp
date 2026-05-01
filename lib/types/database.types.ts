@@ -371,6 +371,11 @@ export type Database = {
           gst_nz_pct: number
           gst_au_pct: number
           planning_start_month: string | null
+          company_legal_name: string | null
+          company_nzbn: string | null
+          company_gst_number: string | null
+          company_address: string | null
+          company_website: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -380,6 +385,11 @@ export type Database = {
           gst_nz_pct?: number
           gst_au_pct?: number
           planning_start_month?: string | null
+          company_legal_name?: string | null
+          company_nzbn?: string | null
+          company_gst_number?: string | null
+          company_address?: string | null
+          company_website?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -389,6 +399,11 @@ export type Database = {
           gst_nz_pct?: number
           gst_au_pct?: number
           planning_start_month?: string | null
+          company_legal_name?: string | null
+          company_nzbn?: string | null
+          company_gst_number?: string | null
+          company_address?: string | null
+          company_website?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -481,6 +496,8 @@ export type Database = {
           country_of_origin: string | null
           country_of_purchase: string | null
           currency: string | null
+          payment_terms: string | null
+          lead_time_days: number | null
           notes: string | null
           is_active: boolean
           created_at: string
@@ -498,6 +515,8 @@ export type Database = {
           country_of_origin?: string | null
           country_of_purchase?: string | null
           currency?: string | null
+          payment_terms?: string | null
+          lead_time_days?: number | null
           notes?: string | null
           is_active?: boolean
           created_at?: string
@@ -515,6 +534,8 @@ export type Database = {
           country_of_origin?: string | null
           country_of_purchase?: string | null
           currency?: string | null
+          payment_terms?: string | null
+          lead_time_days?: number | null
           notes?: string | null
           is_active?: boolean
           created_at?: string
@@ -568,7 +589,9 @@ export type Database = {
         Row: {
           id: string
           purchase_order_id: string
-          ingredient_id: string
+          ingredient_id: string | null
+          product_id: string | null
+          description: string | null
           quantity_ordered: number
           quantity_received: number
           unit_cost: number | null
@@ -580,7 +603,9 @@ export type Database = {
         Insert: {
           id?: string
           purchase_order_id: string
-          ingredient_id: string
+          ingredient_id?: string | null
+          product_id?: string | null
+          description?: string | null
           quantity_ordered: number
           quantity_received?: number
           unit_cost?: number | null
@@ -592,7 +617,9 @@ export type Database = {
         Update: {
           id?: string
           purchase_order_id?: string
-          ingredient_id?: string
+          ingredient_id?: string | null
+          product_id?: string | null
+          description?: string | null
           quantity_ordered?: number
           quantity_received?: number
           unit_cost?: number | null
