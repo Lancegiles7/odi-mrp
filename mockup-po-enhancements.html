@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Odi MRP — PO enhancements mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .tabular-nums { font-variant-numeric: tabular-nums; }</style>
+</head>
+<body class="bg-gray-100 p-8">
+<div class="max-w-[1400px] mx-auto space-y-8">
+
+<header>
+  <h1 class="text-xl font-semibold">PO enhancements — mockup</h1>
+  <p class="text-sm text-gray-600 mt-1">Supplier data captured on first PO and reused thereafter. Soft warnings on pack-size and price drift. New delivery-address management. Inwards Pending page with receipt discrepancy flags.</p>
+</header>
+
+<!-- ============================================================ -->
+<!-- 1 · PO LINE EDITOR — NEW FIELDS + WARNINGS                  -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">1 · PO line editor — pre-fill + warnings</h2>
+    <p class="text-xs text-gray-500 mt-0.5">When a previously-ordered ingredient is selected, supplier code, pack size, and unit price pre-fill from saved ingredient data. Edit on the line, optionally save back.</p>
+  </div>
+  <div class="p-5">
+    <table class="w-full text-xs border border-gray-200 rounded">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+          <th class="text-left px-2 py-2">Type</th>
+          <th class="text-left px-2 py-2">Item</th>
+          <th class="text-left px-2 py-2 w-[110px]">Supplier code</th>
+          <th class="text-right px-2 py-2 w-[80px]">Qty</th>
+          <th class="text-left px-2 py-2 w-[70px]">UoM</th>
+          <th class="text-right px-2 py-2 w-[80px]">Pack size</th>
+          <th class="text-right px-2 py-2 w-[100px]">Unit price</th>
+          <th class="text-right px-2 py-2 w-[100px]">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- Row A: Existing ingredient — all fields pre-filled, no warnings -->
+        <tr class="border-t border-gray-100">
+          <td class="px-2 py-1.5"><select class="text-xs border-gray-200 rounded px-1 py-0.5"><option>Ingredient</option></select></td>
+          <td class="px-2 py-1.5">Beetroot Powder · ING-ORG-BEET-AD</td>
+          <td class="px-2 py-1.5"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" value="ORG-BEET-AD-25" /></td>
+          <td class="px-2 py-1.5"><input class="w-20 text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="50" /></td>
+          <td class="px-2 py-1.5"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" value="kg" /></td>
+          <td class="px-2 py-1.5"><input class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="25" /></td>
+          <td class="px-2 py-1.5"><input class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="42.50" /></td>
+          <td class="px-2 py-1.5 text-right tabular-nums">$2,125.00</td>
+        </tr>
+
+        <!-- Row B: Pack size mismatch (soft warning) -->
+        <tr class="border-t border-gray-100 bg-amber-50/40">
+          <td class="px-2 py-1.5"><select class="text-xs border-gray-200 rounded px-1 py-0.5"><option>Ingredient</option></select></td>
+          <td class="px-2 py-1.5">Quinoa Powder · ING-ORG-QUIN-POW</td>
+          <td class="px-2 py-1.5"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" value="QUIN-FD-10" /></td>
+          <td class="px-2 py-1.5">
+            <input class="w-20 text-right text-xs border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" value="23" />
+            <div class="text-[10px] text-amber-800 mt-0.5">⚠ supplier sells in 10 kg packs · <button class="underline">round up to 30</button></div>
+          </td>
+          <td class="px-2 py-1.5"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" value="kg" /></td>
+          <td class="px-2 py-1.5"><input class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="10" /></td>
+          <td class="px-2 py-1.5"><input class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="38.00" /></td>
+          <td class="px-2 py-1.5 text-right tabular-nums">$874.00</td>
+        </tr>
+
+        <!-- Row C: Price discrepancy (soft warning) -->
+        <tr class="border-t border-gray-100 bg-amber-50/40">
+          <td class="px-2 py-1.5"><select class="text-xs border-gray-200 rounded px-1 py-0.5"><option>Ingredient</option></select></td>
+          <td class="px-2 py-1.5">Apple Powder · ING-ORG-APP-FD</td>
+          <td class="px-2 py-1.5"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" value="APP-FD-5" /></td>
+          <td class="px-2 py-1.5"><input class="w-20 text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="20" /></td>
+          <td class="px-2 py-1.5"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" value="kg" /></td>
+          <td class="px-2 py-1.5"><input class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="5" /></td>
+          <td class="px-2 py-1.5">
+            <input class="w-full text-right text-xs border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" value="68.00" />
+            <div class="text-[10px] text-amber-800 mt-0.5">⚠ saved price $62.00 · <button class="underline">save $68 back to ingredient</button></div>
+          </td>
+          <td class="px-2 py-1.5 text-right tabular-nums">$1,360.00</td>
+        </tr>
+
+        <!-- Row D: First-time ingredient — empty fields, no warnings -->
+        <tr class="border-t border-gray-100">
+          <td class="px-2 py-1.5"><select class="text-xs border-gray-200 rounded px-1 py-0.5"><option>Ingredient</option></select></td>
+          <td class="px-2 py-1.5">Cinnamon · ING-ORG-CIN-POW <span class="text-[10px] text-blue-600 ml-1">(new — values save to ingredient)</span></td>
+          <td class="px-2 py-1.5"><input class="w-full text-xs border border-dashed border-gray-300 rounded px-1.5 py-1 placeholder-gray-300" placeholder="—" /></td>
+          <td class="px-2 py-1.5"><input class="w-20 text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="5" /></td>
+          <td class="px-2 py-1.5"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" value="kg" /></td>
+          <td class="px-2 py-1.5"><input class="w-full text-right text-xs border border-dashed border-gray-300 rounded px-1.5 py-1 placeholder-gray-300" placeholder="—" /></td>
+          <td class="px-2 py-1.5"><input class="w-full text-right text-xs border border-dashed border-gray-300 rounded px-1.5 py-1 placeholder-gray-300" placeholder="—" /></td>
+          <td class="px-2 py-1.5 text-right tabular-nums text-gray-300">—</td>
+        </tr>
+
+      </tbody>
+    </table>
+    <p class="text-[11px] text-gray-500 mt-2">Dashed inputs = no saved value yet. Whatever you enter is written back to the ingredient on PO save.</p>
+  </div>
+</section>
+
+
+<!-- ============================================================ -->
+<!-- 2 · DELIVERY ADDRESS DROPDOWN + NOTES                       -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">2 · Delivery address + notes on PO</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Address picked from saved list. Free-text notes for one-off instructions.</p>
+  </div>
+  <div class="p-5 grid grid-cols-2 gap-5">
+    <div>
+      <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Deliver to</label>
+      <select class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+        <option>Main Warehouse · 12 Maui Place, Auckland 1010 · Atma Okan +64 27 275 4329</option>
+        <option>Brand Nation · 25 Industrial Dr, Auckland · Tony Smith +64 21 555 1234</option>
+        <option>Flavour Makers · Unit 4, 88 Spring St, Sydney NSW · Sarah Lee +61 412 555 678</option>
+        <option>— Manage addresses —</option>
+      </select>
+      <p class="text-[11px] text-gray-500 mt-1">Address shows on the PO PDF letterhead. <a class="underline text-blue-600">+ Add new address</a></p>
+    </div>
+    <div>
+      <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Delivery notes <span class="lowercase font-normal text-gray-400">(this PO only — does not edit the saved address)</span></label>
+      <textarea rows="3" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" placeholder="e.g. Deliver before 10 am · ring doorbell on side gate · ask for Atma">Please deliver between 9 am and noon. Loading dock at rear, ring 0273 555 0099 on arrival.</textarea>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================ -->
+<!-- 3 · DELIVERY ADDRESS MANAGEMENT (settings/list)              -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">3 · Delivery addresses — list / edit</h2>
+      <p class="text-xs text-gray-500 mt-0.5">Manage saved addresses. Country split (NZ / AU). One default per country.</p>
+    </div>
+    <button class="px-3 py-1.5 text-xs bg-gray-900 text-white rounded-md">+ New address</button>
+  </div>
+  <table class="w-full text-xs">
+    <thead>
+      <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <th class="text-left px-4 py-2">Label</th>
+        <th class="text-left px-4 py-2">Address</th>
+        <th class="text-left px-4 py-2">Contact</th>
+        <th class="text-left px-3 py-2">Phone</th>
+        <th class="text-left px-3 py-2 w-[60px]">Country</th>
+        <th class="text-left px-3 py-2 w-[80px]">Default</th>
+        <th class="text-right px-3 py-2 w-[60px]"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-medium">Main Warehouse</td><td class="px-4 py-2">12 Maui Place, Auckland 1010</td><td class="px-4 py-2">Atma Okan</td><td class="px-3 py-2">+64 27 275 4329</td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">NZ</span></td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">★ NZ default</span></td><td class="px-3 py-2 text-right"><a class="text-blue-600 underline">Edit</a></td></tr>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-medium">Brand Nation</td><td class="px-4 py-2">25 Industrial Dr, Auckland</td><td class="px-4 py-2">Tony Smith</td><td class="px-3 py-2">+64 21 555 1234</td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">NZ</span></td><td class="px-3 py-2 text-gray-400">—</td><td class="px-3 py-2 text-right"><a class="text-blue-600 underline">Edit</a></td></tr>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-medium">Flavour Makers</td><td class="px-4 py-2">Unit 4, 88 Spring St, Sydney NSW</td><td class="px-4 py-2">Sarah Lee</td><td class="px-3 py-2">+61 412 555 678</td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">AU</span></td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">★ AU default</span></td><td class="px-3 py-2 text-right"><a class="text-blue-600 underline">Edit</a></td></tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ============================================================ -->
+<!-- 4 · INWARDS PENDING PAGE                                    -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">4 · Inwards Pending page</h2>
+    <p class="text-xs text-gray-500 mt-0.5">All POs in Submitted or Partial — what's expected to arrive. Sidebar entry under Procurement.</p>
+  </div>
+  <div class="p-5 grid grid-cols-4 gap-3">
+    <div class="p-3 bg-blue-50 border border-blue-200 rounded-md"><div class="text-[11px] uppercase font-semibold text-blue-700">Awaiting receipt</div><div class="text-lg font-semibold text-blue-900">5 POs</div><div class="text-[11px] text-blue-700">$48,200 ordered value</div></div>
+    <div class="p-3 bg-amber-50 border border-amber-200 rounded-md"><div class="text-[11px] uppercase font-semibold text-amber-700">Partial</div><div class="text-lg font-semibold text-amber-900">2 POs</div><div class="text-[11px] text-amber-700">$11,400 outstanding</div></div>
+    <div class="p-3 bg-white border border-gray-200 rounded-md"><div class="text-[11px] uppercase font-semibold text-gray-500">Overdue</div><div class="text-lg font-semibold text-gray-900">1 PO</div><div class="text-[11px] text-gray-500">expected ≥ 7 days ago</div></div>
+    <div class="p-3 bg-white border border-gray-200 rounded-md"><div class="text-[11px] uppercase font-semibold text-gray-500">Arriving this week</div><div class="text-lg font-semibold text-gray-900">3 POs</div><div class="text-[11px] text-gray-500">28 Apr → 4 May</div></div>
+  </div>
+  <table class="w-full text-xs">
+    <thead>
+      <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <th class="text-left px-4 py-2">PO #</th>
+        <th class="text-left px-4 py-2">Supplier</th>
+        <th class="text-right px-3 py-2">Lines</th>
+        <th class="text-right px-3 py-2">Total</th>
+        <th class="text-left px-3 py-2">Status</th>
+        <th class="text-left px-3 py-2">Expected</th>
+        <th class="text-right px-3 py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="border-t border-gray-100 bg-red-50/30"><td class="px-4 py-2 font-mono">PO-2026-014</td><td class="px-4 py-2">Forager</td><td class="px-3 py-2 text-right">3</td><td class="px-3 py-2 text-right">$8,440</td><td class="px-3 py-2"><span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Submitted</span></td><td class="px-3 py-2 text-red-700 font-medium">21 Apr · overdue</td><td class="px-3 py-2 text-right"><button class="px-2 py-1 text-[11px] bg-emerald-700 text-white rounded">📦 Receive</button></td></tr>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-mono">PO-2026-016</td><td class="px-4 py-2">Matakana</td><td class="px-3 py-2 text-right">2</td><td class="px-3 py-2 text-right">$3,210</td><td class="px-3 py-2"><span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Partial</span></td><td class="px-3 py-2">2 May</td><td class="px-3 py-2 text-right"><button class="px-2 py-1 text-[11px] bg-emerald-700 text-white rounded">📦 Receive</button></td></tr>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-mono">PO-2026-017</td><td class="px-4 py-2">Brand Nation</td><td class="px-3 py-2 text-right">5</td><td class="px-3 py-2 text-right">$22,650</td><td class="px-3 py-2"><span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Submitted</span></td><td class="px-3 py-2">5 May</td><td class="px-3 py-2 text-right"><button class="px-2 py-1 text-[11px] bg-emerald-700 text-white rounded">📦 Receive</button></td></tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ============================================================ -->
+<!-- 5 · RECEIPT FLOW WITH DISCREPANCY ALERTS                    -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">5 · Receipt with discrepancy alerts</h2>
+    <p class="text-xs text-gray-500 mt-0.5">When invoice quantities or prices differ from the PO, flag inline. On confirm, received qty moves into SOH at Main Warehouse.</p>
+  </div>
+  <table class="w-full text-xs">
+    <thead>
+      <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <th class="text-left px-4 py-2">Item</th>
+        <th class="text-right px-3 py-2">Ordered</th>
+        <th class="text-right px-3 py-2">Receiving now</th>
+        <th class="text-right px-3 py-2">PO price</th>
+        <th class="text-right px-3 py-2">Invoice price</th>
+        <th class="text-left px-3 py-2">Note</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2"><div class="font-medium">Beetroot Powder</div><div class="text-[10px] text-gray-500 font-mono">ING-ORG-BEET-AD</div></td><td class="px-3 py-2 text-right">50 kg</td><td class="px-3 py-2 text-right"><input class="w-20 text-right border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" value="50" /></td><td class="px-3 py-2 text-right tabular-nums text-gray-500">$42.50</td><td class="px-3 py-2 text-right"><input class="w-20 text-right border border-gray-200 rounded px-1.5 py-1 tabular-nums" value="42.50" /></td><td class="px-3 py-2"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" placeholder="Batch # · QA note" /></td></tr>
+      <tr class="border-t border-gray-100 bg-amber-50/40"><td class="px-4 py-2"><div class="font-medium">Quinoa Powder</div><div class="text-[10px] text-gray-500 font-mono">ING-ORG-QUIN-POW</div></td><td class="px-3 py-2 text-right">30 kg</td><td class="px-3 py-2 text-right"><input class="w-20 text-right border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" value="20" /><div class="text-[10px] text-amber-800 mt-0.5">⚠ short 10 kg</div></td><td class="px-3 py-2 text-right tabular-nums text-gray-500">$38.00</td><td class="px-3 py-2 text-right"><input class="w-20 text-right border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" value="40.00" /><div class="text-[10px] text-amber-800 mt-0.5">⚠ +$2.00 vs PO</div></td><td class="px-3 py-2"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" placeholder="" value="Backorder rest by 5 May" /></td></tr>
+      <tr class="border-t border-gray-100 bg-amber-50/40"><td class="px-4 py-2"><div class="font-medium">Apple Powder</div><div class="text-[10px] text-gray-500 font-mono">ING-ORG-APP-FD</div></td><td class="px-3 py-2 text-right">20 kg</td><td class="px-3 py-2 text-right"><input class="w-20 text-right border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" value="22" /><div class="text-[10px] text-amber-800 mt-0.5">⚠ over by 2 kg</div></td><td class="px-3 py-2 text-right tabular-nums text-gray-500">$68.00</td><td class="px-3 py-2 text-right"><input class="w-20 text-right border-gray-200 rounded px-1.5 py-1 tabular-nums" value="68.00" /></td><td class="px-3 py-2"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" /></td></tr>
+    </tbody>
+  </table>
+  <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+    <div class="text-xs text-amber-800"><b>2 lines flagged</b> — qty short on Quinoa (−10 kg), price up on Quinoa (+$2.00), qty over on Apple (+2 kg). On confirm, all received qty moves into SOH at <b>Main Warehouse</b>; flagged lines stay highlighted on the PO for follow-up.</div>
+    <button class="px-3 py-1.5 text-xs bg-emerald-700 text-white rounded-md">Confirm receipt + update SOH</button>
+  </div>
+</section>
+
+
+<!-- ============================================================ -->
+<!-- IMPLEMENTATION                                              -->
+<!-- ============================================================ -->
+<section class="bg-blue-50 border border-blue-200 rounded-lg p-5 space-y-2 text-sm">
+  <h2 class="font-semibold text-blue-900">Implementation summary</h2>
+  <ul class="list-disc pl-5 space-y-1.5 text-blue-900">
+    <li>Migration 016 adds: <code class="bg-white px-1 rounded">ingredients.supplier_sku_code</code>, <code class="bg-white px-1 rounded">supplier_pack_size</code>, <code class="bg-white px-1 rounded">supplier_pack_unit</code>; new <code class="bg-white px-1 rounded">delivery_addresses</code> table; <code class="bg-white px-1 rounded">purchase_orders.delivery_address_id</code> + <code class="bg-white px-1 rounded">delivery_notes</code>; ensures a "Main Warehouse" location row.</li>
+    <li>PO line editor pre-fills supplier_sku_code, pack_size, unit_cost on ingredient pick. Soft warnings on pack-size mismatch and price drift, each with a one-click "save updated value to ingredient".</li>
+    <li>New page <code class="bg-white px-1 rounded">/delivery-addresses</code> for CRUD. Sidebar entry under Admin (alongside Settings / Users).</li>
+    <li>New page <code class="bg-white px-1 rounded">/inwards-pending</code> in the Procurement section. Same data as <code class="bg-white px-1 rounded">/purchase-orders?status=submitted,partial</code> with overdue + this-week tiles.</li>
+    <li>Receipt flow updated: per-line "Invoice price" column (currently called Unit price) with discrepancy alert vs PO price, qty alert vs ordered. On confirm, write a row to <code class="bg-white px-1 rounded">stock_movements</code> (movement_type = 'receipt') and increment <code class="bg-white px-1 rounded">inventory_balances</code> at the Main Warehouse location.</li>
+    <li>Multi-location: schema already supports it (locations table). For v1 we only use Main Warehouse; adding more locations + a per-PO destination dropdown is a small follow-up when you're ready.</li>
+  </ul>
+</section>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Purchase orders — mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+  .pdf-page {
+    width: 794px; min-height: 1123px; background: white; box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 56px 64px; margin: 0 auto; font-size: 12px; line-height: 1.55; color: #1f2937;
+  }
+</style>
+</head>
+<body class="bg-gray-100 p-8">
+
+<div class="max-w-[1500px] mx-auto space-y-10">
+
+  <header>
+    <h1 class="text-2xl font-semibold">Purchase orders — UI mockup</h1>
+    <p class="text-sm text-gray-600 mt-1">
+      External-facing PDF · internal lifecycle (draft → submitted → received) · matching on receipt · arrivals feed back into Ingredient demand.
+    </p>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- 1. PO LIST -->
+  <!-- ============================================================ -->
+  <section>
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">1 · Purchase orders list — /purchase-orders</h2>
+
+    <div class="bg-white rounded-lg border border-gray-200">
+      <div class="px-5 py-3 flex items-center justify-between border-b border-gray-100">
+        <div>
+          <h3 class="text-base font-semibold">Purchase orders</h3>
+          <p class="text-xs text-gray-500 mt-0.5">23 POs · 3 awaiting receipt · 1 partial</p>
+        </div>
+        <div class="flex gap-2 items-center">
+          <select class="text-xs border border-gray-300 rounded-md px-2 py-1.5">
+            <option>All statuses</option><option>Draft</option><option>Submitted</option><option>Partial</option><option>Received</option><option>Cancelled</option>
+          </select>
+          <select class="text-xs border border-gray-300 rounded-md px-2 py-1.5">
+            <option>All suppliers</option><option>Forager</option><option>Matakana</option>
+          </select>
+          <button class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800">+ New PO</button>
+        </div>
+      </div>
+
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+            <th class="text-left px-4 py-2 font-medium w-[110px]">PO #</th>
+            <th class="text-left px-4 py-2 font-medium">Supplier</th>
+            <th class="text-left px-4 py-2 font-medium">Items</th>
+            <th class="text-right px-4 py-2 font-medium">Total</th>
+            <th class="text-left px-3 py-2 font-medium">Status</th>
+            <th class="text-left px-3 py-2 font-medium">Expected</th>
+            <th class="text-right px-3 py-2 font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-t border-gray-100 hover:bg-gray-50">
+            <td class="px-4 py-2 font-mono">PO-2026-014</td>
+            <td class="px-4 py-2">Forager</td>
+            <td class="px-4 py-2 text-gray-600">2 lines · Beef Liver, Beef Spleen</td>
+            <td class="px-4 py-2 text-right tabular-nums">$2,450.00</td>
+            <td class="px-3 py-2"><span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Submitted</span></td>
+            <td class="px-3 py-2 text-gray-700">15 May 26</td>
+            <td class="px-3 py-2 text-right text-gray-400">⋯</td>
+          </tr>
+          <tr class="border-t border-gray-100 hover:bg-gray-50">
+            <td class="px-4 py-2 font-mono">PO-2026-013</td>
+            <td class="px-4 py-2">Matakana</td>
+            <td class="px-4 py-2 text-gray-600">1 line · Green Pea Leaf Powder</td>
+            <td class="px-4 py-2 text-right tabular-nums">$880.00</td>
+            <td class="px-3 py-2"><span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Partial</span></td>
+            <td class="px-3 py-2 text-gray-700">10 May 26</td>
+            <td class="px-3 py-2 text-right text-gray-400">⋯</td>
+          </tr>
+          <tr class="border-t border-gray-100 hover:bg-gray-50">
+            <td class="px-4 py-2 font-mono">PO-2026-012</td>
+            <td class="px-4 py-2">Forager</td>
+            <td class="px-4 py-2 text-gray-600">3 lines · Bone broth, Liver, Spleen</td>
+            <td class="px-4 py-2 text-right tabular-nums">$3,920.00</td>
+            <td class="px-3 py-2"><span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Received</span></td>
+            <td class="px-3 py-2 text-gray-700">22 Apr 26</td>
+            <td class="px-3 py-2 text-right text-gray-400">⋯</td>
+          </tr>
+          <tr class="border-t border-gray-100 hover:bg-gray-50 bg-gray-50/40">
+            <td class="px-4 py-2 font-mono text-gray-500">PO-2026-015</td>
+            <td class="px-4 py-2 text-gray-500">Bulk Goods Ltd</td>
+            <td class="px-4 py-2 text-gray-400">1 line · Chia Powder</td>
+            <td class="px-4 py-2 text-right tabular-nums text-gray-500">$1,200.00</td>
+            <td class="px-3 py-2"><span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">Draft</span></td>
+            <td class="px-3 py-2 text-gray-500">—</td>
+            <td class="px-3 py-2 text-right text-gray-400">⋯</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 2. PO DETAIL / EDIT -->
+  <!-- ============================================================ -->
+  <section>
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">2 · PO detail / new — /purchase-orders/[id]</h2>
+
+    <div class="bg-white rounded-lg border border-gray-200">
+      <!-- Top header: PO + status -->
+      <div class="px-5 py-3 flex items-center justify-between border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <a class="text-xs text-gray-500 hover:underline" href="#">← All POs</a>
+          <h3 class="text-base font-semibold">PO-2026-014</h3>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Submitted</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50">⤓ Download PDF</button>
+          <button class="px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50">✉ Email to supplier</button>
+          <button class="px-3 py-1.5 text-xs bg-emerald-700 text-white rounded-md hover:bg-emerald-800">📦 Receive items</button>
+        </div>
+      </div>
+
+      <!-- Status timeline -->
+      <div class="px-5 py-3 border-b border-gray-100 bg-gray-50/50">
+        <div class="flex items-center text-[11px]">
+          <span class="text-emerald-700">● Draft</span>
+          <span class="mx-2 text-gray-300">─</span>
+          <span class="text-emerald-700">● Submitted <span class="text-gray-500">28 Apr 26</span></span>
+          <span class="mx-2 text-gray-300">─</span>
+          <span class="text-gray-400">○ Partial</span>
+          <span class="mx-2 text-gray-300">─</span>
+          <span class="text-gray-400">○ Received</span>
+        </div>
+      </div>
+
+      <!-- Body: two columns -->
+      <div class="grid grid-cols-3 gap-0">
+        <!-- Left: PO header data -->
+        <div class="col-span-2 p-5 border-r border-gray-100 space-y-5">
+
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Supplier</label>
+              <select class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+                <option>Forager</option>
+                <option>Matakana</option>
+                <option>Bulk Goods Ltd</option>
+              </select>
+              <p class="text-[11px] text-gray-500 mt-1">Net 30 · accounts@forager.co.nz · +64 9 …</p>
+            </div>
+            <div>
+              <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">PO number</label>
+              <input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm font-mono" value="PO-2026-014" />
+              <p class="text-[11px] text-gray-500 mt-1">Auto-generated, editable while draft</p>
+            </div>
+            <div>
+              <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Order date</label>
+              <input type="date" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value="2026-04-28" />
+            </div>
+            <div>
+              <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Expected delivery</label>
+              <input type="date" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value="2026-05-15" />
+            </div>
+          </div>
+
+          <!-- Lines table -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-[11px] uppercase tracking-wider text-gray-500">Line items</label>
+              <button class="text-xs text-blue-600 hover:underline">+ Add line</button>
+            </div>
+            <div class="border border-gray-200 rounded-md overflow-hidden">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+                    <th class="text-left px-3 py-2 font-medium w-[110px]">Type</th>
+                    <th class="text-left px-3 py-2 font-medium">Item</th>
+                    <th class="text-right px-3 py-2 font-medium w-[80px]">Qty</th>
+                    <th class="text-left px-3 py-2 font-medium w-[60px]">UoM</th>
+                    <th class="text-right px-3 py-2 font-medium w-[100px]">Unit price</th>
+                    <th class="text-right px-3 py-2 font-medium w-[100px]">Line total</th>
+                    <th class="w-[30px]"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="border-t border-gray-100">
+                    <td class="px-3 py-2"><select class="w-full text-xs border border-gray-200 rounded px-1 py-0.5"><option>Ingredient</option><option>Product</option><option>Other</option></select></td>
+                    <td class="px-3 py-2">
+                      <input class="w-full text-xs border border-gray-200 rounded px-1.5 py-0.5" value="Beef Liver Powder · ING-ORG-LIV-FD" />
+                      <p class="text-[10px] text-gray-400 mt-0.5">Suggests from your ingredient list as you type</p>
+                    </td>
+                    <td class="px-3 py-2"><input class="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-0.5 tabular-nums" value="50" /></td>
+                    <td class="px-3 py-2"><input class="w-full text-xs border border-gray-200 rounded px-1.5 py-0.5" value="kg" /></td>
+                    <td class="px-3 py-2"><input class="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-0.5 tabular-nums" value="29.00" /></td>
+                    <td class="px-3 py-2 text-right tabular-nums">$1,450.00</td>
+                    <td class="px-3 py-2 text-gray-400 text-center">×</td>
+                  </tr>
+                  <tr class="border-t border-gray-100">
+                    <td class="px-3 py-2"><select class="w-full text-xs border border-gray-200 rounded px-1 py-0.5"><option>Ingredient</option><option>Product</option><option>Other</option></select></td>
+                    <td class="px-3 py-2"><input class="w-full text-xs border border-gray-200 rounded px-1.5 py-0.5" value="Beef Spleen Powder · ING-ORG-SPL-FD" /></td>
+                    <td class="px-3 py-2"><input class="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-0.5 tabular-nums" value="40" /></td>
+                    <td class="px-3 py-2"><input class="w-full text-xs border border-gray-200 rounded px-1.5 py-0.5" value="kg" /></td>
+                    <td class="px-3 py-2"><input class="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-0.5 tabular-nums" value="25.00" /></td>
+                    <td class="px-3 py-2 text-right tabular-nums">$1,000.00</td>
+                    <td class="px-3 py-2 text-gray-400 text-center">×</td>
+                  </tr>
+                  <tr class="border-t-2 border-gray-200 bg-gray-50 text-sm">
+                    <td colspan="5" class="px-3 py-2 text-right font-medium text-gray-700">Subtotal</td>
+                    <td class="px-3 py-2 text-right tabular-nums font-semibold">$2,450.00</td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Notes (internal)</label>
+            <textarea rows="2" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" placeholder="Special instructions, batch refs, etc.">Quoted price valid until end of May.</textarea>
+          </div>
+
+        </div>
+
+        <!-- Right: side panel — sticky stuff -->
+        <div class="p-5 space-y-5 bg-gray-50/40">
+          <div>
+            <h4 class="text-[11px] uppercase tracking-wider text-gray-500 mb-2">Supplier details</h4>
+            <div class="text-sm bg-white border border-gray-200 rounded-md p-3 space-y-1">
+              <div class="font-medium">Forager</div>
+              <div class="text-xs text-gray-600">accounts@forager.co.nz</div>
+              <div class="text-xs text-gray-600">+64 9 555 0100</div>
+              <div class="text-xs text-gray-600">12 Industry Rd, Auckland</div>
+              <div class="pt-2 mt-2 border-t border-gray-100 text-xs">
+                <span class="text-gray-500">Payment terms:</span> <span class="font-medium">Net 30</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-[11px] uppercase tracking-wider text-gray-500 mb-2">Activity</h4>
+            <ul class="text-xs space-y-1.5 text-gray-600">
+              <li>● Submitted 28 Apr 26 · Lance</li>
+              <li>● Created 28 Apr 26 · Lance</li>
+            </ul>
+          </div>
+
+          <div class="pt-3 border-t border-gray-200 space-y-2">
+            <button class="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-white">Cancel PO</button>
+            <button class="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-white text-red-600">Delete (drafts only)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 3. PDF PREVIEW -->
+  <!-- ============================================================ -->
+  <section>
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">3 · PDF export — what the supplier sees</h2>
+
+    <div class="pdf-page">
+      <!-- Letterhead -->
+      <div class="flex items-start justify-between pb-6 border-b-2" style="border-color:#5a8a3a;">
+        <div>
+          <!-- Logo placeholder — real PNG/SVG inserted at build -->
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-14 h-14 rounded-md flex items-center justify-center text-white font-bold text-2xl" style="background:#5a8a3a;">Odi</div>
+            <div>
+              <div class="text-[20px] font-semibold tracking-tight" style="color:#2f4d1f;">Odi Nutrition</div>
+              <div class="text-[10px] text-gray-500 italic">Nutrition you can trust</div>
+            </div>
+          </div>
+        </div>
+        <div class="text-right text-[10px] text-gray-600 leading-tight">
+          <div class="font-semibold text-gray-900 text-[11px]">Odi Nutrition Ltd</div>
+          <div>NZBN: [to be confirmed]</div>
+          <div>GST: [to be confirmed]</div>
+          <div class="mt-2">[Company address line 1]</div>
+          <div>[Company address line 2]</div>
+          <div>www.odinutrition.com</div>
+        </div>
+      </div>
+
+      <!-- Title bar -->
+      <div class="flex items-end justify-between mt-6 mb-6">
+        <h1 class="text-[28px] font-light tracking-wide" style="color:#2f4d1f;">PURCHASE ORDER</h1>
+        <div class="text-right">
+          <div class="text-[10px] uppercase tracking-wider text-gray-500">PO Number</div>
+          <div class="font-mono text-[16px] font-semibold">PO-2026-014</div>
+        </div>
+      </div>
+
+      <!-- From / To grid -->
+      <div class="grid grid-cols-2 gap-8 mb-6">
+        <div>
+          <div class="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">Supplier</div>
+          <div class="text-[13px] font-semibold">Forager</div>
+          <div class="text-[11px] text-gray-700">accounts@forager.co.nz</div>
+          <div class="text-[11px] text-gray-700">+64 9 555 0100</div>
+          <div class="text-[11px] text-gray-700">12 Industry Rd, Auckland</div>
+        </div>
+        <div>
+          <div class="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">Issued by</div>
+          <div class="text-[13px] font-semibold">Atma Okan</div>
+          <div class="text-[11px] text-gray-700">Operations Manager</div>
+          <div class="text-[11px] text-gray-700">+64 27 275 4329</div>
+          <div class="text-[11px] text-gray-700">atma@odinutrition.com</div>
+        </div>
+      </div>
+
+      <!-- Dates / terms -->
+      <div class="grid grid-cols-3 gap-4 mb-5 pb-3 border-b border-gray-200">
+        <div>
+          <div class="text-[9px] uppercase tracking-wider text-gray-500">Order date</div>
+          <div class="text-[12px] font-medium">28 April 2026</div>
+        </div>
+        <div>
+          <div class="text-[9px] uppercase tracking-wider text-gray-500">Expected delivery</div>
+          <div class="text-[12px] font-medium">15 May 2026</div>
+        </div>
+        <div>
+          <div class="text-[9px] uppercase tracking-wider text-gray-500">Payment terms</div>
+          <div class="text-[12px] font-medium">Net 30</div>
+        </div>
+      </div>
+
+      <!-- Line items -->
+      <table class="w-full text-[11px] mb-6">
+        <thead>
+          <tr style="background:#f0f4ec; color:#2f4d1f;">
+            <th class="text-left px-2 py-1.5 font-semibold">Description</th>
+            <th class="text-right px-2 py-1.5 font-semibold w-[60px]">Qty</th>
+            <th class="text-left px-2 py-1.5 font-semibold w-[50px]">UoM</th>
+            <th class="text-right px-2 py-1.5 font-semibold w-[80px]">Unit price</th>
+            <th class="text-right px-2 py-1.5 font-semibold w-[90px]">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-gray-100">
+            <td class="px-2 py-2">
+              <div class="font-medium">Beef Liver Powder · Organic</div>
+              <div class="text-gray-500 text-[10px]">SKU: ING-ORG-LIV-FD</div>
+            </td>
+            <td class="px-2 py-2 text-right tabular-nums">50.00</td>
+            <td class="px-2 py-2">kg</td>
+            <td class="px-2 py-2 text-right tabular-nums">$29.00</td>
+            <td class="px-2 py-2 text-right tabular-nums">$1,450.00</td>
+          </tr>
+          <tr class="border-b border-gray-100">
+            <td class="px-2 py-2">
+              <div class="font-medium">Beef Spleen Powder · Organic</div>
+              <div class="text-gray-500 text-[10px]">SKU: ING-ORG-SPL-FD</div>
+            </td>
+            <td class="px-2 py-2 text-right tabular-nums">40.00</td>
+            <td class="px-2 py-2">kg</td>
+            <td class="px-2 py-2 text-right tabular-nums">$25.00</td>
+            <td class="px-2 py-2 text-right tabular-nums">$1,000.00</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="text-[12px]">
+            <td colspan="4" class="px-2 py-2 text-right font-semibold">Total (NZD ex-GST)</td>
+            <td class="px-2 py-2 text-right tabular-nums font-bold">$2,450.00</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <!-- Notes -->
+      <div class="mb-8 p-3 border border-gray-200 rounded text-[10px] text-gray-700">
+        <div class="font-semibold text-gray-900 mb-1">Delivery notes</div>
+        Please confirm receipt of this PO. Reference <span class="font-mono">PO-2026-014</span> on all invoices and packing slips. Deliver between 9am–4pm to the address on file.
+      </div>
+
+      <!-- Footer -->
+      <div class="absolute-bottom mt-12 pt-3 border-t border-gray-200 text-[9px] text-gray-500 leading-snug">
+        Odi Nutrition Ltd · NZBN [to be confirmed] · GST [to be confirmed] · This document is computer-generated and valid without signature.
+      </div>
+    </div>
+
+    <p class="text-center text-xs text-gray-500 mt-3">Real logo .ai → PNG/SVG conversion at build time. NZBN, GST, address fields populated from a new "Company info" Settings tab.</p>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 4. RECEIVE FLOW -->
+  <!-- ============================================================ -->
+  <section>
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">4 · Receiving — match what arrived vs what was ordered</h2>
+
+    <div class="bg-white rounded-lg border border-gray-200">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-semibold">Receive — PO-2026-014</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Forager · expected 15 May 26 · received today</p>
+        </div>
+        <div class="text-xs text-gray-500">Tip: leave at 0 to skip a line · save creates a stock movement per line</div>
+      </div>
+
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+            <th class="text-left px-4 py-2 font-medium">Item</th>
+            <th class="text-right px-3 py-2 font-medium">Ordered</th>
+            <th class="text-right px-3 py-2 font-medium">Already received</th>
+            <th class="text-right px-3 py-2 font-medium">Receiving now</th>
+            <th class="text-right px-3 py-2 font-medium">Remaining</th>
+            <th class="text-left px-3 py-2 font-medium">Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-t border-gray-100">
+            <td class="px-4 py-2">
+              <div class="font-medium">Beef Liver Powder</div>
+              <div class="text-[10px] text-gray-500 font-mono">ING-ORG-LIV-FD</div>
+            </td>
+            <td class="px-3 py-2 text-right tabular-nums">50.0 kg</td>
+            <td class="px-3 py-2 text-right tabular-nums text-gray-500">0</td>
+            <td class="px-3 py-2 text-right">
+              <input class="w-20 text-right text-xs border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" value="50" />
+            </td>
+            <td class="px-3 py-2 text-right tabular-nums text-gray-500">0</td>
+            <td class="px-3 py-2"><input class="w-full text-xs border border-gray-200 rounded px-1.5 py-1" placeholder="Batch # / qa note" /></td>
+          </tr>
+          <tr class="border-t border-gray-100 bg-amber-50/40">
+            <td class="px-4 py-2">
+              <div class="font-medium">Beef Spleen Powder</div>
+              <div class="text-[10px] text-gray-500 font-mono">ING-ORG-SPL-FD</div>
+            </td>
+            <td class="px-3 py-2 text-right tabular-nums">40.0 kg</td>
+            <td class="px-3 py-2 text-right tabular-nums text-gray-500">0</td>
+            <td class="px-3 py-2 text-right">
+              <input class="w-20 text-right text-xs border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" value="32" />
+            </td>
+            <td class="px-3 py-2 text-right tabular-nums text-amber-800 font-semibold">8.0 kg</td>
+            <td class="px-3 py-2"><input class="w-full text-xs border border-gray-200 rounded px-1.5 py-1" value="Short — supplier to backorder" /></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+        <div class="text-xs text-gray-500">After saving, status moves to <span class="font-semibold">Partial</span> (because spleen is short).</div>
+        <div class="flex gap-2">
+          <button class="px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+          <button class="px-3 py-1.5 text-xs bg-emerald-700 text-white rounded-md hover:bg-emerald-800">Save receipt</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 5. INGREDIENT DEMAND with arrivals -->
+  <!-- ============================================================ -->
+  <section>
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">5 · Ingredient demand — submitted POs feed in as arrivals</h2>
+
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100">
+        <h3 class="text-base font-semibold">Beef Liver Powder · ING-ORG-LIV-FD <span class="text-[10px] text-gray-500 ml-2">supplier: Forager</span></h3>
+      </div>
+      <table class="w-full text-xs" style="min-width: 1200px;">
+        <thead>
+          <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+            <th class="text-left px-4 py-2 font-medium w-[140px]">Lane</th>
+            <th class="text-right px-2 py-2 font-medium">May 26</th>
+            <th class="text-right px-2 py-2 font-medium">Jun 26</th>
+            <th class="text-right px-2 py-2 font-medium">Jul 26</th>
+            <th class="text-right px-2 py-2 font-medium">Aug 26</th>
+            <th class="text-right px-2 py-2 font-medium">Sep 26</th>
+            <th class="text-right px-2 py-2 font-medium">Oct 26</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-t border-gray-100">
+            <td class="px-4 py-2 text-gray-500">Opening stock</td>
+            <td class="px-2 py-2 text-right tabular-nums" colspan="6">1.83 kg <span class="text-[10px] text-gray-400">(carries forward)</span></td>
+          </tr>
+          <tr class="border-t border-gray-100">
+            <td class="px-4 py-2 text-gray-700">Demand</td>
+            <td class="px-2 py-2 text-right tabular-nums">12.0</td>
+            <td class="px-2 py-2 text-right tabular-nums">14.5</td>
+            <td class="px-2 py-2 text-right tabular-nums">15.1</td>
+            <td class="px-2 py-2 text-right tabular-nums">15.8</td>
+            <td class="px-2 py-2 text-right tabular-nums">16.4</td>
+            <td class="px-2 py-2 text-right tabular-nums">17.1</td>
+          </tr>
+          <tr class="border-t border-gray-100 bg-blue-50/40">
+            <td class="px-4 py-2 text-blue-700 font-medium">Arriving (POs)</td>
+            <td class="px-2 py-2 text-right tabular-nums text-blue-700 font-semibold" title="PO-2026-014 · 15 May 26">+50.0 ⓘ</td>
+            <td class="px-2 py-2 text-right tabular-nums">—</td>
+            <td class="px-2 py-2 text-right tabular-nums text-blue-700 font-semibold" title="PO-2026-019 · 12 Jul 26">+30.0 ⓘ</td>
+            <td class="px-2 py-2 text-right tabular-nums">—</td>
+            <td class="px-2 py-2 text-right tabular-nums">—</td>
+            <td class="px-2 py-2 text-right tabular-nums">—</td>
+          </tr>
+          <tr class="border-t-2 border-gray-300 bg-gray-50 font-semibold">
+            <td class="px-4 py-2 text-gray-900">Running balance</td>
+            <td class="px-2 py-2 text-right tabular-nums">39.83</td>
+            <td class="px-2 py-2 text-right tabular-nums">25.33</td>
+            <td class="px-2 py-2 text-right tabular-nums">40.23</td>
+            <td class="px-2 py-2 text-right tabular-nums">24.43</td>
+            <td class="px-2 py-2 text-right tabular-nums text-amber-700">8.03</td>
+            <td class="px-2 py-2 text-right tabular-nums bg-red-50 text-red-700">-9.07</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="px-5 py-2.5 border-t border-gray-100 text-[11px] text-gray-500 flex items-center gap-4">
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-blue-50 border border-blue-200"></span> Arriving (submitted PO, not yet received)</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-50 border border-red-200"></span> Shortfall</span>
+        <span class="text-gray-400">·</span>
+        <span>Hover an arrival to see the PO #. Once received, it disappears from "arriving" and adds to inventory.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 6. SUPPLIER ENHANCEMENTS -->
+  <!-- ============================================================ -->
+  <section>
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-3">6 · Supplier card — Settings → Suppliers</h2>
+
+    <div class="bg-white rounded-lg border border-gray-200 p-5 max-w-xl space-y-3 text-sm">
+      <div class="flex items-start justify-between">
+        <div>
+          <h3 class="text-base font-semibold">Forager</h3>
+          <p class="text-xs text-gray-500">Code: FOR · Active</p>
+        </div>
+        <button class="text-xs text-blue-600 hover:underline">Edit</button>
+      </div>
+      <div class="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100 text-xs">
+        <div><div class="text-gray-500">Contact</div><div>Sarah Lee</div></div>
+        <div><div class="text-gray-500">Email</div><div>accounts@forager.co.nz</div></div>
+        <div><div class="text-gray-500">Phone</div><div>+64 9 555 0100</div></div>
+        <div><div class="text-gray-500">Address</div><div>12 Industry Rd, Auckland</div></div>
+        <div><div class="text-gray-500">Payment terms</div><div class="font-medium">Net 30 <span class="text-gray-400">(new field)</span></div></div>
+        <div><div class="text-gray-500">Lead time</div><div>14 days <span class="text-gray-400">(new field)</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- 7. PROPOSED CHANGES -->
+  <!-- ============================================================ -->
+  <section class="bg-white border border-gray-200 rounded-lg p-5 space-y-4 text-sm">
+    <h2 class="font-semibold">What needs to change underneath</h2>
+
+    <div>
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Schema (one new migration)</h3>
+      <ul class="list-disc pl-5 space-y-1 text-gray-700">
+        <li>Add <code class="bg-gray-100 px-1 rounded">suppliers.payment_terms</code> (text) and <code class="bg-gray-100 px-1 rounded">suppliers.lead_time_days</code> (int).</li>
+        <li>Make <code class="bg-gray-100 px-1 rounded">purchase_order_lines.ingredient_id</code> nullable; add <code class="bg-gray-100 px-1 rounded">product_id</code> (nullable FK) and <code class="bg-gray-100 px-1 rounded">description</code> (free text). Constraint: exactly one of the three is set per line.</li>
+        <li>New <code class="bg-gray-100 px-1 rounded">app_settings</code> columns: <code class="bg-gray-100 px-1 rounded">company_legal_name</code>, <code class="bg-gray-100 px-1 rounded">nzbn</code>, <code class="bg-gray-100 px-1 rounded">gst_number</code>, <code class="bg-gray-100 px-1 rounded">address_lines</code>. (For PDF letterhead.)</li>
+        <li>Auto-numbering trigger or app-level for <code class="bg-gray-100 px-1 rounded">po_number</code> in the format <code class="bg-gray-100 px-1 rounded">PO-YYYY-NNN</code>.</li>
+      </ul>
+    </div>
+
+    <div>
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">New pages</h3>
+      <ul class="list-disc pl-5 space-y-1 text-gray-700">
+        <li><code class="bg-gray-100 px-1 rounded">/purchase-orders</code> — list (with filters)</li>
+        <li><code class="bg-gray-100 px-1 rounded">/purchase-orders/new</code> and <code class="bg-gray-100 px-1 rounded">/purchase-orders/[id]</code> — create / edit / view</li>
+        <li><code class="bg-gray-100 px-1 rounded">/purchase-orders/[id]/receive</code> — receiving flow</li>
+        <li><code class="bg-gray-100 px-1 rounded">/api/purchase-orders/[id]/pdf</code> — generates the PDF on the fly (using <code class="bg-gray-100 px-1 rounded">@react-pdf/renderer</code> or Puppeteer)</li>
+        <li><code class="bg-gray-100 px-1 rounded">/suppliers</code> + edit — minimal CRUD so you can manage payment terms, contacts, etc. (Sidebar link already exists.)</li>
+        <li>Settings → "Company info" tab — for NZBN/GST/address used on the PDF</li>
+      </ul>
+    </div>
+
+    <div>
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Ingredient demand integration</h3>
+      <ul class="list-disc pl-5 space-y-1 text-gray-700">
+        <li>New "Arriving" row added to each ingredient — sums quantities from PO lines with status <code class="bg-gray-100 px-1 rounded">submitted</code> or <code class="bg-gray-100 px-1 rounded">partially_received</code> by their <code class="bg-gray-100 px-1 rounded">expected_delivery_date</code>'s month.</li>
+        <li>"Running balance" row replaces the simple shortfall logic, factoring in arrivals.</li>
+        <li>On receipt, the line stops contributing to "arriving" and the received qty becomes part of inventory (via stock_movements).</li>
+      </ul>
+    </div>
+
+    <div>
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Open questions for you</h3>
+      <ul class="list-disc pl-5 space-y-1 text-gray-700">
+        <li><b>NZBN, GST number, full company address</b> — what should the PDF show? (I've used placeholders.)</li>
+        <li><b>Currency</b> — assuming NZD on PDFs. Mixed-currency POs needed?</li>
+        <li><b>Email-to-supplier</b> button — send via SMTP from the app, or just generate a draft you copy/paste? (First is bigger build.)</li>
+        <li><b>Multi-line "other"</b> — allowed, or only one "other" per PO?</li>
+      </ul>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

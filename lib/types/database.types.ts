@@ -200,6 +200,9 @@ export type Database = {
           reorder_point: number | null
           confirmed_supplier: string | null           // legacy text; prefer supplier_id
           supplier_id: string | null
+          supplier_sku_code: string | null
+          supplier_pack_size: number | null
+          supplier_pack_unit: string | null
           lead_time: string | null
           status: 'confirmed' | 'pending' | 'inactive'
           price: number | null
@@ -553,6 +556,8 @@ export type Database = {
           status: 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled'
           order_date: string
           expected_delivery_date: string | null
+          delivery_address_id: string | null
+          delivery_notes: string | null
           notes: string | null
           created_at: string
           updated_at: string

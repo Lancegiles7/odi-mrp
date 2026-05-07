@@ -30,10 +30,11 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
 
   const [{ data: po }, { data: lines }, settings] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('po_number, status, order_date, expected_delivery_date, notes, supplier_id')
+      .select('po_number, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, supplier_id')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
         po_number: string; status: string; order_date: string; expected_delivery_date: string | null;
+        delivery_address_id: string | null; delivery_notes: string | null;
         notes: string | null; supplier_id: string;
       } | null }>,
     supabase.from('purchase_order_lines')
@@ -49,8 +50,8 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
 
   if (!po) notFound()
 
-  // Resolve supplier + line names
-  const [{ data: supplier }, { data: ingredients }, { data: products }] = await Promise.all([
+  // Resolve supplier + line names + delivery address
+  const [{ data: supplier }, { data: ingredients }, { data: products }, { data: deliveryAddress }] = await Promise.all([
     supabase.from('suppliers')
       .select('name, contact_name, email, phone, address, payment_terms')
       .eq('id', po.supplier_id)
@@ -59,11 +60,17 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
         address: string | null; payment_terms: string | null;
       } | null }>,
     supabase.from('ingredients')
-      .select('id, sku_code, name')
-      .in('id', (lines ?? []).filter((l) => l.ingredient_id).map((l) => l.ingredient_id!) ) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string }> | null }>,
+      .select('id, sku_code, name, supplier_sku_code')
+      .in('id', (lines ?? []).filter((l) => l.ingredient_id).map((l) => l.ingredient_id!) ) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; supplier_sku_code: string | null }> | null }>,
     supabase.from('products')
       .select('id, sku_code, name')
       .in('id', (lines ?? []).filter((l) => l.product_id).map((l) => l.product_id!)) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string }> | null }>,
+    po.delivery_address_id
+      ? supabase.from('delivery_addresses')
+          .select('label, street, contact_name, phone, country')
+          .eq('id', po.delivery_address_id)
+          .maybeSingle() as unknown as Promise<{ data: { label: string; street: string; contact_name: string | null; phone: string | null; country: string } | null }>
+      : Promise.resolve({ data: null }),
   ])
 
   const ingMap  = new Map((ingredients ?? []).map((i) => [i.id, i]))
@@ -134,7 +141,7 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 mb-6">
+        <div className="grid grid-cols-3 gap-6 mb-6">
           <div>
             <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">Supplier</div>
             <div className="text-[13px] font-semibold">{supplier?.name ?? '—'}</div>
@@ -142,6 +149,19 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
             {supplier?.email && <div className="text-[11px] text-gray-700">{supplier.email}</div>}
             {supplier?.phone && <div className="text-[11px] text-gray-700">{supplier.phone}</div>}
             {supplier?.address && <div className="text-[11px] text-gray-700 whitespace-pre-line">{supplier.address}</div>}
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">Deliver to</div>
+            {deliveryAddress ? (
+              <>
+                <div className="text-[13px] font-semibold">{deliveryAddress.label}</div>
+                <div className="text-[11px] text-gray-700 whitespace-pre-line">{deliveryAddress.street}</div>
+                {deliveryAddress.contact_name && <div className="text-[11px] text-gray-700 mt-1">Attn: {deliveryAddress.contact_name}</div>}
+                {deliveryAddress.phone && <div className="text-[11px] text-gray-700">{deliveryAddress.phone}</div>}
+              </>
+            ) : (
+              <div className="text-[11px] text-gray-400">No address selected</div>
+            )}
           </div>
           <div>
             <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">Issued by</div>
@@ -183,12 +203,13 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
               const prod = l.product_id    ? prodMap.get(l.product_id)   : null
               const name = ing?.name ?? prod?.name ?? l.description ?? '—'
               const sku  = ing?.sku_code ?? prod?.sku_code ?? null
+              const supplierSku = ing?.supplier_sku_code ?? null
               const total = (Number(l.unit_cost) || 0) * Number(l.quantity_ordered)
               return (
                 <tr key={l.id} className="border-b border-gray-100">
                   <td className="px-2 py-2 align-top">
                     <div className="font-medium">{name}</div>
-                    {sku && <div className="text-gray-500 text-[10px]">SKU: {sku}</div>}
+                    {sku && <div className="text-gray-500 text-[10px]">Internal SKU: {sku}{supplierSku ? `  ·  Supplier code: ${supplierSku}` : ''}</div>}
                     {l.notes && <div className="text-gray-500 text-[10px]">{l.notes}</div>}
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums align-top">{Number(l.quantity_ordered).toLocaleString()}</td>
@@ -207,10 +228,10 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
           </tfoot>
         </table>
 
-        {po.notes && (
-          <div className="mb-8 p-3 border border-gray-200 rounded text-[10px] text-gray-700">
+        {po.delivery_notes && (
+          <div className="mb-4 p-3 border border-gray-200 rounded text-[10px] text-gray-700">
             <div className="font-semibold text-gray-900 mb-1">Delivery notes</div>
-            <div className="whitespace-pre-line">{po.notes}</div>
+            <div className="whitespace-pre-line">{po.delivery_notes}</div>
           </div>
         )}
 

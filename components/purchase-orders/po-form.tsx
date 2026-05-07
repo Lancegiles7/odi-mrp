@@ -22,12 +22,27 @@ interface IngredientOption {
   sku_code: string
   name: string
   unit_of_measure: string | null
+  // Saved supplier reference data — pre-fills new PO lines
+  supplier_sku_code:  string | null
+  supplier_pack_size: number | null
+  supplier_pack_unit: string | null
+  price:              number | null
 }
 
 interface ProductOption {
   id: string
   sku_code: string
   name: string
+}
+
+interface DeliveryAddressOption {
+  id: string
+  label: string
+  street: string
+  contact_name: string | null
+  phone: string | null
+  country: 'NZ' | 'AU'
+  is_default: boolean
 }
 
 export interface POFormProps {
@@ -37,12 +52,15 @@ export interface POFormProps {
   initialSupplierId: string
   initialOrderDate: string         // 'YYYY-MM-DD'
   initialExpected: string | null   // 'YYYY-MM-DD' or null
+  initialDeliveryAddressId: string | null
+  initialDeliveryNotes: string | null
   initialNotes: string | null
   initialLines: POLineInput[]
   status: 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled'
   suppliers: SupplierOption[]
   ingredients: IngredientOption[]
   products: ProductOption[]
+  deliveryAddresses: DeliveryAddressOption[]
 }
 
 const NEW_LINE: POLineInput = {
@@ -66,6 +84,13 @@ export function POForm(props: POFormProps) {
   const [orderDate, setOrderDate]   = useState(props.initialOrderDate)
   const [expected, setExpected]     = useState(props.initialExpected ?? '')
   const [notes, setNotes]           = useState(props.initialNotes ?? '')
+  const [deliveryAddressId, setDeliveryAddressId] = useState(
+    props.initialDeliveryAddressId
+      ?? props.deliveryAddresses.find((a) => a.is_default && a.country === 'NZ')?.id
+      ?? props.deliveryAddresses[0]?.id
+      ?? '',
+  )
+  const [deliveryNotes, setDeliveryNotes] = useState(props.initialDeliveryNotes ?? '')
   const [lines, setLines]           = useState<POLineInput[]>(
     props.initialLines.length > 0 ? props.initialLines : [{ ...NEW_LINE }],
   )
@@ -99,6 +124,15 @@ export function POForm(props: POFormProps) {
         if (patch.line_type === 'ingredient') next.unit_of_measure = 'kg'
         if (patch.line_type === 'product')    next.unit_of_measure = 'each'
       }
+      // Pre-fill from the selected ingredient's saved supplier reference
+      // data — but only when the user picks a different ingredient (or sets
+      // it for the first time), so we don't blow away their typed values.
+      if (patch.ingredient_id && patch.ingredient_id !== l.ingredient_id) {
+        const ing = props.ingredients.find((x) => x.id === patch.ingredient_id)
+        if (ing) {
+          if (next.unit_cost == null && ing.price != null) next.unit_cost = Number(ing.price)
+        }
+      }
       return next
     }))
   }
@@ -119,6 +153,8 @@ export function POForm(props: POFormProps) {
         supplier_id: supplierId,
         order_date: orderDate,
         expected_delivery_date: expected || null,
+        delivery_address_id: deliveryAddressId || null,
+        delivery_notes: deliveryNotes || null,
         notes: notes || null,
         lines,
       }
@@ -250,6 +286,36 @@ export function POForm(props: POFormProps) {
                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
               />
             </Field>
+
+            <Field label="Deliver to">
+              <select
+                disabled={!isEditable}
+                value={deliveryAddressId}
+                onChange={(e) => setDeliveryAddressId(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
+              >
+                <option value="">— Select an address —</option>
+                {props.deliveryAddresses.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label} · {a.country}{a.is_default ? ' ★' : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-500 mt-1">
+                <Link href="/delivery-addresses" target="_blank" className="text-blue-600 hover:underline">Manage addresses ↗</Link>
+              </p>
+            </Field>
+
+            <Field label="Delivery notes (this PO)">
+              <textarea
+                disabled={!isEditable}
+                rows={2}
+                value={deliveryNotes}
+                onChange={(e) => setDeliveryNotes(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
+                placeholder="e.g. Deliver between 9 am and noon · loading dock at rear"
+              />
+            </Field>
           </div>
 
           <div>
@@ -265,11 +331,13 @@ export function POForm(props: POFormProps) {
                   <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                     <th className="text-left px-3 py-2 font-medium w-[110px]">Type</th>
                     <th className="text-left px-3 py-2 font-medium">Item</th>
+                    <th className="text-left px-3 py-2 font-medium w-[120px]">Supplier code</th>
                     <th className="text-right px-3 py-2 font-medium w-[80px]">Qty</th>
                     <th className="text-left px-3 py-2 font-medium w-[60px]">UoM</th>
+                    <th className="text-right px-3 py-2 font-medium w-[80px]">Pack size</th>
                     <th className="text-right px-3 py-2 font-medium w-[100px]">Unit price</th>
                     <th className="text-right px-3 py-2 font-medium w-[100px]">Line total</th>
-                    {isDraft && <th className="w-[30px]"></th>}
+                    {isEditable && <th className="w-[30px]"></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -285,7 +353,7 @@ export function POForm(props: POFormProps) {
                     />
                   ))}
                   <tr className="border-t-2 border-gray-200 bg-gray-50 text-sm">
-                    <td colSpan={5} className="px-3 py-2 text-right font-medium text-gray-700">Subtotal (NZD ex-GST)</td>
+                    <td colSpan={7} className="px-3 py-2 text-right font-medium text-gray-700">Subtotal (NZD ex-GST)</td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold">${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     {isEditable && <td></td>}
                   </tr>
@@ -419,9 +487,42 @@ function LineRow({
   onRemove?: () => void
 }) {
   const lineTotal = (Number(line.unit_cost) || 0) * (Number(line.quantity_ordered) || 0)
+  const isIngredient = line.line_type === 'ingredient'
+  const ing = isIngredient && line.ingredient_id
+    ? ingredients.find((x) => x.id === line.ingredient_id) ?? null
+    : null
+
+  // Effective values shown on this line (after any user edits)
+  const lineSupSku   = line.save_back_supplier_data?.supplier_sku_code  ?? ing?.supplier_sku_code  ?? ''
+  const linePackSize = line.save_back_supplier_data?.supplier_pack_size ?? ing?.supplier_pack_size ?? null
+  const linePackUom  = line.save_back_supplier_data?.supplier_pack_unit ?? ing?.supplier_pack_unit ?? line.unit_of_measure
+  // Saved values for diff-detection
+  const savedSupSku   = ing?.supplier_sku_code  ?? null
+  const savedPackSize = ing?.supplier_pack_size ?? null
+  const savedPrice    = ing?.price              ?? null
+
+  // Pack-size compliance — soft warning + suggested round-up
+  const qty = Number(line.quantity_ordered) || 0
+  const packSize = Number(linePackSize) || 0
+  const packMismatch = isIngredient && packSize > 0 && qty > 0 && qty % packSize !== 0
+  const suggestedQty = packMismatch ? Math.ceil(qty / packSize) * packSize : null
+
+  // Price drift — soft warning when entered price differs from saved
+  const priceDrift = isIngredient && savedPrice != null && line.unit_cost != null && Math.abs(line.unit_cost - savedPrice) > 0.001
+
+  // Helper: update save-back data for this line (one field, partial)
+  function patchSaveBack(patch: Partial<NonNullable<POLineInput['save_back_supplier_data']>>) {
+    const current = line.save_back_supplier_data ?? {
+      supplier_sku_code:  ing?.supplier_sku_code  ?? null,
+      supplier_pack_size: ing?.supplier_pack_size ?? null,
+      supplier_pack_unit: ing?.supplier_pack_unit ?? null,
+      price:              ing?.price              ?? null,
+    }
+    onChange({ save_back_supplier_data: { ...current, ...patch } })
+  }
 
   return (
-    <tr className="border-t border-gray-100">
+    <tr className="border-t border-gray-100 align-top">
       <td className="px-3 py-2">
         <select
           disabled={readOnly}
@@ -471,6 +572,26 @@ function LineRow({
           />
         )}
       </td>
+
+      {/* SUPPLIER CODE */}
+      <td className="px-3 py-2">
+        {isIngredient ? (
+          <>
+            <input
+              disabled={readOnly || !line.ingredient_id}
+              value={lineSupSku}
+              onChange={(e) => patchSaveBack({ supplier_sku_code: e.target.value || null })}
+              placeholder={savedSupSku ? '' : '—'}
+              className={`w-full text-xs border rounded px-1.5 py-1 ${savedSupSku ? 'border-gray-200' : 'border-dashed border-gray-300 placeholder-gray-300'} disabled:bg-gray-50`}
+            />
+            {!readOnly && lineSupSku !== (savedSupSku ?? '') && (
+              <p className="text-[10px] text-blue-700 mt-0.5">will save to ingredient on PO save</p>
+            )}
+          </>
+        ) : <span className="text-gray-300">—</span>}
+      </td>
+
+      {/* QTY */}
       <td className="px-3 py-2">
         <input
           disabled={readOnly}
@@ -479,9 +600,17 @@ function LineRow({
           min={0}
           value={line.quantity_ordered || ''}
           onChange={(e) => onChange({ quantity_ordered: e.target.value === '' ? 0 : Number(e.target.value) })}
-          className="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums disabled:bg-gray-50"
+          className={`w-full text-right text-xs border rounded px-1.5 py-1 tabular-nums ${packMismatch ? 'border-amber-300 bg-amber-50' : 'border-gray-200'} disabled:bg-gray-50`}
         />
+        {packMismatch && (
+          <p className="text-[10px] text-amber-800 mt-0.5">
+            ⚠ pack {packSize}{linePackUom ? ` ${linePackUom}` : ''}
+            {' · '}
+            <button type="button" className="underline" onClick={() => onChange({ quantity_ordered: suggestedQty! })}>round to {suggestedQty}</button>
+          </p>
+        )}
       </td>
+
       <td className="px-3 py-2">
         <input
           disabled={readOnly}
@@ -490,6 +619,29 @@ function LineRow({
           className="w-full text-xs border border-gray-200 rounded px-1.5 py-1 disabled:bg-gray-50"
         />
       </td>
+
+      {/* PACK SIZE */}
+      <td className="px-3 py-2">
+        {isIngredient ? (
+          <>
+            <input
+              disabled={readOnly || !line.ingredient_id}
+              type="number"
+              step="any"
+              min={0}
+              value={linePackSize ?? ''}
+              onChange={(e) => patchSaveBack({ supplier_pack_size: e.target.value === '' ? null : Number(e.target.value) })}
+              placeholder={savedPackSize == null ? '—' : ''}
+              className={`w-full text-right text-xs border rounded px-1.5 py-1 tabular-nums ${savedPackSize == null ? 'border-dashed border-gray-300 placeholder-gray-300' : 'border-gray-200'} disabled:bg-gray-50`}
+            />
+            {!readOnly && (linePackSize ?? null) !== (savedPackSize ?? null) && (
+              <p className="text-[10px] text-blue-700 mt-0.5">will save</p>
+            )}
+          </>
+        ) : <span className="text-gray-300">—</span>}
+      </td>
+
+      {/* UNIT PRICE */}
       <td className="px-3 py-2">
         <input
           disabled={readOnly}
@@ -498,9 +650,17 @@ function LineRow({
           min={0}
           value={line.unit_cost ?? ''}
           onChange={(e) => onChange({ unit_cost: e.target.value === '' ? null : Number(e.target.value) })}
-          className="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums disabled:bg-gray-50"
+          className={`w-full text-right text-xs border rounded px-1.5 py-1 tabular-nums ${priceDrift ? 'border-amber-300 bg-amber-50' : 'border-gray-200'} disabled:bg-gray-50`}
         />
+        {priceDrift && (
+          <p className="text-[10px] text-amber-800 mt-0.5">
+            ⚠ saved ${savedPrice!.toFixed(2)}
+            {' · '}
+            <button type="button" className="underline" onClick={() => patchSaveBack({ price: line.unit_cost })}>save ${line.unit_cost!.toFixed(2)} back</button>
+          </p>
+        )}
       </td>
+
       <td className="px-3 py-2 text-right tabular-nums">
         ${lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </td>
