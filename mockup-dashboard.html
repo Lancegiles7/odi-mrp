@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Odi MRP — Budget dashboard mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+  .bar { display: inline-block; height: 18px; background: #5a8a3a; border-radius: 2px; vertical-align: middle; }
+  .bar.au   { background: #2563eb; }
+  .bar.dim  { background: #9ca3af; }
+</style>
+</head>
+<body class="bg-gray-50 p-8">
+<div class="max-w-[1600px] mx-auto space-y-6">
+
+<!-- HEADER -->
+<header class="flex items-start justify-between">
+  <div>
+    <h1 class="text-2xl font-semibold">Budget dashboard</h1>
+    <p class="text-sm text-gray-500 mt-1">FY27 → FY29 outlook · synced from <span class="font-medium">FY27 Budget – Revised May 26.xlsx</span> · last upload 4 May 2026 by Lance</p>
+  </div>
+  <div class="flex gap-2 items-center">
+    <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+      <button class="px-3 py-1.5 font-medium bg-white text-gray-700 hover:bg-gray-50">3-Yr</button>
+      <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-gray-900 text-white">FY27</button>
+      <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-white text-gray-700 hover:bg-gray-50">FY28</button>
+      <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-white text-gray-700 hover:bg-gray-50">FY29</button>
+    </div>
+    <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+      <button class="px-3 py-1.5 font-medium bg-gray-900 text-white">Combined</button>
+      <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-white text-gray-700 hover:bg-gray-50">NZ</button>
+      <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-white text-gray-700 hover:bg-gray-50">AU</button>
+    </div>
+    <button class="px-3 py-1.5 text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-50">↑ Re-upload XLSX</button>
+  </div>
+</header>
+
+<!-- TOP TILES -->
+<div class="grid grid-cols-5 gap-3">
+  <div class="bg-white border border-gray-200 rounded-md p-3">
+    <div class="text-[11px] uppercase font-semibold text-gray-500">Gross revenue FY27</div>
+    <div class="text-lg font-semibold text-gray-900">$9.82M</div>
+    <div class="text-[11px] text-gray-500">D2C $3.22M · B2B $6.60M</div>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-md p-3">
+    <div class="text-[11px] uppercase font-semibold text-gray-500">Net revenue FY27</div>
+    <div class="text-lg font-semibold text-gray-900">$7.02M</div>
+    <div class="text-[11px] text-gray-500">3-Yr CAGR <span class="text-emerald-700">+170%</span></div>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-md p-3">
+    <div class="text-[11px] uppercase font-semibold text-gray-500">Gross profit %</div>
+    <div class="text-lg font-semibold text-gray-900">31.9%</div>
+    <div class="text-[11px] text-gray-500">→ 37.2% by FY29</div>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-md p-3">
+    <div class="text-[11px] uppercase font-semibold text-gray-500">Marketing %</div>
+    <div class="text-lg font-semibold text-gray-900">28.8%</div>
+    <div class="text-[11px] text-gray-500">$2.02M FY27</div>
+  </div>
+  <div class="p-3 bg-red-50 border border-red-200 rounded-md">
+    <div class="text-[11px] uppercase font-semibold text-red-700">EBITDA FY27</div>
+    <div class="text-lg font-semibold text-red-800">−$1.41M</div>
+    <div class="text-[11px] text-red-700">Breakeven by FY28 · +$5.7M FY29</div>
+  </div>
+</div>
+
+<!-- SECTION 1 — P&L BREAKDOWN -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">1 · P&amp;L breakdown</h2>
+      <p class="text-xs text-gray-500 mt-0.5">Total Business · monthly · NZ + AU consolidated</p>
+    </div>
+    <a class="text-xs text-blue-600 hover:underline" href="#">Source: Copy of Total Business P&amp;L</a>
+  </div>
+
+  <!-- Revenue split visual -->
+  <div class="p-5 border-b border-gray-100">
+    <div class="text-[11px] uppercase tracking-wider text-gray-500 mb-2">Net revenue split by channel — FY27 monthly</div>
+    <table class="w-full text-xs">
+      <thead>
+        <tr class="text-[10px] uppercase tracking-wider text-gray-500">
+          <th class="text-left px-2 py-1 w-[80px]">Month</th>
+          <th class="text-left px-2 py-1">Channel mix (D2C vs Retail)</th>
+          <th class="text-right px-2 py-1 w-[100px]">Total Net Rev</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- A few illustrative months -->
+        <tr class="border-t border-gray-100"><td class="px-2 py-1 text-gray-700">Apr 26</td>
+          <td><span class="bar"  style="width: 36%"></span><span class="bar dim" style="width: 64%"></span></td>
+          <td class="px-2 py-1 text-right tabular-nums">$57k</td></tr>
+        <tr class="border-t border-gray-100"><td class="px-2 py-1 text-gray-700">May 26</td>
+          <td><span class="bar"  style="width: 49%"></span><span class="bar dim" style="width: 51%"></span></td>
+          <td class="px-2 py-1 text-right tabular-nums">$142k</td></tr>
+        <tr class="border-t border-gray-100"><td class="px-2 py-1 text-gray-700">Jun 26</td>
+          <td><span class="bar"  style="width: 49%"></span><span class="bar dim" style="width: 51%"></span></td>
+          <td class="px-2 py-1 text-right tabular-nums">$172k</td></tr>
+        <tr class="border-t border-gray-100"><td class="px-2 py-1 text-gray-700">Nov 26</td>
+          <td><span class="bar"  style="width: 42%"></span><span class="bar dim" style="width: 58%"></span></td>
+          <td class="px-2 py-1 text-right tabular-nums">$838k</td></tr>
+        <tr class="border-t border-gray-100"><td class="px-2 py-1 text-gray-700">Mar 27</td>
+          <td><span class="bar"  style="width: 40%"></span><span class="bar dim" style="width: 60%"></span></td>
+          <td class="px-2 py-1 text-right tabular-nums">$1.23M</td></tr>
+        <tr class="border-t border-gray-200 bg-gray-50 font-semibold"><td class="px-2 py-1.5">FY27</td>
+          <td><span class="bar"  style="width: 41%"></span><span class="bar dim" style="width: 59%"></span></td>
+          <td class="px-2 py-1.5 text-right tabular-nums">$7.02M</td></tr>
+      </tbody>
+    </table>
+    <div class="flex items-center gap-4 text-[11px] text-gray-500 mt-2">
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded" style="background:#5a8a3a"></span> D2C (NZ + AU)</span>
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-gray-400"></span> Retail / B2B (NZ + AU)</span>
+    </div>
+  </div>
+
+  <!-- Monthly P&L table -->
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs" style="min-width: 1500px;">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+          <th class="text-left px-3 py-2 font-medium w-[180px]">Line item</th>
+          <th class="text-right px-2 py-2 font-medium">Apr-26</th>
+          <th class="text-right px-2 py-2 font-medium">May-26</th>
+          <th class="text-right px-2 py-2 font-medium">Jun-26</th>
+          <th class="text-right px-2 py-2 font-medium">Jul-26</th>
+          <th class="text-right px-2 py-2 font-medium">Aug-26</th>
+          <th class="text-right px-2 py-2 font-medium">Sep-26</th>
+          <th class="text-right px-2 py-2 font-medium">Oct-26</th>
+          <th class="text-right px-2 py-2 font-medium">Nov-26</th>
+          <th class="text-right px-2 py-2 font-medium">Dec-26</th>
+          <th class="text-right px-2 py-2 font-medium">Jan-27</th>
+          <th class="text-right px-2 py-2 font-medium">Feb-27</th>
+          <th class="text-right px-2 py-2 font-medium">Mar-27</th>
+          <th class="text-right px-3 py-2 font-medium bg-gray-100 border-l border-gray-200">FY27</th>
+        </tr>
+      </thead>
+      <tbody class="text-xs tabular-nums text-gray-700">
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-1.5 font-medium text-gray-900">Gross revenue</td>
+          <td class="px-2 py-1.5 text-right">79k</td><td class="px-2 py-1.5 text-right">189k</td><td class="px-2 py-1.5 text-right">228k</td><td class="px-2 py-1.5 text-right">292k</td><td class="px-2 py-1.5 text-right">383k</td><td class="px-2 py-1.5 text-right">685k</td><td class="px-2 py-1.5 text-right">948k</td><td class="px-2 py-1.5 text-right">1.20M</td><td class="px-2 py-1.5 text-right">1.17M</td><td class="px-2 py-1.5 text-right">1.38M</td><td class="px-2 py-1.5 text-right">1.53M</td><td class="px-2 py-1.5 text-right">1.74M</td>
+          <td class="px-3 py-1.5 text-right font-semibold bg-gray-50 border-l border-gray-200">$9.82M</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-1.5 pl-6 text-gray-600">— D2C</td>
+          <td class="px-2 py-1.5 text-right">23k</td><td class="px-2 py-1.5 text-right">77k</td><td class="px-2 py-1.5 text-right">93k</td><td class="px-2 py-1.5 text-right">100k</td><td class="px-2 py-1.5 text-right">100k</td><td class="px-2 py-1.5 text-right">240k</td><td class="px-2 py-1.5 text-right">287k</td><td class="px-2 py-1.5 text-right">424k</td><td class="px-2 py-1.5 text-right">343k</td><td class="px-2 py-1.5 text-right">470k</td><td class="px-2 py-1.5 text-right">513k</td><td class="px-2 py-1.5 text-right">545k</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">$3.22M</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-1.5 pl-6 text-gray-600">— B2B / retail</td>
+          <td class="px-2 py-1.5 text-right">56k</td><td class="px-2 py-1.5 text-right">112k</td><td class="px-2 py-1.5 text-right">135k</td><td class="px-2 py-1.5 text-right">192k</td><td class="px-2 py-1.5 text-right">283k</td><td class="px-2 py-1.5 text-right">445k</td><td class="px-2 py-1.5 text-right">661k</td><td class="px-2 py-1.5 text-right">772k</td><td class="px-2 py-1.5 text-right">827k</td><td class="px-2 py-1.5 text-right">911k</td><td class="px-2 py-1.5 text-right">1.01M</td><td class="px-2 py-1.5 text-right">1.19M</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">$6.60M</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-1.5 font-medium text-gray-900">Net revenue</td>
+          <td class="px-2 py-1.5 text-right">57k</td><td class="px-2 py-1.5 text-right">142k</td><td class="px-2 py-1.5 text-right">172k</td><td class="px-2 py-1.5 text-right">215k</td><td class="px-2 py-1.5 text-right">274k</td><td class="px-2 py-1.5 text-right">499k</td><td class="px-2 py-1.5 text-right">676k</td><td class="px-2 py-1.5 text-right">838k</td><td class="px-2 py-1.5 text-right">827k</td><td class="px-2 py-1.5 text-right">993k</td><td class="px-2 py-1.5 text-right">1.09M</td><td class="px-2 py-1.5 text-right">1.23M</td>
+          <td class="px-3 py-1.5 text-right font-semibold bg-gray-50 border-l border-gray-200">$7.02M</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-1.5 text-gray-600">Total COGs</td>
+          <td class="px-2 py-1.5 text-right">53k</td><td class="px-2 py-1.5 text-right">123k</td><td class="px-2 py-1.5 text-right">147k</td><td class="px-2 py-1.5 text-right">184k</td><td class="px-2 py-1.5 text-right">218k</td><td class="px-2 py-1.5 text-right">367k</td><td class="px-2 py-1.5 text-right">445k</td><td class="px-2 py-1.5 text-right">561k</td><td class="px-2 py-1.5 text-right">536k</td><td class="px-2 py-1.5 text-right">642k</td><td class="px-2 py-1.5 text-right">708k</td><td class="px-2 py-1.5 text-right">796k</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">$4.78M</td>
+        </tr>
+        <tr class="border-t border-gray-100 bg-emerald-50/50">
+          <td class="px-3 py-1.5 font-medium text-emerald-900">Gross profit</td>
+          <td class="px-2 py-1.5 text-right">4k</td><td class="px-2 py-1.5 text-right">19k</td><td class="px-2 py-1.5 text-right">24k</td><td class="px-2 py-1.5 text-right">31k</td><td class="px-2 py-1.5 text-right">56k</td><td class="px-2 py-1.5 text-right">132k</td><td class="px-2 py-1.5 text-right">231k</td><td class="px-2 py-1.5 text-right">277k</td><td class="px-2 py-1.5 text-right">292k</td><td class="px-2 py-1.5 text-right">350k</td><td class="px-2 py-1.5 text-right">386k</td><td class="px-2 py-1.5 text-right">438k</td>
+          <td class="px-3 py-1.5 text-right font-semibold bg-emerald-100 border-l border-emerald-200">$2.24M</td>
+        </tr>
+        <tr class="border-t border-gray-100 bg-emerald-50/30">
+          <td class="px-3 py-1.5 pl-6 text-emerald-800">GP %</td>
+          <td class="px-2 py-1.5 text-right">6%</td><td class="px-2 py-1.5 text-right">13%</td><td class="px-2 py-1.5 text-right">14%</td><td class="px-2 py-1.5 text-right">14%</td><td class="px-2 py-1.5 text-right">20%</td><td class="px-2 py-1.5 text-right">27%</td><td class="px-2 py-1.5 text-right">34%</td><td class="px-2 py-1.5 text-right">33%</td><td class="px-2 py-1.5 text-right">35%</td><td class="px-2 py-1.5 text-right">35%</td><td class="px-2 py-1.5 text-right">35%</td><td class="px-2 py-1.5 text-right">36%</td>
+          <td class="px-3 py-1.5 text-right font-semibold bg-emerald-100 border-l border-emerald-200">31.9%</td>
+        </tr>
+        <tr class="border-t border-gray-100"><td class="px-3 py-1.5 text-gray-600">Marketing</td>
+          <td class="px-2 py-1.5 text-right">40k</td><td class="px-2 py-1.5 text-right">68k</td><td class="px-2 py-1.5 text-right">75k</td><td class="px-2 py-1.5 text-right">82k</td><td class="px-2 py-1.5 text-right">57k</td><td class="px-2 py-1.5 text-right">206k</td><td class="px-2 py-1.5 text-right">225k</td><td class="px-2 py-1.5 text-right">283k</td><td class="px-2 py-1.5 text-right">203k</td><td class="px-2 py-1.5 text-right">258k</td><td class="px-2 py-1.5 text-right">257k</td><td class="px-2 py-1.5 text-right">268k</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">$2.02M</td></tr>
+        <tr class="border-t border-gray-100"><td class="px-3 py-1.5 text-gray-600">OPEX</td>
+          <td class="px-2 py-1.5 text-right">89k</td><td class="px-2 py-1.5 text-right">78k</td><td class="px-2 py-1.5 text-right">81k</td><td class="px-2 py-1.5 text-right">123k</td><td class="px-2 py-1.5 text-right">139k</td><td class="px-2 py-1.5 text-right">130k</td><td class="px-2 py-1.5 text-right">149k</td><td class="px-2 py-1.5 text-right">131k</td><td class="px-2 py-1.5 text-right">153k</td><td class="px-2 py-1.5 text-right">197k</td><td class="px-2 py-1.5 text-right">176k</td><td class="px-2 py-1.5 text-right">183k</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">$1.63M</td></tr>
+        <tr class="border-t-2 border-gray-200 bg-red-50/30">
+          <td class="px-3 py-1.5 font-semibold text-red-900">EBITDA</td>
+          <td class="px-2 py-1.5 text-right text-red-700">−125k</td><td class="px-2 py-1.5 text-right text-red-700">−127k</td><td class="px-2 py-1.5 text-right text-red-700">−132k</td><td class="px-2 py-1.5 text-right text-red-700">−175k</td><td class="px-2 py-1.5 text-right text-red-700">−140k</td><td class="px-2 py-1.5 text-right text-red-700">−204k</td><td class="px-2 py-1.5 text-right text-red-700">−143k</td><td class="px-2 py-1.5 text-right text-red-700">−137k</td><td class="px-2 py-1.5 text-right text-red-700">−65k</td><td class="px-2 py-1.5 text-right text-red-700">−105k</td><td class="px-2 py-1.5 text-right text-red-700">−48k</td><td class="px-2 py-1.5 text-right text-red-700">−12k</td>
+          <td class="px-3 py-1.5 text-right font-semibold text-red-800 bg-red-100 border-l border-red-200">−$1.41M</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+
+<!-- SECTION 2 — UNIFIED ORDERS BREAKDOWN -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">2 · Orders breakdown</h2>
+      <p class="text-xs text-gray-500 mt-0.5">Monthly · D2C + Retail · NZ + AU split · grand total. Forecasting view.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-[11px]">
+        <button class="px-2.5 py-1 font-medium bg-gray-900 text-white">Orders</button>
+        <button class="px-2.5 py-1 font-medium border-l border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Units</button>
+        <button class="px-2.5 py-1 font-medium border-l border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Revenue</button>
+      </div>
+      <a class="text-xs text-blue-600 hover:underline" href="#">Source tabs</a>
+    </div>
+  </div>
+
+  <!-- Headline tiles -->
+  <div class="p-5 grid grid-cols-4 gap-3">
+    <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-emerald-700">D2C orders FY27</div>
+      <div class="text-lg font-semibold text-emerald-900">24,749</div>
+      <div class="text-[11px] text-emerald-700">NZ 13,889 · AU 10,860</div>
+    </div>
+    <div class="p-3 bg-white border border-gray-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-gray-500">Retail orders FY27 <span class="normal-case font-normal">(store-months)</span></div>
+      <div class="text-lg font-semibold text-gray-900">7,824</div>
+      <div class="text-[11px] text-gray-500">WW 1,212 · Other 6,612</div>
+    </div>
+    <div class="p-3 bg-white border border-gray-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-gray-500">Active stores end FY27</div>
+      <div class="text-lg font-semibold text-gray-900">879</div>
+      <div class="text-[11px] text-gray-500">NZ 394 · AU 485 (incl. 101 WW)</div>
+    </div>
+    <div class="p-3 bg-white border border-gray-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-gray-500">Grand total orders FY27</div>
+      <div class="text-lg font-semibold text-gray-900">32,573</div>
+      <div class="text-[11px] text-gray-500">D2C 76% · Retail 24%</div>
+    </div>
+  </div>
+
+  <!-- The big monthly table -->
+  <div class="overflow-x-auto border-t border-gray-100">
+    <table class="w-full text-xs" style="min-width: 1500px;">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+          <th class="text-left px-3 py-2 font-medium w-[200px] sticky left-0 bg-gray-50">Channel</th>
+          <th class="text-right px-2 py-2 font-medium">Apr-26</th>
+          <th class="text-right px-2 py-2 font-medium">May-26</th>
+          <th class="text-right px-2 py-2 font-medium">Jun-26</th>
+          <th class="text-right px-2 py-2 font-medium">Jul-26</th>
+          <th class="text-right px-2 py-2 font-medium">Aug-26</th>
+          <th class="text-right px-2 py-2 font-medium">Sep-26</th>
+          <th class="text-right px-2 py-2 font-medium">Oct-26</th>
+          <th class="text-right px-2 py-2 font-medium">Nov-26</th>
+          <th class="text-right px-2 py-2 font-medium">Dec-26</th>
+          <th class="text-right px-2 py-2 font-medium">Jan-27</th>
+          <th class="text-right px-2 py-2 font-medium">Feb-27</th>
+          <th class="text-right px-2 py-2 font-medium">Mar-27</th>
+          <th class="text-right px-3 py-2 font-medium bg-gray-100 border-l border-gray-200">FY27</th>
+          <th class="text-right px-3 py-2 font-medium bg-gray-100">FY28</th>
+          <th class="text-right px-3 py-2 font-medium bg-gray-100">FY29</th>
+        </tr>
+      </thead>
+      <tbody class="tabular-nums text-gray-700">
+
+        <!-- D2C SECTION -->
+        <tr class="border-t border-gray-200 bg-emerald-50/60">
+          <td colspan="16" class="px-3 py-1.5 text-[10px] uppercase tracking-wider text-emerald-800 font-semibold sticky left-0 bg-emerald-50/60">D2C — direct-to-consumer orders</td>
+        </tr>
+        <tr class="border-t border-gray-100 hover:bg-gray-50">
+          <td class="px-3 py-1.5 pl-8 text-gray-700 sticky left-0 bg-white hover:bg-gray-50">D2C — NZ</td>
+          <td class="px-2 py-1.5 text-right">280</td><td class="px-2 py-1.5 text-right">925</td><td class="px-2 py-1.5 text-right">1,125</td><td class="px-2 py-1.5 text-right">1,200</td><td class="px-2 py-1.5 text-right">1,158</td><td class="px-2 py-1.5 text-right">1,176</td><td class="px-2 py-1.5 text-right">1,173</td><td class="px-2 py-1.5 text-right">1,501</td><td class="px-2 py-1.5 text-right">1,186</td><td class="px-2 py-1.5 text-right">1,354</td><td class="px-2 py-1.5 text-right">1,393</td><td class="px-2 py-1.5 text-right">1,418</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">13,889</td><td class="px-3 py-1.5 text-right bg-gray-50">19,009</td><td class="px-3 py-1.5 text-right bg-gray-50">27,310</td>
+        </tr>
+        <tr class="border-t border-gray-100 hover:bg-gray-50">
+          <td class="px-3 py-1.5 pl-8 text-gray-700 sticky left-0 bg-white hover:bg-gray-50">D2C — AU</td>
+          <td class="px-2 py-1.5 text-right">200</td><td class="px-2 py-1.5 text-right">580</td><td class="px-2 py-1.5 text-right">680</td><td class="px-2 py-1.5 text-right">740</td><td class="px-2 py-1.5 text-right">815</td><td class="px-2 py-1.5 text-right">870</td><td class="px-2 py-1.5 text-right">920</td><td class="px-2 py-1.5 text-right">1,150</td><td class="px-2 py-1.5 text-right">940</td><td class="px-2 py-1.5 text-right">1,000</td><td class="px-2 py-1.5 text-right">1,055</td><td class="px-2 py-1.5 text-right">1,090</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">10,860</td><td class="px-3 py-1.5 text-right bg-gray-50">39,240</td><td class="px-3 py-1.5 text-right bg-gray-50">77,659</td>
+        </tr>
+        <tr class="border-t border-gray-200 bg-emerald-50/30 font-semibold">
+          <td class="px-3 py-1.5 text-emerald-900 sticky left-0 bg-emerald-50/30">D2C TOTAL</td>
+          <td class="px-2 py-1.5 text-right">480</td><td class="px-2 py-1.5 text-right">1,505</td><td class="px-2 py-1.5 text-right">1,805</td><td class="px-2 py-1.5 text-right">1,940</td><td class="px-2 py-1.5 text-right">1,973</td><td class="px-2 py-1.5 text-right">2,046</td><td class="px-2 py-1.5 text-right">2,093</td><td class="px-2 py-1.5 text-right">2,651</td><td class="px-2 py-1.5 text-right">2,126</td><td class="px-2 py-1.5 text-right">2,354</td><td class="px-2 py-1.5 text-right">2,448</td><td class="px-2 py-1.5 text-right">2,508</td>
+          <td class="px-3 py-1.5 text-right bg-emerald-100 border-l border-emerald-200">24,749</td><td class="px-3 py-1.5 text-right bg-emerald-100">58,249</td><td class="px-3 py-1.5 text-right bg-emerald-100">104,970</td>
+        </tr>
+
+        <!-- RETAIL SECTION -->
+        <tr class="border-t border-gray-200 bg-blue-50/60">
+          <td colspan="16" class="px-3 py-1.5 text-[10px] uppercase tracking-wider text-blue-800 font-semibold sticky left-0 bg-blue-50/60">Retail — store orders (1 per active store-month)</td>
+        </tr>
+
+        <!-- WOOLWORTHS -->
+        <tr class="border-t border-gray-100 hover:bg-gray-50"><td class="px-3 py-1.5 pl-8 text-gray-700 sticky left-0 bg-white hover:bg-gray-50">Woolworths — NZ</td>
+          <td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">1,212</td><td class="px-3 py-1.5 text-right bg-gray-50">1,512</td><td class="px-3 py-1.5 text-right bg-gray-50">1,962</td></tr>
+        <tr class="border-t border-gray-100 hover:bg-gray-50"><td class="px-3 py-1.5 pl-8 text-gray-400 sticky left-0 bg-white hover:bg-gray-50">Woolworths — AU <span class="text-[9px]">(launches FY29)</span></td>
+          <td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">0</td><td class="px-3 py-1.5 text-right bg-gray-50">2,400</td><td class="px-3 py-1.5 text-right bg-gray-50">7,800</td></tr>
+        <tr class="border-t border-gray-200 bg-blue-50/30 font-semibold"><td class="px-3 py-1.5 text-blue-900 pl-6 sticky left-0 bg-blue-50/30">Woolworths TOTAL</td>
+          <td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td><td class="px-2 py-1.5 text-right">101</td>
+          <td class="px-3 py-1.5 text-right bg-blue-100 border-l border-blue-200">1,212</td><td class="px-3 py-1.5 text-right bg-blue-100">3,912</td><td class="px-3 py-1.5 text-right bg-blue-100">9,762</td></tr>
+
+        <!-- GROCERY -->
+        <tr class="border-t border-gray-100 hover:bg-gray-50"><td class="px-3 py-1.5 pl-8 text-gray-700 sticky left-0 bg-white hover:bg-gray-50">Grocery — NZ</td>
+          <td class="px-2 py-1.5 text-right">10</td><td class="px-2 py-1.5 text-right">30</td><td class="px-2 py-1.5 text-right">50</td><td class="px-2 py-1.5 text-right">65</td><td class="px-2 py-1.5 text-right">75</td><td class="px-2 py-1.5 text-right">80</td><td class="px-2 py-1.5 text-right">85</td><td class="px-2 py-1.5 text-right">90</td><td class="px-2 py-1.5 text-right">90</td><td class="px-2 py-1.5 text-right">90</td><td class="px-2 py-1.5 text-right">100</td><td class="px-2 py-1.5 text-right">110</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">875</td><td class="px-3 py-1.5 text-right bg-gray-50">1,440</td><td class="px-3 py-1.5 text-right bg-gray-50">1,560</td></tr>
+        <tr class="border-t border-gray-100 hover:bg-gray-50"><td class="px-3 py-1.5 pl-8 text-gray-700 sticky left-0 bg-white hover:bg-gray-50">Grocery — AU</td>
+          <td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right">15</td><td class="px-2 py-1.5 text-right">35</td><td class="px-2 py-1.5 text-right">70</td><td class="px-2 py-1.5 text-right">95</td><td class="px-2 py-1.5 text-right">125</td><td class="px-2 py-1.5 text-right">155</td><td class="px-2 py-1.5 text-right">175</td><td class="px-2 py-1.5 text-right">180</td><td class="px-2 py-1.5 text-right">190</td><td class="px-2 py-1.5 text-right">200</td><td class="px-2 py-1.5 text-right">210</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">1,450</td><td class="px-3 py-1.5 text-right bg-gray-50">5,160</td><td class="px-3 py-1.5 text-right bg-gray-50">7,560</td></tr>
+        <tr class="border-t border-gray-200 bg-blue-50/30 font-semibold"><td class="px-3 py-1.5 text-blue-900 pl-6 sticky left-0 bg-blue-50/30">Grocery TOTAL</td>
+          <td class="px-2 py-1.5 text-right">10</td><td class="px-2 py-1.5 text-right">45</td><td class="px-2 py-1.5 text-right">85</td><td class="px-2 py-1.5 text-right">135</td><td class="px-2 py-1.5 text-right">170</td><td class="px-2 py-1.5 text-right">205</td><td class="px-2 py-1.5 text-right">240</td><td class="px-2 py-1.5 text-right">265</td><td class="px-2 py-1.5 text-right">270</td><td class="px-2 py-1.5 text-right">280</td><td class="px-2 py-1.5 text-right">300</td><td class="px-2 py-1.5 text-right">320</td>
+          <td class="px-3 py-1.5 text-right bg-blue-100 border-l border-blue-200">2,325</td><td class="px-3 py-1.5 text-right bg-blue-100">6,600</td><td class="px-3 py-1.5 text-right bg-blue-100">9,120</td></tr>
+
+        <!-- PHARMACY -->
+        <tr class="border-t border-gray-100 hover:bg-gray-50"><td class="px-3 py-1.5 pl-8 text-gray-700 sticky left-0 bg-white hover:bg-gray-50">Pharmacy — NZ</td>
+          <td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right">60</td><td class="px-2 py-1.5 text-right">65</td><td class="px-2 py-1.5 text-right">70</td><td class="px-2 py-1.5 text-right">70</td><td class="px-2 py-1.5 text-right">70</td><td class="px-2 py-1.5 text-right">70</td><td class="px-2 py-1.5 text-right">70</td><td class="px-2 py-1.5 text-right">70</td><td class="px-2 py-1.5 text-right">70</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">615</td><td class="px-3 py-1.5 text-right bg-gray-50">1,140</td><td class="px-3 py-1.5 text-right bg-gray-50">1,260</td></tr>
+        <tr class="border-t border-gray-100 hover:bg-gray-50"><td class="px-3 py-1.5 pl-8 text-gray-700 sticky left-0 bg-white hover:bg-gray-50">Pharmacy — AU</td>
+          <td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right">15</td><td class="px-2 py-1.5 text-right">35</td><td class="px-2 py-1.5 text-right">70</td><td class="px-2 py-1.5 text-right">95</td><td class="px-2 py-1.5 text-right">125</td><td class="px-2 py-1.5 text-right">150</td><td class="px-2 py-1.5 text-right">170</td><td class="px-2 py-1.5 text-right">175</td><td class="px-2 py-1.5 text-right">180</td><td class="px-2 py-1.5 text-right">190</td><td class="px-2 py-1.5 text-right">205</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">1,410</td><td class="px-3 py-1.5 text-right bg-gray-50">5,040</td><td class="px-3 py-1.5 text-right bg-gray-50">7,260</td></tr>
+        <tr class="border-t border-gray-200 bg-blue-50/30 font-semibold"><td class="px-3 py-1.5 text-blue-900 pl-6 sticky left-0 bg-blue-50/30">Pharmacy TOTAL</td>
+          <td class="px-2 py-1.5 text-right">0</td><td class="px-2 py-1.5 text-right">15</td><td class="px-2 py-1.5 text-right">35</td><td class="px-2 py-1.5 text-right">130</td><td class="px-2 py-1.5 text-right">160</td><td class="px-2 py-1.5 text-right">195</td><td class="px-2 py-1.5 text-right">220</td><td class="px-2 py-1.5 text-right">240</td><td class="px-2 py-1.5 text-right">245</td><td class="px-2 py-1.5 text-right">250</td><td class="px-2 py-1.5 text-right">260</td><td class="px-2 py-1.5 text-right">275</td>
+          <td class="px-3 py-1.5 text-right bg-blue-100 border-l border-blue-200">2,025</td><td class="px-3 py-1.5 text-right bg-blue-100">6,180</td><td class="px-3 py-1.5 text-right bg-blue-100">8,520</td></tr>
+
+        <!-- OTHER -->
+        <tr class="border-t border-gray-100 hover:bg-gray-50"><td class="px-3 py-1.5 pl-8 text-gray-700 sticky left-0 bg-white hover:bg-gray-50">Other (Baby/P&amp;C) — NZ</td>
+          <td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right">4</td><td class="px-2 py-1.5 text-right">8</td><td class="px-2 py-1.5 text-right">12</td><td class="px-2 py-1.5 text-right">16</td><td class="px-2 py-1.5 text-right">18</td><td class="px-2 py-1.5 text-right">20</td><td class="px-2 py-1.5 text-right">22</td><td class="px-2 py-1.5 text-right">22</td><td class="px-2 py-1.5 text-right">22</td><td class="px-2 py-1.5 text-right">24</td><td class="px-2 py-1.5 text-right">26</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">194</td><td class="px-3 py-1.5 text-right bg-gray-50">348</td><td class="px-3 py-1.5 text-right bg-gray-50">408</td></tr>
+        <tr class="border-t border-gray-100 hover:bg-gray-50"><td class="px-3 py-1.5 pl-8 text-gray-700 sticky left-0 bg-white hover:bg-gray-50">Other (Baby/P&amp;C) — AU</td>
+          <td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right">5</td><td class="px-2 py-1.5 text-right">15</td><td class="px-2 py-1.5 text-right">25</td><td class="px-2 py-1.5 text-right">30</td><td class="px-2 py-1.5 text-right">40</td><td class="px-2 py-1.5 text-right">55</td><td class="px-2 py-1.5 text-right">65</td><td class="px-2 py-1.5 text-right">70</td><td class="px-2 py-1.5 text-right">75</td><td class="px-2 py-1.5 text-right">80</td><td class="px-2 py-1.5 text-right">70</td>
+          <td class="px-3 py-1.5 text-right bg-gray-50 border-l border-gray-200">530</td><td class="px-3 py-1.5 text-right bg-gray-50">1,680</td><td class="px-3 py-1.5 text-right bg-gray-50">2,580</td></tr>
+        <tr class="border-t border-gray-200 bg-blue-50/30 font-semibold"><td class="px-3 py-1.5 text-blue-900 pl-6 sticky left-0 bg-blue-50/30">Other TOTAL</td>
+          <td class="px-2 py-1.5 text-right">0</td><td class="px-2 py-1.5 text-right">9</td><td class="px-2 py-1.5 text-right">23</td><td class="px-2 py-1.5 text-right">37</td><td class="px-2 py-1.5 text-right">46</td><td class="px-2 py-1.5 text-right">58</td><td class="px-2 py-1.5 text-right">75</td><td class="px-2 py-1.5 text-right">87</td><td class="px-2 py-1.5 text-right">92</td><td class="px-2 py-1.5 text-right">97</td><td class="px-2 py-1.5 text-right">104</td><td class="px-2 py-1.5 text-right">96</td>
+          <td class="px-3 py-1.5 text-right bg-blue-100 border-l border-blue-200">724</td><td class="px-3 py-1.5 text-right bg-blue-100">2,028</td><td class="px-3 py-1.5 text-right bg-blue-100">2,988</td></tr>
+
+        <!-- Retail grand total -->
+        <tr class="border-t-2 border-blue-200 bg-blue-100/60 font-semibold"><td class="px-3 py-2 text-blue-900 sticky left-0 bg-blue-100/60">RETAIL TOTAL</td>
+          <td class="px-2 py-2 text-right">128</td><td class="px-2 py-2 text-right">257</td><td class="px-2 py-2 text-right">331</td><td class="px-2 py-2 text-right">490</td><td class="px-2 py-2 text-right">564</td><td class="px-2 py-2 text-right">646</td><td class="px-2 py-2 text-right">723</td><td class="px-2 py-2 text-right">780</td><td class="px-2 py-2 text-right">795</td><td class="px-2 py-2 text-right">815</td><td class="px-2 py-2 text-right">852</td><td class="px-2 py-2 text-right">879</td>
+          <td class="px-3 py-2 text-right bg-blue-200 border-l border-blue-300">7,260</td><td class="px-3 py-2 text-right bg-blue-200">19,728</td><td class="px-3 py-2 text-right bg-blue-200">31,578</td></tr>
+
+        <!-- GRAND TOTAL -->
+        <tr class="border-t-2 border-gray-400 bg-gray-900 text-white font-semibold">
+          <td class="px-3 py-2.5 sticky left-0 bg-gray-900">GRAND TOTAL ORDERS</td>
+          <td class="px-2 py-2.5 text-right">608</td><td class="px-2 py-2.5 text-right">1,762</td><td class="px-2 py-2.5 text-right">2,136</td><td class="px-2 py-2.5 text-right">2,430</td><td class="px-2 py-2.5 text-right">2,537</td><td class="px-2 py-2.5 text-right">2,692</td><td class="px-2 py-2.5 text-right">2,816</td><td class="px-2 py-2.5 text-right">3,431</td><td class="px-2 py-2.5 text-right">2,921</td><td class="px-2 py-2.5 text-right">3,169</td><td class="px-2 py-2.5 text-right">3,300</td><td class="px-2 py-2.5 text-right">3,387</td>
+          <td class="px-3 py-2.5 text-right bg-gray-800 border-l border-gray-700">32,009</td><td class="px-3 py-2.5 text-right bg-gray-800">77,977</td><td class="px-3 py-2.5 text-right bg-gray-800">136,548</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footnote -->
+  <div class="px-5 py-3 bg-gray-50/60 border-t border-gray-100 text-[11px] text-gray-600 leading-relaxed">
+    <p><b>How "orders" are counted:</b> D2C uses customer order count (one row in the order book = one order). Retail uses <b>active store-months</b> as a proxy for ordering cadence (each ranged store typically reorders monthly), which is what your spreadsheet's monthly active-store count rolls up to. Switch to <b>Units</b> in the toggle to see SKU volumes (drives production planning) or <b>Revenue</b> to dollarise the same hierarchy.</p>
+    <p class="mt-1.5">FY27 / FY28 / FY29 columns hold each financial year's full-year total · monthly columns drive forecasting cadence.</p>
+  </div>
+</section>
+
+
+<!-- SECTION 4 — TIED TO MRP -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">4 · Live MRP snapshot</h2>
+      <p class="text-xs text-gray-500 mt-0.5">No upload needed — pulled from current MRP data so the budget view sits next to operational reality</p>
+    </div>
+  </div>
+  <div class="grid grid-cols-4 gap-0">
+    <div class="p-4 border-r border-gray-100">
+      <div class="text-[11px] uppercase font-semibold text-gray-500 mb-1">Production this month</div>
+      <div class="text-lg font-semibold text-gray-900">12,540 units</div>
+      <div class="text-[11px] text-emerald-700">vs forecast 12,200 (+2.8%)</div>
+      <a href="/production" class="text-[10px] text-blue-600 hover:underline">View schedule →</a>
+    </div>
+    <div class="p-4 border-r border-gray-100">
+      <div class="text-[11px] uppercase font-semibold text-gray-500 mb-1">Open POs</div>
+      <div class="text-lg font-semibold text-gray-900">3 · $48,200</div>
+      <div class="text-[11px] text-gray-500">2 awaiting receipt · 1 partial</div>
+      <a href="/purchase-orders" class="text-[10px] text-blue-600 hover:underline">View POs →</a>
+    </div>
+    <div class="p-4 border-r border-gray-100">
+      <div class="text-[11px] uppercase font-semibold text-red-700 mb-1">Ingredient shortfalls</div>
+      <div class="text-lg font-semibold text-red-800">3 ingredients</div>
+      <div class="text-[11px] text-red-700">Carrot · Beetroot · Quinoa within 60 days</div>
+      <a href="/ingredients/demand" class="text-[10px] text-blue-600 hover:underline">View demand →</a>
+    </div>
+    <div class="p-4">
+      <div class="text-[11px] uppercase font-semibold text-gray-500 mb-1">Demand vs budget (units)</div>
+      <div class="text-lg font-semibold text-gray-900">94%</div>
+      <div class="text-[11px] text-gray-500">FY27 demand running 6% under plan</div>
+      <a href="/demand" class="text-[10px] text-blue-600 hover:underline">View demand →</a>
+    </div>
+  </div>
+</section>
+
+
+<!-- BEHAVIOR + IMPLEMENTATION -->
+<section class="bg-white border border-gray-200 rounded-lg p-5 space-y-3 text-sm">
+  <h2 class="font-semibold">Behaviour notes</h2>
+  <ul class="list-disc pl-5 space-y-1.5 text-gray-700">
+    <li><b>FY toggle</b> at the top switches all sections between FY27 / FY28 / FY29 / 3-Yr.</li>
+    <li><b>Region toggle</b> (Combined / NZ / AU) re-filters every table and tile.</li>
+    <li><b>Re-upload XLSX</b> button replaces the snapshot. The dashboard always shows the most recent upload (with date/user).</li>
+    <li><b>Live MRP snapshot</b> reads operational data straight from the MRP — no upload needed; updates whenever production/POs/demand change.</li>
+    <li><b>Variance later</b>: when actuals come in, each row gets Budget · Actual · Variance columns. Out of scope for v1 (no actuals source yet).</li>
+  </ul>
+</section>
+
+<section class="bg-blue-50 border border-blue-200 rounded-lg p-5 space-y-2 text-sm">
+  <h2 class="font-semibold text-blue-900">Implementation (for reference)</h2>
+  <ul class="list-disc pl-5 space-y-1.5 text-blue-900">
+    <li>New migration: <code class="bg-white px-1 rounded">budget_snapshots</code> table — one row per upload (id, source_filename, uploaded_at, uploaded_by) + child <code class="bg-white px-1 rounded">budget_line_items</code> (snapshot_id, section, line_item, year_month, region, value).</li>
+    <li>New page <code class="bg-white px-1 rounded">/dashboard/budget</code> reading the latest snapshot. Reuses existing demand/production/PO queries for the MRP snapshot section.</li>
+    <li>New <code class="bg-white px-1 rounded">/dashboard/budget/import</code> XLSX upload page — same pattern as demand import. Parses "Copy of Total Business P&amp;L", "Copy of NZ/AUS D2C", "Copy of NZ/AUS Retail" tabs into the structured table.</li>
+    <li>Sidebar: replace the empty Dashboard link with this page.</li>
+  </ul>
+</section>
+
+</div>
+</body>
+</html>
