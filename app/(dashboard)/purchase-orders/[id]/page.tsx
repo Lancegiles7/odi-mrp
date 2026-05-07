@@ -13,14 +13,16 @@ interface PageProps {
 export default async function PurchaseOrderDetailPage({ params }: PageProps) {
   const supabase = createClient()
 
-  const [{ data: po }, { data: lines }, { data: suppliers }, { data: ingredients }, { data: products }] = await Promise.all([
+  const [{ data: po }, { data: lines }, { data: suppliers }, { data: ingredients }, { data: products }, { data: addresses }] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('id, po_number, supplier_id, status, order_date, expected_delivery_date, notes')
+      .select('id, po_number, supplier_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
         id: string; po_number: string; supplier_id: string;
         status: 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled';
-        order_date: string; expected_delivery_date: string | null; notes: string | null;
+        order_date: string; expected_delivery_date: string | null;
+        delivery_address_id: string | null; delivery_notes: string | null;
+        notes: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
       .select('id, ingredient_id, product_id, description, quantity_ordered, unit_cost, unit_of_measure, notes')
@@ -34,13 +36,17 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       .select('id, name, payment_terms, email, phone')
       .order('name') as unknown as Promise<{ data: Array<{ id: string; name: string; payment_terms: string | null; email: string | null; phone: string | null }> | null }>,
     supabase.from('ingredients')
-      .select('id, sku_code, name, unit_of_measure')
+      .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price')
       .eq('is_active', true)
-      .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null }> | null }>,
+      .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_sku_code: string | null; supplier_pack_size: number | null; supplier_pack_unit: string | null; price: number | null }> | null }>,
     supabase.from('products')
       .select('id, sku_code, name')
       .is('deleted_at', null)
       .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string }> | null }>,
+    supabase.from('delivery_addresses')
+      .select('id, label, street, contact_name, phone, country, is_default')
+      .eq('is_active', true)
+      .order('country').order('label') as unknown as Promise<{ data: Array<{ id: string; label: string; street: string; contact_name: string | null; phone: string | null; country: 'NZ' | 'AU'; is_default: boolean }> | null }>,
   ])
 
   if (!po) notFound()
@@ -65,12 +71,15 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       initialSupplierId={po.supplier_id}
       initialOrderDate={po.order_date.slice(0, 10)}
       initialExpected={po.expected_delivery_date?.slice(0, 10) ?? null}
+      initialDeliveryAddressId={po.delivery_address_id}
+      initialDeliveryNotes={po.delivery_notes}
       initialNotes={po.notes}
       initialLines={initialLines}
       status={po.status}
       suppliers={suppliers ?? []}
       ingredients={ingredients ?? []}
       products={products ?? []}
+      deliveryAddresses={addresses ?? []}
     />
   )
 }

@@ -8,19 +8,23 @@ export const metadata: Metadata = { title: 'New purchase order' }
 export default async function NewPurchaseOrderPage() {
   const supabase = createClient()
 
-  const [{ data: suppliers }, { data: ingredients }, { data: products }] = await Promise.all([
+  const [{ data: suppliers }, { data: ingredients }, { data: products }, { data: addresses }] = await Promise.all([
     supabase.from('suppliers')
       .select('id, name, payment_terms, email, phone')
       .eq('is_active', true)
       .order('name') as unknown as Promise<{ data: Array<{ id: string; name: string; payment_terms: string | null; email: string | null; phone: string | null }> | null }>,
     supabase.from('ingredients')
-      .select('id, sku_code, name, unit_of_measure')
+      .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price')
       .eq('is_active', true)
-      .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null }> | null }>,
+      .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_sku_code: string | null; supplier_pack_size: number | null; supplier_pack_unit: string | null; price: number | null }> | null }>,
     supabase.from('products')
       .select('id, sku_code, name')
       .is('deleted_at', null)
       .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string }> | null }>,
+    supabase.from('delivery_addresses')
+      .select('id, label, street, contact_name, phone, country, is_default')
+      .eq('is_active', true)
+      .order('country').order('label') as unknown as Promise<{ data: Array<{ id: string; label: string; street: string; contact_name: string | null; phone: string | null; country: 'NZ' | 'AU'; is_default: boolean }> | null }>,
   ])
 
   const today = new Date()
@@ -34,12 +38,15 @@ export default async function NewPurchaseOrderPage() {
       initialSupplierId=""
       initialOrderDate={todayStr}
       initialExpected={null}
+      initialDeliveryAddressId={null}
+      initialDeliveryNotes={null}
       initialNotes={null}
       initialLines={[]}
       status="draft"
       suppliers={suppliers ?? []}
       ingredients={ingredients ?? []}
       products={products ?? []}
+      deliveryAddresses={addresses ?? []}
     />
   )
 }

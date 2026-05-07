@@ -26,7 +26,7 @@ interface Props {
 
 interface RowState {
   receiving_now: number
-  unit_cost: number | null
+  invoice_unit_cost: number | null   // user-entered invoice price (defaults to PO price)
   note: string
 }
 
@@ -40,9 +40,9 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
     for (const l of lines) {
       const remaining = Math.max(0, l.quantity_ordered - l.quantity_received)
       out[l.id] = {
-        receiving_now: remaining,
-        unit_cost:     l.unit_cost,
-        note:          '',
+        receiving_now:     remaining,
+        invoice_unit_cost: l.unit_cost,
+        note:              '',
       }
     }
     return out
@@ -64,10 +64,10 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
     const receipts = lines
       .filter((l) => (state[l.id]?.receiving_now ?? 0) > 0)
       .map((l) => ({
-        line_id:       l.id,
-        receiving_now: state[l.id].receiving_now,
-        unit_cost:     state[l.id].unit_cost,
-        note:          state[l.id].note,
+        line_id:           l.id,
+        receiving_now:     state[l.id].receiving_now,
+        invoice_unit_cost: state[l.id].invoice_unit_cost,
+        note:              state[l.id].note,
       }))
 
     if (receipts.length === 0) {
@@ -111,8 +111,8 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
             <th className="text-right px-3 py-2 font-medium">Ordered</th>
             <th className="text-right px-3 py-2 font-medium">Already received</th>
             <th className="text-right px-3 py-2 font-medium">Receiving now</th>
-            <th className="text-right px-3 py-2 font-medium">Unit price</th>
-            <th className="text-right px-3 py-2 font-medium">Remaining after</th>
+            <th className="text-right px-3 py-2 font-medium">PO price</th>
+            <th className="text-right px-3 py-2 font-medium">Invoice price</th>
             <th className="text-left px-3 py-2 font-medium">Note</th>
           </tr>
         </thead>
@@ -122,8 +122,17 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
             const newReceived = Math.min(l.quantity_ordered, l.quantity_received + (s.receiving_now ?? 0))
             const remaining   = Math.max(0, l.quantity_ordered - newReceived)
             const isShort     = remaining > 0 && (s.receiving_now ?? 0) > 0
+            // Qty over: receiving now exceeds remaining-to-go
+            const remainingBefore = Math.max(0, l.quantity_ordered - l.quantity_received)
+            const qtyOver = (s.receiving_now ?? 0) > remainingBefore
+            // Price drift vs PO line price
+            const priceDrift = l.unit_cost != null && s.invoice_unit_cost != null
+              && Math.abs(s.invoice_unit_cost - l.unit_cost) > 0.001
+            const priceDelta = (priceDrift && l.unit_cost != null && s.invoice_unit_cost != null)
+              ? s.invoice_unit_cost - l.unit_cost : 0
+            const flagged = isShort || qtyOver || priceDrift
             return (
-              <tr key={l.id} className={`border-t border-gray-100 ${isShort ? 'bg-amber-50/40' : ''}`}>
+              <tr key={l.id} className={`border-t border-gray-100 align-top ${flagged ? 'bg-amber-50/40' : ''}`}>
                 <td className="px-4 py-2">
                   <div className="font-medium">{l.label}</div>
                   {l.sku && <div className="text-[10px] text-gray-500 font-mono">{l.sku}</div>}
@@ -143,21 +152,28 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
                     onChange={(e) => updateRow(l.id, { receiving_now: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)) })}
                     className="w-24 text-right text-xs border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums"
                   />
+                  {isShort  && <div className="text-[10px] text-amber-800 mt-0.5">⚠ short {remaining.toLocaleString()} {l.unit_of_measure}</div>}
+                  {qtyOver  && <div className="text-[10px] text-amber-800 mt-0.5">⚠ over by {((s.receiving_now ?? 0) - remainingBefore).toLocaleString()} {l.unit_of_measure}</div>}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-500">
+                  {l.unit_cost != null ? `$${l.unit_cost.toFixed(2)}` : '—'}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <input
                     type="number"
                     step="any"
                     min={0}
-                    value={s.unit_cost ?? ''}
-                    onChange={(e) => updateRow(l.id, { unit_cost: e.target.value === '' ? null : Number(e.target.value) })}
+                    value={s.invoice_unit_cost ?? ''}
+                    onChange={(e) => updateRow(l.id, { invoice_unit_cost: e.target.value === '' ? null : Number(e.target.value) })}
                     placeholder={l.unit_cost?.toString() ?? '0.00'}
-                    className="w-24 text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums"
-                    title="Amend the per-unit price if it differs from the PO"
+                    className={`w-24 text-right text-xs rounded px-1.5 py-1 tabular-nums ${priceDrift ? 'border border-amber-300 bg-amber-50' : 'border border-gray-200'}`}
+                    title="Per-unit price from the supplier invoice"
                   />
-                </td>
-                <td className={`px-3 py-2 text-right tabular-nums ${isShort ? 'text-amber-800 font-semibold' : 'text-gray-500'}`}>
-                  {remaining > 0 ? `${remaining.toLocaleString()} ${l.unit_of_measure}` : '—'}
+                  {priceDrift && (
+                    <div className="text-[10px] text-amber-800 mt-0.5">
+                      ⚠ {priceDelta > 0 ? '+' : ''}${priceDelta.toFixed(2)} vs PO
+                    </div>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   <input
@@ -173,20 +189,21 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
         </tbody>
       </table>
 
-      <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
-        <div className="text-xs text-gray-500">
+      <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-4">
+        <div className="text-xs text-gray-600">
           {willBePartial
-            ? <>Status will move to <span className="font-semibold text-amber-800">Partial</span> (some lines short).</>
+            ? <>Status will move to <span className="font-semibold text-amber-800">Partial</span>.</>
             : <>Status will move to <span className="font-semibold text-emerald-700">Received</span>.</>}
+          {' '}On confirm, received qty moves into <b>Stock on Hand</b> at <b>Main Warehouse</b>; flagged lines stay highlighted on the PO for follow-up.
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-shrink-0">
           <Link href={`/purchase-orders/${poId}`} className="px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50">Cancel</Link>
           <button
             disabled={pending}
             onClick={onSave}
             className="px-3 py-1.5 text-xs bg-emerald-700 text-white rounded-md hover:bg-emerald-800 disabled:opacity-50"
           >
-            {pending ? 'Saving…' : 'Save receipt'}
+            {pending ? 'Saving…' : 'Confirm receipt + update SOH'}
           </button>
         </div>
       </div>

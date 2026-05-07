@@ -16,6 +16,8 @@ import {
   TrendingUp,
   Factory,
   Leaf,
+  Inbox,
+  MapPin,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROLES } from '@/lib/constants'
@@ -28,8 +30,10 @@ const ICON_MAP = {
   '/products/trash':  Trash2,
   '/ingredients':     FlaskConical,
   '/ingredients/demand': Leaf,
-  '/suppliers':       Truck,
-  '/purchase-orders': ShoppingCart,
+  '/suppliers':         Truck,
+  '/purchase-orders':   ShoppingCart,
+  '/inwards-pending':   Inbox,
+  '/delivery-addresses':MapPin,
   '/inventory':       Warehouse,
   '/stock-movements': ArrowLeftRight,
   '/settings':        SettingsIcon,
@@ -54,8 +58,9 @@ const NAV_GROUPS = [
   {
     label: 'Procurement',
     items: [
-      { name: 'Suppliers',       href: '/suppliers' },
-      { name: 'Purchase Orders', href: '/purchase-orders' },
+      { name: 'Suppliers',         href: '/suppliers' },
+      { name: 'Purchase Orders',   href: '/purchase-orders' },
+      { name: 'Inwards Pending',   href: '/inwards-pending' },
     ],
   },
   {
@@ -70,9 +75,10 @@ const NAV_GROUPS = [
 const ADMIN_GROUP = {
   label: 'Admin',
   items: [
-    { name: 'Settings',       href: '/settings' },
-    { name: 'Product trash',  href: '/products/trash' },
-    { name: 'Users',          href: '/users' },
+    { name: 'Settings',           href: '/settings' },
+    { name: 'Delivery addresses', href: '/delivery-addresses' },
+    { name: 'Product trash',      href: '/products/trash' },
+    { name: 'Users',              href: '/users' },
   ],
 }
 

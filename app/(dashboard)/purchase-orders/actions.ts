@@ -16,6 +16,15 @@ export interface POLineInput {
   unit_cost: number | null
   unit_of_measure: string
   notes: string | null
+  // Supplier reference data — only sent when the user has clicked
+  // "save updated value to ingredient" on the line. When non-null, the
+  // PO save also writes these back to the ingredient row.
+  save_back_supplier_data?: {
+    supplier_sku_code:  string | null
+    supplier_pack_size: number | null
+    supplier_pack_unit: string | null
+    price:              number | null
+  }
 }
 
 // ============================================================
@@ -51,6 +60,8 @@ export async function createPurchaseOrder(input: {
   supplier_id: string
   order_date: string
   expected_delivery_date: string | null
+  delivery_address_id: string | null
+  delivery_notes: string | null
   notes: string | null
   lines: POLineInput[]
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
@@ -74,6 +85,8 @@ export async function createPurchaseOrder(input: {
       status:                 'draft',
       order_date:             input.order_date,
       expected_delivery_date: input.expected_delivery_date,
+      delivery_address_id:    input.delivery_address_id,
+      delivery_notes:         input.delivery_notes,
       notes:                  input.notes,
       created_by:             profile?.id ?? null,
     })
@@ -97,7 +110,10 @@ export async function createPurchaseOrder(input: {
     return { ok: false, error: linesErr.message }
   }
 
+  await applySaveBackToIngredients(supabase, input.lines)
+
   revalidatePath('/purchase-orders')
+  revalidatePath('/ingredients')
   return { ok: true, id: poHeader.id }
 }
 
@@ -110,6 +126,8 @@ export async function updatePurchaseOrder(input: {
   supplier_id: string
   order_date: string
   expected_delivery_date: string | null
+  delivery_address_id: string | null
+  delivery_notes: string | null
   notes: string | null
   lines: POLineInput[]
 }): Promise<{ ok: boolean; error?: string }> {
@@ -133,6 +151,8 @@ export async function updatePurchaseOrder(input: {
       supplier_id:            input.supplier_id,
       order_date:             input.order_date,
       expected_delivery_date: input.expected_delivery_date,
+      delivery_address_id:    input.delivery_address_id,
+      delivery_notes:         input.delivery_notes,
       notes:                  input.notes,
     })
     .eq('id', input.id)
@@ -150,9 +170,33 @@ export async function updatePurchaseOrder(input: {
     if (lErr) return { ok: false, error: lErr.message }
   }
 
+  await applySaveBackToIngredients(supabase, input.lines)
+
   revalidatePath('/purchase-orders')
   revalidatePath(`/purchase-orders/${input.id}`)
+  revalidatePath('/ingredients')
   return { ok: true }
+}
+
+// ============================================================
+// Helper: write supplier ref-data back to ingredient when the user
+// has clicked "save updated value to ingredient" on a line.
+// ============================================================
+async function applySaveBackToIngredients(
+  supabase: ReturnType<typeof createClient>,
+  lines: POLineInput[],
+): Promise<void> {
+  for (const l of lines) {
+    if (!l.save_back_supplier_data || !l.ingredient_id) continue
+    const patch: Record<string, unknown> = {}
+    const sb = l.save_back_supplier_data
+    if (sb.supplier_sku_code !== undefined) patch.supplier_sku_code  = sb.supplier_sku_code
+    if (sb.supplier_pack_size !== undefined) patch.supplier_pack_size = sb.supplier_pack_size
+    if (sb.supplier_pack_unit !== undefined) patch.supplier_pack_unit = sb.supplier_pack_unit
+    if (sb.price !== undefined)              patch.price              = sb.price
+    if (Object.keys(patch).length === 0) continue
+    await supabase.from('ingredients').update(patch).eq('id', l.ingredient_id)
+  }
 }
 
 // ============================================================
@@ -190,21 +234,42 @@ export async function deleteDraftPo(id: string): Promise<{ ok: boolean; error?: 
 }
 
 // ============================================================
-// Receive lines — accepts new received_qty and optional unit_cost amend
+// Receive lines — records the receipt as a stock movement (which
+// increments inventory_balances at Main Warehouse via DB trigger),
+// updates quantity_received on each PO line, and records the
+// invoice unit price separately from the agreed PO price.
+//
+// PO line.unit_cost is left unchanged (= the agreed PO price). The
+// invoice price arrives on stock_movements.unit_cost.
 // ============================================================
 export async function receivePoLines(input: {
   po_id: string
-  receipts: Array<{ line_id: string; receiving_now: number; unit_cost: number | null; note: string | null }>
+  receipts: Array<{ line_id: string; receiving_now: number; invoice_unit_cost: number | null; note: string | null }>
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
 
-  // Pull current lines to compute new quantity_received
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+
+  // Resolve Main Warehouse location
+  const { data: mainLoc } = await supabase
+    .from('locations')
+    .select('id')
+    .eq('code', 'MAIN')
+    .maybeSingle() as { data: { id: string } | null }
+  if (!mainLoc) return { ok: false, error: 'Main Warehouse location is missing — please contact admin' }
+
+  // Pull current lines (we need ingredient_id, qty info, agreed price, uom)
   const { data: lines } = await supabase
     .from('purchase_order_lines')
-    .select('id, quantity_ordered, quantity_received, unit_cost')
-    .eq('purchase_order_id', input.po_id) as { data: Array<{ id: string; quantity_ordered: number; quantity_received: number; unit_cost: number | null }> | null }
+    .select('id, ingredient_id, product_id, quantity_ordered, quantity_received, unit_cost, unit_of_measure')
+    .eq('purchase_order_id', input.po_id) as { data: Array<{
+      id: string; ingredient_id: string | null; product_id: string | null;
+      quantity_ordered: number; quantity_received: number; unit_cost: number | null;
+      unit_of_measure: string;
+    }> | null }
 
   if (!lines) return { ok: false, error: 'PO lines not found' }
 
@@ -217,20 +282,39 @@ export async function receivePoLines(input: {
       Number(line.quantity_ordered),
       Number(line.quantity_received) + Number(r.receiving_now),
     )
+    const actualReceiving = newReceived - Number(line.quantity_received)
+    if (actualReceiving <= 0) continue
 
-    const updates: Record<string, unknown> = {
-      quantity_received: newReceived,
-    }
-    if (r.unit_cost != null && Number.isFinite(r.unit_cost) && r.unit_cost >= 0) {
-      updates.unit_cost = r.unit_cost
-    }
-    if (r.note?.trim()) {
-      updates.notes = r.note.trim()
-    }
-
-    const { error } = await supabase
+    // Update PO line — qty + optional note. Do NOT overwrite unit_cost
+    // (keep it as the agreed PO price for receipt comparisons).
+    const updates: Record<string, unknown> = { quantity_received: newReceived }
+    if (r.note?.trim()) updates.notes = r.note.trim()
+    const { error: lineErr } = await supabase
       .from('purchase_order_lines').update(updates).eq('id', r.line_id)
-    if (error) return { ok: false, error: error.message }
+    if (lineErr) return { ok: false, error: lineErr.message }
+
+    // Stock movement — only for ingredient lines (product / 'other' lines
+    // don't increment ingredient inventory).
+    if (line.ingredient_id) {
+      const invoiceCost = (r.invoice_unit_cost != null && Number.isFinite(r.invoice_unit_cost) && r.invoice_unit_cost >= 0)
+        ? r.invoice_unit_cost
+        : line.unit_cost
+      const { error: mvErr } = await supabase
+        .from('stock_movements')
+        .insert({
+          ingredient_id:          line.ingredient_id,
+          location_id:            mainLoc.id,
+          movement_type:          'purchase_received',
+          quantity:               actualReceiving,
+          unit_of_measure:        line.unit_of_measure,
+          reference_type:         'purchase_order',
+          purchase_order_line_id: line.id,
+          unit_cost:              invoiceCost,
+          notes:                  r.note?.trim() ?? '',
+          created_by:             profile?.id ?? null,
+        })
+      if (mvErr) return { ok: false, error: `Stock movement failed: ${mvErr.message}` }
+    }
   }
 
   // Recompute PO status: sum of received vs ordered across all lines
