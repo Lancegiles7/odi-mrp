@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { SupplierForm } from '@/components/suppliers/supplier-form'
+import { DeleteSupplierButton } from '@/components/suppliers/delete-supplier-button'
 import { updateSupplier } from '@/app/(dashboard)/suppliers/actions'
 
 export const metadata: Metadata = { title: 'Supplier' }
@@ -53,6 +54,14 @@ export default async function EditSupplierPage({ params, searchParams }: PagePro
           error={searchParams.error}
           initial={data}
         />
+      </div>
+
+      <div className="mt-5 bg-white border border-red-200 rounded-lg p-5">
+        <h2 className="text-sm font-semibold text-red-700 mb-1">Danger zone</h2>
+        <p className="text-xs text-gray-500 mb-3">
+          Permanent. Only allowed if no purchase orders, ingredients, or packaging items reference this supplier.
+        </p>
+        <DeleteSupplierButton id={data.id} name={data.name} />
       </div>
     </div>
   )

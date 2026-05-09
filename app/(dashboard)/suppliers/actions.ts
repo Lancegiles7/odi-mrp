@@ -64,6 +64,37 @@ export async function createSupplier(formData: FormData) {
   redirect(`/suppliers/${data.id}?saved=1`)
 }
 
+export async function deleteSupplier(id: string): Promise<{ ok: boolean; error?: string }> {
+  if (!id) return { ok: false, error: 'Missing supplier id' }
+
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  const [poRes, ingRes, pakRes] = await Promise.all([
+    supabase.from('purchase_orders').select('id', { count: 'exact', head: true }).eq('supplier_id', id),
+    supabase.from('ingredients').select('id', { count: 'exact', head: true }).eq('supplier_id', id),
+    supabase.from('packaging').select('id', { count: 'exact', head: true }).eq('supplier_id', id),
+  ])
+  const refs: string[] = []
+  if ((poRes.count ?? 0)  > 0) refs.push(`${poRes.count} purchase order${poRes.count === 1 ? '' : 's'}`)
+  if ((ingRes.count ?? 0) > 0) refs.push(`${ingRes.count} ingredient${ingRes.count === 1 ? '' : 's'}`)
+  if ((pakRes.count ?? 0) > 0) refs.push(`${pakRes.count} packaging item${pakRes.count === 1 ? '' : 's'}`)
+
+  if (refs.length > 0) {
+    return {
+      ok: false,
+      error: `Cannot delete: this supplier is referenced by ${refs.join(', ')}. Mark it inactive instead, or reassign those records first.`,
+    }
+  }
+
+  const { error } = await supabase.from('suppliers').delete().eq('id', id)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/suppliers')
+  return { ok: true }
+}
+
 export async function updateSupplier(formData: FormData) {
   const parsed = parsePayload(formData)
   if (typeof parsed === 'string') redirect(`/suppliers?error=${encodeURIComponent(parsed)}`)
