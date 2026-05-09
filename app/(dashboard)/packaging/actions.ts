@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { computeLoadedNzd, type FxRates } from '@/lib/packaging-cost'
+import { resolveQuantityPerUnit, type EntryMode } from '@/lib/packaging-entry'
 import { isKnownPackagingType, SUPPORTED_CURRENCIES, type CurrencyCode } from '@/lib/constants'
 
 interface PackagingForm {
@@ -226,7 +227,10 @@ export interface BatchCreateRow {
   price: number | null
   currency: CurrencyCode
   freight_per_unit_nzd: number | null
-  quantity_per_unit: number
+  /** How the user entered the quantity. */
+  entry_mode: EntryMode
+  /** The number the user typed (per_pack: items per product; per_group: products per packaging). */
+  entry_value: number
   include_in_cost: boolean
   current_soh: number | null
   original_order_qty: number | null
@@ -242,7 +246,7 @@ export async function batchCreatePackagingForProduct(input: {
   if (!user) return { ok: false, error: 'Not authenticated' }
 
   if (!input.product_id) return { ok: false, error: 'Pick a product first' }
-  const valid = input.rows.filter((r) => r.sku_code.trim() && r.name.trim() && r.quantity_per_unit > 0)
+  const valid = input.rows.filter((r) => r.sku_code.trim() && r.name.trim() && r.entry_value > 0)
   if (valid.length === 0) return { ok: false, error: 'Add at least one packaging row with SKU, name and qty.' }
 
   const { data: profile } = await supabase
@@ -289,12 +293,15 @@ export async function batchCreatePackagingForProduct(input: {
     }
     newPackagingIds.push(pak.id)
 
+    const qty = resolveQuantityPerUnit(r.entry_mode, r.entry_value)
     const { error: linkErr } = await supabase
       .from('product_packaging')
       .insert({
         product_id:        input.product_id,
         packaging_id:      pak.id,
-        quantity_per_unit: r.quantity_per_unit,
+        quantity_per_unit: qty,
+        entry_mode:        r.entry_mode,
+        entry_value:       r.entry_value,
         include_in_cost:   r.include_in_cost,
       })
     if (linkErr) return { ok: false, error: linkErr.message }
@@ -314,7 +321,15 @@ export async function batchCreatePackagingForProduct(input: {
 // ============================================================
 export async function setProductPackagingBom(input: {
   product_id: string
-  rows: Array<{ packaging_id: string; quantity_per_unit: number; include_in_cost?: boolean; notes: string | null }>
+  rows: Array<{
+    packaging_id: string
+    entry_mode?: EntryMode
+    entry_value?: number
+    /** Legacy callers can still pass quantity_per_unit; treated as per_pack. */
+    quantity_per_unit?: number
+    include_in_cost?: boolean
+    notes: string | null
+  }>
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -326,13 +341,21 @@ export async function setProductPackagingBom(input: {
   if (delErr) return { ok: false, error: delErr.message }
 
   const inserts = input.rows
-    .filter((r) => r.packaging_id && r.quantity_per_unit > 0)
-    .map((r) => ({
+    .map((r) => {
+      const mode  = r.entry_mode ?? 'per_pack'
+      const value = r.entry_value ?? r.quantity_per_unit ?? 0
+      const qty   = resolveQuantityPerUnit(mode, value)
+      return { row: r, mode, value, qty }
+    })
+    .filter((x) => x.row.packaging_id && x.qty > 0)
+    .map((x) => ({
       product_id:        input.product_id,
-      packaging_id:      r.packaging_id,
-      quantity_per_unit: r.quantity_per_unit,
-      include_in_cost:   r.include_in_cost ?? true,
-      notes:             r.notes,
+      packaging_id:      x.row.packaging_id,
+      quantity_per_unit: x.qty,
+      entry_mode:        x.mode,
+      entry_value:       x.value,
+      include_in_cost:   x.row.include_in_cost ?? true,
+      notes:             x.row.notes,
     }))
 
   if (inserts.length > 0) {
@@ -386,7 +409,14 @@ async function recomputeProductPackagingCost(
 // ============================================================
 export async function setPackagingProducts(input: {
   packaging_id: string
-  rows: Array<{ product_id: string; quantity_per_unit: number; include_in_cost?: boolean; notes: string | null }>
+  rows: Array<{
+    product_id: string
+    entry_mode?: EntryMode
+    entry_value?: number
+    quantity_per_unit?: number
+    include_in_cost?: boolean
+    notes: string | null
+  }>
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -403,13 +433,21 @@ export async function setPackagingProducts(input: {
   if (delErr) return { ok: false, error: delErr.message }
 
   const inserts = input.rows
-    .filter((r) => r.product_id && r.quantity_per_unit > 0)
-    .map((r) => ({
-      product_id:        r.product_id,
+    .map((r) => {
+      const mode  = r.entry_mode ?? 'per_pack'
+      const value = r.entry_value ?? r.quantity_per_unit ?? 0
+      const qty   = resolveQuantityPerUnit(mode, value)
+      return { row: r, mode, value, qty }
+    })
+    .filter((x) => x.row.product_id && x.qty > 0)
+    .map((x) => ({
+      product_id:        x.row.product_id,
       packaging_id:      input.packaging_id,
-      quantity_per_unit: r.quantity_per_unit,
-      include_in_cost:   r.include_in_cost ?? true,
-      notes:             r.notes,
+      quantity_per_unit: x.qty,
+      entry_mode:        x.mode,
+      entry_value:       x.value,
+      include_in_cost:   x.row.include_in_cost ?? true,
+      notes:             x.row.notes,
     }))
 
   if (inserts.length > 0) {

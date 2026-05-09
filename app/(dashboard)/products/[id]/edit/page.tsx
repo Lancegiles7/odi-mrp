@@ -57,8 +57,8 @@ export default async function EditProductPage({ params, searchParams }: PageProp
       .order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string; total_loaded_cost_nzd: number | null }> | null },
     supabase
       .from('product_packaging')
-      .select('packaging_id, quantity_per_unit, include_in_cost, notes')
-      .eq('product_id', params.id) as { data: Array<{ packaging_id: string; quantity_per_unit: number; include_in_cost: boolean; notes: string | null }> | null },
+      .select('packaging_id, quantity_per_unit, entry_mode, entry_value, include_in_cost, notes')
+      .eq('product_id', params.id) as { data: Array<{ packaging_id: string; quantity_per_unit: number; entry_mode: string | null; entry_value: number | null; include_in_cost: boolean; notes: string | null }> | null },
   ])
 
   if (!product) notFound()
@@ -128,7 +128,8 @@ export default async function EditProductPage({ params, searchParams }: PageProp
         packaging={packaging ?? []}
         initialRows={(productPackaging ?? []).map((r) => ({
           packaging_id: r.packaging_id,
-          quantity_per_unit: Number(r.quantity_per_unit),
+          entry_mode: (r.entry_mode === 'per_group' ? 'per_group' : 'per_pack') as 'per_pack' | 'per_group',
+          entry_value: r.entry_value != null ? Number(r.entry_value) : Number(r.quantity_per_unit),
           include_in_cost: r.include_in_cost ?? true,
           notes: r.notes,
         }))}

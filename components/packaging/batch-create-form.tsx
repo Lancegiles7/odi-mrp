@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { batchCreatePackagingForProduct, type BatchCreateRow } from '@/app/(dashboard)/packaging/actions'
+import { type EntryMode } from '@/lib/packaging-entry'
 import { PACKAGING_TYPES, SUPPORTED_CURRENCIES, type CurrencyCode } from '@/lib/constants'
 import { createClient } from '@/lib/supabase/client'
 
@@ -25,8 +26,14 @@ interface Props {
 const blankRow = (): BatchCreateRow => ({
   sku_code: '', name: '', type: 'OTHER', unit_of_measure: 'each',
   supplier_id: null, price: null, currency: 'NZD', freight_per_unit_nzd: null,
-  quantity_per_unit: 1, include_in_cost: true, current_soh: null, original_order_qty: null,
+  entry_mode: 'per_pack', entry_value: 1,
+  include_in_cost: true, current_soh: null, original_order_qty: null,
 })
+
+function resolveQty(mode: EntryMode, value: number): number {
+  if (!value || value <= 0) return 0
+  return mode === 'per_group' ? 1 / value : value
+}
 
 export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) {
   const router = useRouter()
@@ -64,7 +71,7 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
   function onSave() {
     setError(null)
     if (!productId) { setError('Pick a product first.'); return }
-    const validRows = rows.filter((r) => r.sku_code.trim() && r.name.trim() && r.quantity_per_unit > 0)
+    const validRows = rows.filter((r) => r.sku_code.trim() && r.name.trim() && r.entry_value > 0)
     if (validRows.length === 0) { setError('Add at least one row with SKU, name and qty.'); return }
 
     start(async () => {
@@ -128,7 +135,7 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
       <div>
         <div className="text-[11px] uppercase tracking-wider text-gray-500 mb-2">New packaging items for this product</div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs border border-gray-200 rounded-md overflow-hidden min-w-[1100px]">
+          <table className="w-full text-xs border border-gray-200 rounded-md overflow-hidden min-w-[1280px]">
             <thead>
               <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                 <th className="text-left px-2 py-2 w-[150px]">SKU code</th>
@@ -138,7 +145,8 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
                 <th className="text-right px-2 py-2 w-[80px]">Price</th>
                 <th className="text-left px-2 py-2 w-[60px]">Cur</th>
                 <th className="text-right px-2 py-2 w-[80px]">Freight</th>
-                <th className="text-right px-2 py-2 w-[90px]">Qty/unit</th>
+                <th className="text-right px-2 py-2 w-[70px]">Qty</th>
+                <th className="text-left px-2 py-2 w-[180px]">Mode</th>
                 <th className="text-center px-2 py-2 w-[70px]" title="Include this packaging's cost in the product's BOM cost calculation">In&nbsp;cost?</th>
                 <th className="text-right px-2 py-2 w-[80px]">SOH</th>
                 <th className="text-right px-2 py-2 w-[100px]">Original PO</th>
@@ -189,9 +197,20 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
                       className="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
                   </td>
                   <td className="px-2 py-1.5">
-                    <input type="number" step="any" min={0} value={r.quantity_per_unit}
-                      onChange={(e) => update(i, { quantity_per_unit: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    <input type="number" step="any" min={0} value={r.entry_value}
+                      onChange={(e) => update(i, { entry_value: e.target.value === '' ? 0 : Number(e.target.value) })}
                       className="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <select value={r.entry_mode}
+                      onChange={(e) => update(i, { entry_mode: e.target.value as EntryMode })}
+                      className="w-full text-xs border border-gray-200 rounded px-1.5 py-1">
+                      <option value="per_pack">per product</option>
+                      <option value="per_group">products per packaging</option>
+                    </select>
+                    {r.entry_mode === 'per_group' && r.entry_value > 0 && (
+                      <div className="text-[10px] text-gray-400 mt-0.5 tabular-nums">→ {resolveQty(r.entry_mode, r.entry_value).toFixed(4)} per product</div>
+                    )}
                   </td>
                   <td className="px-2 py-1.5 text-center">
                     <input type="checkbox" checked={r.include_in_cost}

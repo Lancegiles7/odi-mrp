@@ -26,8 +26,8 @@ export default async function EditPackagingPage({ params, searchParams }: PagePr
     supabase.from('suppliers').select('id, name').order('name') as { data: Array<{ id: string; name: string }> | null },
     supabase.from('app_settings').select('fx_rates').eq('id', 1).maybeSingle() as { data: { fx_rates: FxRates } | null },
     supabase.from('product_packaging')
-      .select('product_id, quantity_per_unit, include_in_cost, notes')
-      .eq('packaging_id', params.id) as { data: Array<{ product_id: string; quantity_per_unit: number; include_in_cost: boolean; notes: string | null }> | null },
+      .select('product_id, quantity_per_unit, entry_mode, entry_value, include_in_cost, notes')
+      .eq('packaging_id', params.id) as { data: Array<{ product_id: string; quantity_per_unit: number; entry_mode: string | null; entry_value: number | null; include_in_cost: boolean; notes: string | null }> | null },
     supabase.from('inventory_balances').select('quantity_on_hand').eq('packaging_id', params.id).maybeSingle() as { data: { quantity_on_hand: number } | null },
     supabase.from('products').select('id, sku_code, name').order('name') as { data: Array<{ id: string; sku_code: string | null; name: string }> | null },
   ])
@@ -64,7 +64,8 @@ export default async function EditPackagingPage({ params, searchParams }: PagePr
           packagingName={data.name}
           initialRows={(usedIn ?? []).map((u) => ({
             product_id: u.product_id,
-            quantity_per_unit: Number(u.quantity_per_unit),
+            entry_mode: (u.entry_mode === 'per_group' ? 'per_group' : 'per_pack') as 'per_pack' | 'per_group',
+            entry_value: u.entry_value != null ? Number(u.entry_value) : Number(u.quantity_per_unit),
             include_in_cost: u.include_in_cost ?? true,
             notes: u.notes,
           }))}
