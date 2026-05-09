@@ -28,6 +28,19 @@ interface PackagingForm {
   reorder_point: number | null
   is_active: boolean
   notes: string | null
+
+  // Original Order baseline (migration 018)
+  original_order_qty:    number | null
+  original_order_date:   string | null
+  original_order_notes:  string | null
+  current_soh:           number | null
+  current_soh_as_of:     string | null
+}
+
+function txt(raw: FormDataEntryValue | null): string | null {
+  if (raw == null) return null
+  const v = String(raw).trim()
+  return v === '' ? null : v
 }
 
 function num(raw: FormDataEntryValue | null): number | null {
@@ -63,6 +76,11 @@ function parsePayload(formData: FormData): PackagingForm | string {
     reorder_point:          num(formData.get('reorder_point')),
     is_active:              formData.get('is_active') === 'on',
     notes:                  ((formData.get('notes') as string | null) || '').trim() || null,
+    original_order_qty:    num(formData.get('original_order_qty')),
+    original_order_date:   txt(formData.get('original_order_date')),
+    original_order_notes:  txt(formData.get('original_order_notes')),
+    current_soh:           num(formData.get('current_soh')),
+    current_soh_as_of:     txt(formData.get('current_soh_as_of')),
   }
 }
 
@@ -125,9 +143,116 @@ export async function updatePackaging(formData: FormData) {
 
   if (error) redirect(`/packaging/${id}?error=${encodeURIComponent(error.message)}`)
 
+  // Propagate cost change to every product that links to this packaging
+  const { data: linked } = await supabase
+    .from('product_packaging').select('product_id').eq('packaging_id', id!) as
+    { data: Array<{ product_id: string }> | null }
+  for (const row of linked ?? []) {
+    await recomputeProductPackagingCost(supabase, row.product_id)
+    revalidatePath(`/products/${row.product_id}`)
+    revalidatePath(`/products/${row.product_id}/edit`)
+  }
+
   revalidatePath('/packaging')
   revalidatePath(`/packaging/${id}`)
+  revalidatePath('/packaging/demand')
   redirect(`/packaging/${id}?saved=1`)
+}
+
+// ============================================================
+// Batch create — packaging items + product BOM links in one go
+// Called from the new product-first /packaging/new form.
+// ============================================================
+export interface BatchCreateRow {
+  sku_code: string
+  name: string
+  type: string
+  unit_of_measure: string
+  supplier_id: string | null
+  price: number | null
+  currency: CurrencyCode
+  freight_per_unit_nzd: number | null
+  quantity_per_unit: number
+  include_in_cost: boolean
+  current_soh: number | null
+  original_order_qty: number | null
+}
+
+export async function batchCreatePackagingForProduct(input: {
+  product_id: string
+  original_order_date: string | null
+  rows: BatchCreateRow[]
+}): Promise<{ ok: boolean; error?: string; created?: number }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  if (!input.product_id) return { ok: false, error: 'Pick a product first' }
+  const valid = input.rows.filter((r) => r.sku_code.trim() && r.name.trim() && r.quantity_per_unit > 0)
+  if (valid.length === 0) return { ok: false, error: 'Add at least one packaging row with SKU, name and qty.' }
+
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+
+  const fxRates = await loadFxRates()
+
+  const newPackagingIds: string[] = []
+  for (const r of valid) {
+    if (!isKnownPackagingType(r.type)) return { ok: false, error: `Invalid type "${r.type}" on ${r.sku_code}` }
+    if (!SUPPORTED_CURRENCIES.includes(r.currency)) return { ok: false, error: `Invalid currency on ${r.sku_code}` }
+
+    const total_loaded_cost_nzd = computeLoadedNzd({
+      price: r.price, currency: r.currency, fx_rate_override: null, freight_per_unit_nzd: r.freight_per_unit_nzd,
+    }, fxRates)
+
+    const { data: pak, error: pakErr } = await supabase
+      .from('packaging')
+      .insert({
+        sku_code:             r.sku_code.trim(),
+        name:                 r.name.trim(),
+        type:                 r.type,
+        unit_of_measure:      r.unit_of_measure || 'each',
+        supplier_id:          r.supplier_id,
+        price:                r.price,
+        currency:             r.currency,
+        freight_per_unit_nzd: r.freight_per_unit_nzd,
+        total_loaded_cost_nzd,
+        opening_stock_override: r.current_soh,
+        original_order_qty:    r.original_order_qty,
+        original_order_date:   input.original_order_date,
+        current_soh:           r.current_soh,
+        current_soh_as_of:     input.original_order_date,   // sensible default; user can edit later
+        is_active:             true,
+        created_by:            profile?.id ?? null,
+      })
+      .select('id').single() as { data: { id: string } | null; error: { message: string; code?: string } | null }
+
+    if (pakErr || !pak) {
+      const msg = pakErr?.code === '23505'
+        ? `SKU "${r.sku_code}" already exists. Pick a different SKU code.`
+        : (pakErr?.message ?? 'Save failed')
+      return { ok: false, error: msg }
+    }
+    newPackagingIds.push(pak.id)
+
+    const { error: linkErr } = await supabase
+      .from('product_packaging')
+      .insert({
+        product_id:        input.product_id,
+        packaging_id:      pak.id,
+        quantity_per_unit: r.quantity_per_unit,
+        include_in_cost:   r.include_in_cost,
+      })
+    if (linkErr) return { ok: false, error: linkErr.message }
+  }
+
+  await recomputeProductPackagingCost(supabase, input.product_id)
+
+  revalidatePath('/packaging')
+  revalidatePath('/packaging/demand')
+  revalidatePath(`/products/${input.product_id}`)
+  revalidatePath(`/products/${input.product_id}/edit`)
+  return { ok: true, created: newPackagingIds.length }
 }
 
 // ============================================================
@@ -135,7 +260,7 @@ export async function updatePackaging(formData: FormData) {
 // ============================================================
 export async function setProductPackagingBom(input: {
   product_id: string
-  rows: Array<{ packaging_id: string; quantity_per_unit: number; notes: string | null }>
+  rows: Array<{ packaging_id: string; quantity_per_unit: number; include_in_cost?: boolean; notes: string | null }>
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -146,33 +271,59 @@ export async function setProductPackagingBom(input: {
     .from('product_packaging').delete().eq('product_id', input.product_id)
   if (delErr) return { ok: false, error: delErr.message }
 
-  if (input.rows.length === 0) {
-    revalidatePath(`/products/${input.product_id}`)
-    revalidatePath('/packaging')
-    return { ok: true }
-  }
-
   const inserts = input.rows
     .filter((r) => r.packaging_id && r.quantity_per_unit > 0)
     .map((r) => ({
       product_id:        input.product_id,
       packaging_id:      r.packaging_id,
       quantity_per_unit: r.quantity_per_unit,
+      include_in_cost:   r.include_in_cost ?? true,
       notes:             r.notes,
     }))
 
-  if (inserts.length === 0) {
-    revalidatePath(`/products/${input.product_id}`)
-    return { ok: true }
+  if (inserts.length > 0) {
+    const { error: insErr } = await supabase.from('product_packaging').insert(inserts)
+    if (insErr) return { ok: false, error: insErr.message }
   }
 
-  const { error: insErr } = await supabase.from('product_packaging').insert(inserts)
-  if (insErr) return { ok: false, error: insErr.message }
+  // Recompute the product's per-pack packaging cost from the In-cost rows so
+  // the existing product cost summary picks it up automatically.
+  await recomputeProductPackagingCost(supabase, input.product_id)
 
   revalidatePath(`/products/${input.product_id}`)
+  revalidatePath(`/products/${input.product_id}/edit`)
   revalidatePath('/packaging')
   revalidatePath('/packaging/demand')
   return { ok: true }
+}
+
+async function recomputeProductPackagingCost(
+  supabase: ReturnType<typeof createClient>,
+  productId: string,
+): Promise<void> {
+  const { data: links } = await supabase
+    .from('product_packaging')
+    .select('quantity_per_unit, include_in_cost, packaging:packaging_id ( total_loaded_cost_nzd )')
+    .eq('product_id', productId) as {
+      data: Array<{
+        quantity_per_unit: number
+        include_in_cost: boolean
+        packaging: { total_loaded_cost_nzd: number | null } | null
+      }> | null
+    }
+
+  let total = 0
+  for (const r of links ?? []) {
+    if (!r.include_in_cost) continue
+    const cost = Number(r.packaging?.total_loaded_cost_nzd) || 0
+    const qty  = Number(r.quantity_per_unit) || 0
+    total += cost * qty
+  }
+
+  // Round to 4 dp (matches numeric(12,4) on products.packaging)
+  const rounded = Math.round(total * 10000) / 10000
+
+  await supabase.from('products').update({ packaging: rounded }).eq('id', productId)
 }
 
 // ============================================================
@@ -181,11 +332,17 @@ export async function setProductPackagingBom(input: {
 // ============================================================
 export async function setPackagingProducts(input: {
   packaging_id: string
-  rows: Array<{ product_id: string; quantity_per_unit: number; notes: string | null }>
+  rows: Array<{ product_id: string; quantity_per_unit: number; include_in_cost?: boolean; notes: string | null }>
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
+
+  // Capture which products were previously linked so we can recompute them
+  // even if they're being removed in this save.
+  const { data: priorLinks } = await supabase
+    .from('product_packaging').select('product_id').eq('packaging_id', input.packaging_id) as
+    { data: Array<{ product_id: string }> | null }
 
   const { error: delErr } = await supabase
     .from('product_packaging').delete().eq('packaging_id', input.packaging_id)
@@ -197,23 +354,30 @@ export async function setPackagingProducts(input: {
       product_id:        r.product_id,
       packaging_id:      input.packaging_id,
       quantity_per_unit: r.quantity_per_unit,
+      include_in_cost:   r.include_in_cost ?? true,
       notes:             r.notes,
     }))
 
-  if (inserts.length === 0) {
-    revalidatePath(`/packaging/${input.packaging_id}`)
-    revalidatePath('/packaging')
-    revalidatePath('/packaging/demand')
-    return { ok: true }
+  if (inserts.length > 0) {
+    const { error: insErr } = await supabase.from('product_packaging').insert(inserts)
+    if (insErr) return { ok: false, error: insErr.message }
   }
 
-  const { error: insErr } = await supabase.from('product_packaging').insert(inserts)
-  if (insErr) return { ok: false, error: insErr.message }
+  // Recompute every product touched (added, removed, or unchanged via this save)
+  const productIds = new Set<string>([
+    ...(priorLinks ?? []).map((l) => l.product_id),
+    ...inserts.map((r) => r.product_id),
+  ])
+  for (const pid of productIds) {
+    await recomputeProductPackagingCost(supabase, pid)
+  }
 
   revalidatePath(`/packaging/${input.packaging_id}`)
   revalidatePath('/packaging')
   revalidatePath('/packaging/demand')
-  // Each affected product page should refresh its packaging cost too
-  for (const row of inserts) revalidatePath(`/products/${row.product_id}`)
+  for (const pid of productIds) {
+    revalidatePath(`/products/${pid}`)
+    revalidatePath(`/products/${pid}/edit`)
+  }
   return { ok: true }
 }

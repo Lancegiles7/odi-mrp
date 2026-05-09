@@ -14,6 +14,7 @@ interface ProductOption {
 interface BomRow {
   product_id: string
   quantity_per_unit: number
+  include_in_cost: boolean
   notes: string | null
 }
 
@@ -38,7 +39,7 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { product_id: '', quantity_per_unit: 1, notes: null }])
+    setRows((prev) => [...prev, { product_id: '', quantity_per_unit: 1, include_in_cost: true, notes: null }])
   }
 
   function removeRow(idx: number) {
@@ -83,22 +84,24 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
         <thead>
           <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
             <th className="text-left px-3 py-2">Product</th>
-            <th className="text-right px-3 py-2 w-[160px]">Qty per product unit</th>
+            <th className="text-right px-3 py-2 w-[140px]">Qty per product unit</th>
+            <th className="text-center px-3 py-2 w-[80px]" title="Include this packaging in the product's BOM cost calculation">In&nbsp;cost?</th>
             <th className="px-3 py-2 w-[40px]"></th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={3} className="px-3 py-4 text-center text-xs text-gray-400">
+              <td colSpan={4} className="px-3 py-4 text-center text-xs text-gray-400">
                 Not on any product&rsquo;s BOM yet. Click &ldquo;Add product&rdquo; to link one.
               </td>
             </tr>
           )}
           {rows.map((r, i) => {
             const p = productById.get(r.product_id)
+            const excluded = !r.include_in_cost
             return (
-              <tr key={i} className="border-t border-gray-100">
+              <tr key={i} className={`border-t border-gray-100 ${excluded ? 'bg-amber-50/40' : ''}`}>
                 <td className="px-3 py-1.5">
                   <select
                     value={r.product_id}
@@ -124,6 +127,14 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
                     value={r.quantity_per_unit}
                     onChange={(e) => update(i, { quantity_per_unit: e.target.value === '' ? 0 : Number(e.target.value) })}
                     className="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums"
+                  />
+                </td>
+                <td className="px-3 py-1.5 text-center">
+                  <input
+                    type="checkbox"
+                    checked={r.include_in_cost}
+                    onChange={(e) => update(i, { include_in_cost: e.target.checked })}
+                    className="rounded border-gray-300"
                   />
                 </td>
                 <td className="px-3 py-1.5 text-center">

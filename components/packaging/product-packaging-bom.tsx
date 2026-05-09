@@ -18,6 +18,7 @@ interface PackagingOption {
 interface BomRow {
   packaging_id: string
   quantity_per_unit: number
+  include_in_cost: boolean
   notes: string | null
 }
 
@@ -42,7 +43,7 @@ export function ProductPackagingBom({ productId, productName, initialRows, packa
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { packaging_id: '', quantity_per_unit: 1, notes: null }])
+    setRows((prev) => [...prev, { packaging_id: '', quantity_per_unit: 1, include_in_cost: true, notes: null }])
   }
 
   function removeRow(idx: number) {
@@ -61,6 +62,7 @@ export function ProductPackagingBom({ productId, productName, initialRows, packa
   }
 
   const totalCost = rows.reduce((s, r) => {
+    if (!r.include_in_cost) return s
     const p = packById.get(r.packaging_id)
     if (!p) return s
     return s + (Number(p.total_loaded_cost_nzd) || 0) * (Number(r.quantity_per_unit) || 0)
@@ -71,10 +73,12 @@ export function ProductPackagingBom({ productId, productName, initialRows, packa
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-900">Packaging BOM</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Per-unit packaging consumed when {productName} is manufactured. Add a row per packaging item.</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Per-unit packaging consumed when {productName} is manufactured. Untick <span className="font-medium">In cost?</span> to link a packaging item for demand only (cost excluded from per-unit BOM).
+          </p>
         </div>
         <Link
-          href={`/packaging/new?return_to=${encodeURIComponent(`/products/${productId}/edit`)}`}
+          href={`/packaging/new?return_to=${encodeURIComponent(`/products/${productId}/edit`)}&product_id=${productId}`}
           className="text-sm px-2.5 py-1 border border-gray-300 rounded-md hover:bg-gray-50"
         >
           + New packaging item
@@ -90,6 +94,7 @@ export function ProductPackagingBom({ productId, productName, initialRows, packa
             <th className="text-left px-3 py-2">Packaging item</th>
             <th className="text-left px-3 py-2 w-[120px]">Type</th>
             <th className="text-right px-3 py-2 w-[140px]">Qty per product unit</th>
+            <th className="text-center px-3 py-2 w-[80px]" title="Include this packaging's cost in the product's BOM cost calculation">In&nbsp;cost?</th>
             <th className="text-right px-3 py-2 w-[110px]">Loaded NZD</th>
             <th className="text-right px-3 py-2 w-[120px]">Cost contribution</th>
             <th className="px-3 py-2 w-[40px]"></th>
@@ -99,8 +104,9 @@ export function ProductPackagingBom({ productId, productName, initialRows, packa
           {rows.map((r, i) => {
             const p = packById.get(r.packaging_id)
             const cost = (Number(p?.total_loaded_cost_nzd) || 0) * (Number(r.quantity_per_unit) || 0)
+            const excluded = !r.include_in_cost
             return (
-              <tr key={i} className="border-t border-gray-100">
+              <tr key={i} className={`border-t border-gray-100 ${excluded ? 'bg-amber-50/40' : ''}`}>
                 <td className="px-3 py-1.5">
                   <select
                     value={r.packaging_id}
@@ -124,11 +130,19 @@ export function ProductPackagingBom({ productId, productName, initialRows, packa
                     className="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums"
                   />
                 </td>
+                <td className="px-3 py-1.5 text-center">
+                  <input
+                    type="checkbox"
+                    checked={r.include_in_cost}
+                    onChange={(e) => update(i, { include_in_cost: e.target.checked })}
+                    className="rounded border-gray-300"
+                  />
+                </td>
                 <td className="px-3 py-1.5 text-right tabular-nums text-gray-600">
                   {p?.total_loaded_cost_nzd != null ? `$${Number(p.total_loaded_cost_nzd).toFixed(4)}` : '—'}
                 </td>
                 <td className="px-3 py-1.5 text-right tabular-nums text-gray-700">
-                  {cost > 0 ? `$${cost.toFixed(4)}` : '—'}
+                  {excluded ? <span className="text-gray-400 italic">excluded</span> : (cost > 0 ? `$${cost.toFixed(4)}` : '—')}
                 </td>
                 <td className="px-3 py-1.5 text-center">
                   <button onClick={() => removeRow(i)} className="text-gray-400 hover:text-red-600">×</button>
@@ -137,7 +151,7 @@ export function ProductPackagingBom({ productId, productName, initialRows, packa
             )
           })}
           <tr className="border-t-2 border-gray-200 bg-gray-50 text-sm">
-            <td colSpan={4} className="px-3 py-2 text-right font-medium text-gray-700">Packaging cost per {productName} unit</td>
+            <td colSpan={5} className="px-3 py-2 text-right font-medium text-gray-700">Packaging cost per {productName} unit</td>
             <td className="px-3 py-2 text-right tabular-nums font-semibold">${totalCost.toFixed(4)}</td>
             <td></td>
           </tr>

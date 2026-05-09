@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Odi MRP — Packaging v2 + Original Order mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-gray-100 p-8">
+<div class="max-w-[1500px] mx-auto space-y-10">
+
+<header>
+  <h1 class="text-xl font-semibold">Packaging v2 + Original Order — mockup</h1>
+  <p class="text-sm text-gray-600 mt-1">Three changes: (1) product-first packaging creation, (2) per-link "include in BOM cost" toggle, (3) Original Order baseline on packaging / ingredients / products with auto-generated bulk consumption movement.</p>
+</header>
+
+<!-- ============================================================ -->
+<!-- 1 · NEW PACKAGING — PRODUCT-FIRST BATCH FORM                 -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-start justify-between">
+    <div>
+      <h2 class="text-base font-semibold">1 · /packaging/new — product-first batch creation</h2>
+      <p class="text-xs text-gray-500 mt-0.5">Pick the product, then add every packaging item that goes into it in one form. Each row creates a packaging SKU + a product link in one save.</p>
+    </div>
+    <span class="text-[10px] px-2 py-1 bg-gray-100 rounded text-gray-600">Replaces today's single-item form</span>
+  </div>
+  <div class="p-5 space-y-5">
+
+    <!-- Product picker -->
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Product this packaging is for</label>
+      <select class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+        <option>Brownie 4-pack · PRD-BRW-4PK</option>
+        <option>Bone Broth Tub 500ml · PRD-BB-500</option>
+        <option>Granola 350g · PRD-GR-350</option>
+      </select>
+      <p class="text-[11px] text-gray-500 mt-1">You can also add packaging from the catalogue or product edit page later — this is the fast path when you're setting up a new product's packaging from scratch.</p>
+    </div>
+
+    <!-- Existing packaging already linked (read-only summary) -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+      <div class="text-[11px] uppercase tracking-wider text-blue-800 font-semibold mb-1">Already on Brownie 4-pack's BOM</div>
+      <p class="text-xs text-blue-800">Nothing yet — this product has no packaging linked. Add rows below.</p>
+    </div>
+
+    <!-- Batch packaging entry table -->
+    <div>
+      <div class="text-[11px] uppercase tracking-wider text-gray-500 mb-2">New packaging items for this product</div>
+      <table class="w-full text-xs border border-gray-200 rounded-md overflow-hidden">
+        <thead>
+          <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+            <th class="text-left px-2 py-2 w-[140px]">SKU code</th>
+            <th class="text-left px-2 py-2">Name</th>
+            <th class="text-left px-2 py-2 w-[110px]">Type</th>
+            <th class="text-left px-2 py-2 w-[160px]">Supplier</th>
+            <th class="text-right px-2 py-2 w-[80px]">Price</th>
+            <th class="text-left px-2 py-2 w-[60px]">Cur</th>
+            <th class="text-right px-2 py-2 w-[80px]">Qty/unit</th>
+            <th class="text-center px-2 py-2 w-[70px]" title="Include this packaging's cost in the product's BOM cost calculation">In&nbsp;cost?</th>
+            <th class="text-right px-2 py-2 w-[80px]">SOH</th>
+            <th class="text-right px-2 py-2 w-[100px]">Original&nbsp;PO</th>
+            <th class="px-2 py-2 w-[24px]"></th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <!-- Flow wrap row -->
+          <tr class="border-t border-gray-100">
+            <td class="px-2 py-1.5"><input value="PAK-BRW-FW" class="w-full text-xs border-gray-200 rounded px-1.5 py-1 font-mono" /></td>
+            <td class="px-2 py-1.5"><input value="Brownie flow wrap" class="w-full text-xs border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5"><select class="w-full text-xs border-gray-200 rounded px-1 py-1"><option>Pouch</option><option>Box</option><option>Carton</option><option>Insert</option><option>Other</option></select></td>
+            <td class="px-2 py-1.5"><select class="w-full text-xs border-gray-200 rounded px-1 py-1"><option>FlexiPack NZ</option></select></td>
+            <td class="px-2 py-1.5"><input value="0.18" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5"><select class="w-full text-xs border-gray-200 rounded px-1 py-1"><option>NZD</option><option>AUD</option><option>USD</option></select></td>
+            <td class="px-2 py-1.5"><input value="4" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5 text-center"><input type="checkbox" checked class="rounded" /></td>
+            <td class="px-2 py-1.5"><input value="2400" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5"><input value="5000" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5 text-center"><button class="text-gray-400 hover:text-red-600">×</button></td>
+          </tr>
+
+          <!-- Box row -->
+          <tr class="border-t border-gray-100">
+            <td class="px-2 py-1.5"><input value="PAK-BRW-BOX4" class="w-full text-xs border-gray-200 rounded px-1.5 py-1 font-mono" /></td>
+            <td class="px-2 py-1.5"><input value="Brownie 4-pack box" class="w-full text-xs border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5"><select class="w-full text-xs border-gray-200 rounded px-1 py-1"><option>Box</option></select></td>
+            <td class="px-2 py-1.5"><select class="w-full text-xs border-gray-200 rounded px-1 py-1"><option>BoxCo</option></select></td>
+            <td class="px-2 py-1.5"><input value="0.42" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5"><select class="w-full text-xs border-gray-200 rounded px-1 py-1"><option>NZD</option></select></td>
+            <td class="px-2 py-1.5"><input value="1" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5 text-center"><input type="checkbox" checked class="rounded" /></td>
+            <td class="px-2 py-1.5"><input value="800" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5"><input value="1200" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5 text-center"><button class="text-gray-400 hover:text-red-600">×</button></td>
+          </tr>
+
+          <!-- SRT row — linked for demand, NOT included in cost -->
+          <tr class="border-t border-gray-100 bg-amber-50/40">
+            <td class="px-2 py-1.5"><input value="PAK-SRT-A" class="w-full text-xs border-gray-200 rounded px-1.5 py-1 font-mono" /></td>
+            <td class="px-2 py-1.5"><input value="Shelf-ready tray (5-product)" class="w-full text-xs border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5"><select class="w-full text-xs border-gray-200 rounded px-1 py-1"><option>Carton</option></select></td>
+            <td class="px-2 py-1.5"><select class="w-full text-xs border-gray-200 rounded px-1 py-1"><option>BoxCo</option></select></td>
+            <td class="px-2 py-1.5"><input value="0.95" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5"><select class="w-full text-xs border-gray-200 rounded px-1 py-1"><option>NZD</option></select></td>
+            <td class="px-2 py-1.5"><input value="0.2" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5 text-center"><input type="checkbox" class="rounded" /></td>
+            <td class="px-2 py-1.5"><input value="120" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5"><input value="500" class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" /></td>
+            <td class="px-2 py-1.5 text-center"><button class="text-gray-400 hover:text-red-600">×</button></td>
+          </tr>
+
+        </tbody>
+      </table>
+      <div class="flex items-center justify-between mt-2">
+        <button class="text-xs text-blue-600 hover:underline">+ Add another packaging item</button>
+        <p class="text-[11px] text-gray-500">Tip: untick <span class="font-medium">In&nbsp;cost?</span> for items linked only for demand (e.g. shared trays/cartons whose cost is allocated elsewhere).</p>
+      </div>
+    </div>
+
+    <!-- Optional original order date -->
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Original PO date (applies to all rows above unless overridden)</label>
+      <input type="date" value="2026-01-15" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+    </div>
+
+    <div class="flex justify-end gap-2 pt-3 border-t border-gray-100">
+      <button class="px-3 py-1.5 text-sm border border-gray-300 rounded-md">Cancel</button>
+      <button class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md">Save 3 packaging items + link to Brownie 4-pack</button>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 2 · PRODUCT EDIT — PACKAGING BOM WITH "IN COST?" TOGGLE     -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">2 · Product edit · Packaging BOM — with "In cost?" per row</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Brownie 4-pack edit page · BOM cost only includes rows with "In cost?" ticked. Other rows still flow demand through to /packaging/demand.</p>
+  </div>
+  <div class="p-5">
+    <table class="w-full text-xs border border-gray-200 rounded-md overflow-hidden">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+          <th class="text-left px-3 py-2">Packaging item</th>
+          <th class="text-left px-3 py-2 w-[110px]">Type</th>
+          <th class="text-right px-3 py-2 w-[120px]">Qty / product unit</th>
+          <th class="text-center px-3 py-2 w-[80px]">In&nbsp;cost?</th>
+          <th class="text-right px-3 py-2 w-[110px]">Loaded NZD</th>
+          <th class="text-right px-3 py-2 w-[140px]">Cost contribution</th>
+          <th class="px-3 py-2 w-[40px]"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-1.5"><span class="font-medium">Brownie flow wrap</span> <span class="text-[10px] text-gray-500 font-mono">PAK-BRW-FW</span></td>
+          <td class="px-3 py-1.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Pouch</span></td>
+          <td class="px-3 py-1.5 text-right tabular-nums">4</td>
+          <td class="px-3 py-1.5 text-center"><input type="checkbox" checked class="rounded" /></td>
+          <td class="px-3 py-1.5 text-right tabular-nums text-gray-600">$0.1800</td>
+          <td class="px-3 py-1.5 text-right tabular-nums">$0.7200</td>
+          <td class="px-3 py-1.5 text-center"><button class="text-gray-400 hover:text-red-600">×</button></td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-1.5"><span class="font-medium">Brownie 4-pack box</span> <span class="text-[10px] text-gray-500 font-mono">PAK-BRW-BOX4</span></td>
+          <td class="px-3 py-1.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">Box</span></td>
+          <td class="px-3 py-1.5 text-right tabular-nums">1</td>
+          <td class="px-3 py-1.5 text-center"><input type="checkbox" checked class="rounded" /></td>
+          <td class="px-3 py-1.5 text-right tabular-nums text-gray-600">$0.4200</td>
+          <td class="px-3 py-1.5 text-right tabular-nums">$0.4200</td>
+          <td class="px-3 py-1.5 text-center"><button class="text-gray-400 hover:text-red-600">×</button></td>
+        </tr>
+        <tr class="border-t border-gray-100 bg-amber-50/40">
+          <td class="px-3 py-1.5"><span class="font-medium">Shelf-ready tray</span> <span class="text-[10px] text-gray-500 font-mono">PAK-SRT-A</span></td>
+          <td class="px-3 py-1.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Carton</span></td>
+          <td class="px-3 py-1.5 text-right tabular-nums">0.2</td>
+          <td class="px-3 py-1.5 text-center"><input type="checkbox" class="rounded" /></td>
+          <td class="px-3 py-1.5 text-right tabular-nums text-gray-600">$0.9500</td>
+          <td class="px-3 py-1.5 text-right tabular-nums text-gray-300">excluded</td>
+          <td class="px-3 py-1.5 text-center"><button class="text-gray-400 hover:text-red-600">×</button></td>
+        </tr>
+        <tr class="border-t-2 border-gray-200 bg-gray-50 text-sm">
+          <td colspan="5" class="px-3 py-2 text-right font-medium text-gray-700">Packaging cost per Brownie 4-pack unit</td>
+          <td class="px-3 py-2 text-right tabular-nums font-semibold">$1.1400</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="text-[11px] text-gray-500 mt-2">Demand still flows through for unticked rows: 1,000 Brownies → 4,000 flow wraps, 1,000 boxes, 200 SRTs (the SRT just doesn't add to per-unit cost).</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3 · ORIGINAL ORDER SECTION — ON PACKAGING / INGREDIENT / PRODUCT FORMS -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">3 · Original Order section — packaging / ingredients / products</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Same UI block reused on all three edit forms. Captures the launch PO + lets you set today's SOH; the system auto-creates a single bulk consumption movement so Stock Movements stays the source of truth.</p>
+  </div>
+  <div class="p-5">
+    <div class="grid grid-cols-2 gap-4 max-w-3xl">
+      <div>
+        <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Original order qty</label>
+        <input value="5000" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm text-right tabular-nums" />
+      </div>
+      <div>
+        <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Original order date</label>
+        <input type="date" value="2026-01-15" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+      </div>
+      <div class="col-span-2">
+        <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Notes (optional)</label>
+        <input value="First Brownie launch run — FlexiPack PO #1042" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+      </div>
+      <div>
+        <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Current SOH (today)</label>
+        <input value="2400" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm text-right tabular-nums" />
+      </div>
+      <div>
+        <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">SOH as of (date)</label>
+        <input type="date" value="2026-05-09" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+      </div>
+    </div>
+
+    <!-- Auto-derived consumption + stock movement preview -->
+    <div class="mt-5 p-4 bg-emerald-50 border border-emerald-200 rounded-md max-w-3xl">
+      <div class="grid grid-cols-3 gap-4 items-end">
+        <div>
+          <div class="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">Original</div>
+          <div class="text-2xl font-semibold text-emerald-900 tabular-nums">5,000</div>
+          <div class="text-[10px] text-emerald-700">Jan 15 2026</div>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">− Current SOH</div>
+          <div class="text-2xl font-semibold text-emerald-900 tabular-nums">2,400</div>
+          <div class="text-[10px] text-emerald-700">May 9 2026</div>
+        </div>
+        <div>
+          <div class="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">= Consumed since launch</div>
+          <div class="text-2xl font-semibold text-emerald-900 tabular-nums">2,600</div>
+          <div class="text-[10px] text-emerald-700">114 days</div>
+        </div>
+      </div>
+      <div class="mt-3 pt-3 border-t border-emerald-200 text-xs text-emerald-900">
+        <span class="font-semibold">On save:</span> a single stock movement entry will be created — type <span class="font-mono bg-emerald-100 px-1 rounded">opening_adjustment</span>, qty <span class="font-mono bg-emerald-100 px-1 rounded">−2,600</span>, dated <span class="font-mono bg-emerald-100 px-1 rounded">2026-05-09</span>, with a reference back to this item. You can find it in Stock Movements.
+      </div>
+    </div>
+
+    <p class="text-[11px] text-gray-500 mt-3 max-w-3xl">If you re-edit current SOH later, the existing opening_adjustment is updated in place (not duplicated). Future PO receipts and BOM consumption write their own movements as normal.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 4 · STOCK MOVEMENTS — HOW IT SHOWS UP                        -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">4 · Stock Movements — Brownie flow wrap example</h2>
+    <p class="text-xs text-gray-500 mt-0.5">How Original Order + bulk consumption + future receipts/usage stack up.</p>
+  </div>
+  <div class="p-5">
+    <table class="w-full text-xs border border-gray-200 rounded-md overflow-hidden">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+          <th class="text-left px-3 py-2 w-[110px]">Date</th>
+          <th class="text-left px-3 py-2 w-[160px]">Type</th>
+          <th class="text-right px-3 py-2 w-[100px]">Qty</th>
+          <th class="text-left px-3 py-2">Reference</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-1.5">2026-01-15</td>
+          <td class="px-3 py-1.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">opening_balance</span></td>
+          <td class="px-3 py-1.5 text-right tabular-nums">+5,000</td>
+          <td class="px-3 py-1.5 text-gray-600">Original order — FlexiPack PO #1042</td>
+        </tr>
+        <tr class="border-t border-gray-100 bg-amber-50/40">
+          <td class="px-3 py-1.5">2026-05-09</td>
+          <td class="px-3 py-1.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">opening_adjustment</span></td>
+          <td class="px-3 py-1.5 text-right tabular-nums">−2,600</td>
+          <td class="px-3 py-1.5 text-gray-600">Current SOH set to 2,400 (consumed since launch)</td>
+        </tr>
+        <tr class="border-t border-gray-100 text-gray-300">
+          <td class="px-3 py-1.5">future</td>
+          <td class="px-3 py-1.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">po_receipt</span></td>
+          <td class="px-3 py-1.5 text-right tabular-nums">+10,000</td>
+          <td class="px-3 py-1.5">PO-2026-005 received</td>
+        </tr>
+        <tr class="border-t border-gray-100 text-gray-300">
+          <td class="px-3 py-1.5">future</td>
+          <td class="px-3 py-1.5"><span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">production</span></td>
+          <td class="px-3 py-1.5 text-right tabular-nums">−4,000</td>
+          <td class="px-3 py-1.5">Brownie 4-pack run — 1,000 units</td>
+        </tr>
+        <tr class="border-t-2 border-gray-200 bg-gray-50 text-sm">
+          <td colspan="2" class="px-3 py-2 text-right font-medium text-gray-700">Current SOH</td>
+          <td class="px-3 py-2 text-right tabular-nums font-semibold">2,400</td>
+          <td class="px-3 py-2 text-[10px] text-gray-500">(rows in colour are the live ones today)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 5 · DECISIONS / OPEN QUESTIONS                               -->
+<!-- ============================================================ -->
+<section class="bg-yellow-50 border border-yellow-300 rounded-lg p-5">
+  <h2 class="text-base font-semibold text-yellow-900">Decisions before build</h2>
+  <ul class="mt-3 space-y-2 text-sm text-yellow-900">
+    <li><span class="font-semibold">A.</span> "In cost?" toggle defaults to <span class="font-mono bg-yellow-100 px-1 rounded">true</span> for new rows — sound right?</li>
+    <li><span class="font-semibold">B.</span> The product-first form replaces today's <span class="font-mono bg-yellow-100 px-1 rounded">/packaging/new</span>. The existing single-item editor (<span class="font-mono bg-yellow-100 px-1 rounded">/packaging/[id]</span>) and the catalogue list both stay. OK?</li>
+    <li><span class="font-semibold">C.</span> Original Order added to packaging, ingredients, AND products — same 3 fields each (qty, date, notes) + Current SOH + SOH-as-of date. Confirmed for all three?</li>
+    <li><span class="font-semibold">D.</span> Two separate stock movements created on save: <span class="font-mono bg-yellow-100 px-1 rounded">opening_balance +N</span> on original date, and <span class="font-mono bg-yellow-100 px-1 rounded">opening_adjustment −M</span> on SOH date if SOH &lt; Original. If SOH &gt; Original, the adjustment is positive (receipt with no PO link). OK?</li>
+    <li><span class="font-semibold">E.</span> Editing current SOH later updates the existing adjustment row in place (no duplicates). Confirm.</li>
+  </ul>
+</section>
+
+</div>
+</body>
+</html>

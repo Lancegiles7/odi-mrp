@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { Ingredient, Supplier } from '@/lib/types/database.types'
 import { UNITS_OF_MEASURE } from '@/lib/constants'
 import { SupplierPicker } from './supplier-picker'
+import { OriginalOrderSection } from '@/components/shared/original-order-section'
 
 type SupplierOption = Pick<
   Supplier,
@@ -274,6 +275,17 @@ export function IngredientForm({
             A price change is recorded in the history ledger on save (any change to Price, Freight, or Total Loaded Cost).
           </p>
         )}
+      </div>
+
+      {/* Original Order baseline */}
+      <div className="bg-white border border-gray-200 rounded-lg p-5">
+        <OriginalOrderSection
+          initialOriginalQty={(ingredient as unknown as { original_order_qty?: number | null })?.original_order_qty ?? null}
+          initialOriginalDate={(ingredient as unknown as { original_order_date?: string | null })?.original_order_date ?? null}
+          initialOriginalNotes={(ingredient as unknown as { original_order_notes?: string | null })?.original_order_notes ?? null}
+          initialCurrentSoh={(ingredient as unknown as { current_soh?: number | null })?.current_soh ?? null}
+          initialCurrentSohDate={(ingredient as unknown as { current_soh_as_of?: string | null })?.current_soh_as_of ?? null}
+        />
       </div>
 
       {/* Actions */}

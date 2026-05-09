@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import type { Product } from '@/lib/types/database.types'
 import { PRODUCT_GROUPS, MANUFACTURERS } from '@/lib/constants'
+import { OriginalOrderSection } from '@/components/shared/original-order-section'
 
 interface ProductFormProps {
   product?: Product | null
@@ -248,6 +249,18 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Original Order baseline */}
+      <div className="bg-white border border-gray-200 rounded-lg p-5">
+        <OriginalOrderSection
+          initialOriginalQty={(product as unknown as { original_order_qty?: number | null })?.original_order_qty ?? null}
+          initialOriginalDate={(product as unknown as { original_order_date?: string | null })?.original_order_date ?? null}
+          initialOriginalNotes={(product as unknown as { original_order_notes?: string | null })?.original_order_notes ?? null}
+          initialCurrentSoh={(product as unknown as { current_soh?: number | null })?.current_soh ?? null}
+          initialCurrentSohDate={(product as unknown as { current_soh_as_of?: string | null })?.current_soh_as_of ?? null}
+          hideStockMovementHint
+        />
       </div>
 
       {/* Actions */}
