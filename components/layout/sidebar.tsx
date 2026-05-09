@@ -18,6 +18,7 @@ import {
   Leaf,
   Inbox,
   MapPin,
+  Box as BoxIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROLES } from '@/lib/constants'
@@ -30,6 +31,8 @@ const ICON_MAP = {
   '/products/trash':  Trash2,
   '/ingredients':     FlaskConical,
   '/ingredients/demand': Leaf,
+  '/packaging':         BoxIcon,
+  '/packaging/demand':  BoxIcon,
   '/suppliers':         Truck,
   '/purchase-orders':   ShoppingCart,
   '/inwards-pending':   Inbox,
@@ -51,8 +54,10 @@ const NAV_GROUPS = [
       { name: 'Demand',             href: '/demand' },
       { name: 'Production',         href: '/production' },
       { name: 'Ingredient demand',  href: '/ingredients/demand' },
+      { name: 'Packaging demand',   href: '/packaging/demand' },
       { name: 'Products / BOMs',    href: '/products' },
       { name: 'Ingredients',        href: '/ingredients' },
+      { name: 'Packaging',          href: '/packaging' },
     ],
   },
   {
