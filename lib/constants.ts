@@ -93,7 +93,7 @@ export const PACKAGING_TYPES = [
   { code: 'BOX',          label: 'Box' },
   { code: 'POUCH_SNACKS', label: 'Pouch — snacks' },
   { code: 'POUCH',        label: 'Pouch' },
-  { code: 'SRT',          label: 'SRT (shelf-ready tray)' },
+  { code: 'SRT',          label: 'SRT' },
 ] as const
 
 export type PackagingTypeCode = (typeof PACKAGING_TYPES)[number]['code'] | 'OTHER'

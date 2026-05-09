@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/utils'
 import { calcProductCostSummary, calcBomLineValues } from '@/lib/costing'
 import { getAppSettings } from '@/lib/settings'
-import { PRODUCT_GROUP_LABELS, ROLES } from '@/lib/constants'
+import { PRODUCT_GROUP_LABELS, ROLES, packagingTypeLabel } from '@/lib/constants'
 import { DeleteProductButton } from '@/components/products/delete-product-button'
 import type { BomItemWithIngredient } from '@/lib/types/database.types'
 
@@ -23,7 +23,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
     .from('user_profiles').select('roles(name)').eq('id', user?.id ?? '').maybeSingle() as { data: { roles: { name: string } | null } | null }
   const isAdmin = profile?.roles?.name === ROLES.ADMIN
 
-  const [{ data: product }, settings] = await Promise.all([
+  const [{ data: product }, settings, { data: packagingLinks }] = await Promise.all([
     supabase
       .from('products')
       .select(`
@@ -39,6 +39,17 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
       .eq('id', params.id)
       .single(),
     getAppSettings(),
+    supabase
+      .from('product_packaging')
+      .select('packaging_id, quantity_per_unit, entry_mode, entry_value, include_in_cost, packaging:packaging_id(sku_code, name, type, total_loaded_cost_nzd)')
+      .eq('product_id', params.id) as unknown as { data: Array<{
+        packaging_id: string
+        quantity_per_unit: number
+        entry_mode: string | null
+        entry_value: number | null
+        include_in_cost: boolean
+        packaging: { sku_code: string; name: string; type: string; total_loaded_cost_nzd: number | null } | null
+      }> | null },
   ])
 
   if (!product) notFound()
@@ -287,7 +298,10 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             </table>
 
             <div className="grid grid-cols-2 gap-x-10 gap-y-1 px-5 py-4 text-sm border-t border-gray-100 bg-gray-50/50">
-              <LineItem label="Packaging" value={product.packaging} />
+              <PackagingBreakdown
+                links={packagingLinks ?? []}
+                total={Number(product.packaging) || 0}
+              />
               <LineItem label="Toll"      value={product.toll} />
               <LineItem label="Margin"    value={product.margin} />
               <LineItem label="Task / other" value={product.other} />
@@ -364,6 +378,59 @@ function LineItem({ label, value }: { label: string; value: number | null }) {
     <div className="flex justify-between">
       <span className="text-gray-600">{label}</span>
       <span className="font-medium">{value != null ? formatCurrency(value) : '—'}</span>
+    </div>
+  )
+}
+
+function PackagingBreakdown({
+  links, total,
+}: {
+  links: Array<{
+    packaging_id: string
+    quantity_per_unit: number
+    entry_mode: string | null
+    entry_value: number | null
+    include_in_cost: boolean
+    packaging: { sku_code: string; name: string; type: string; total_loaded_cost_nzd: number | null } | null
+  }>
+  total: number
+}) {
+  const rows = links
+    .filter((l) => l.packaging != null)
+    .sort((a, b) => (a.packaging?.name ?? '').localeCompare(b.packaging?.name ?? ''))
+
+  if (rows.length === 0) {
+    return <LineItem label="Packaging" value={total > 0 ? total : null} />
+  }
+
+  return (
+    <div className="col-span-2">
+      <div className="flex justify-between font-medium">
+        <span className="text-gray-700">Packaging</span>
+        <span>{formatCurrency(total)}</span>
+      </div>
+      <ul className="mt-1 space-y-0.5 pl-3 border-l-2 border-gray-200 text-xs">
+        {rows.map((l) => {
+          const qty = Number(l.quantity_per_unit) || 0
+          const unitCost = Number(l.packaging?.total_loaded_cost_nzd) || 0
+          const contribution = qty * unitCost
+          const excluded = !l.include_in_cost
+          const entryDisplay = l.entry_mode === 'per_group' && l.entry_value
+            ? `${Number(l.entry_value)} per ${packagingTypeLabel(l.packaging?.type ?? 'OTHER')} (= ${qty.toFixed(4)} per pack)`
+            : `${qty} per pack`
+          return (
+            <li key={l.packaging_id} className="flex justify-between gap-2">
+              <span className={`flex-1 truncate ${excluded ? 'text-gray-400' : 'text-gray-600'}`}>
+                · {packagingTypeLabel(l.packaging?.type ?? 'OTHER')} — {l.packaging?.name}{' '}
+                <span className="text-gray-400">({entryDisplay} × ${unitCost.toFixed(4)})</span>
+              </span>
+              <span className={`tabular-nums ${excluded ? 'text-gray-400 italic' : 'text-gray-700'}`}>
+                {excluded ? 'excluded' : formatCurrency(contribution)}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }
