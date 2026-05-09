@@ -78,12 +78,17 @@ export function aggregatePackagingDemand(input: AggregateInput): SupplierGroup[]
     })
   }
 
+  // Track which packaging items have ANY product link so we can keep them
+  // visible on the demand page even when there's no production yet.
+  const linkedPackaging = new Set<string>()
+
   // Walk each product → packaging link
   for (const pp of productPackaging) {
     const row = rows.get(pp.packaging_id)
     if (!row) continue
     const prod = productById.get(pp.product_id)
     if (!prod) continue
+    linkedPackaging.add(pp.packaging_id)
 
     const perProduct = {
       id: prod.id,
@@ -94,7 +99,6 @@ export function aggregatePackagingDemand(input: AggregateInput): SupplierGroup[]
       totalDemand: 0,
     }
 
-    let any = false
     for (const m of months) {
       const units = unitsByMonthByProduct.get(m)?.get(prod.id) ?? 0
       if (!units) continue
@@ -103,9 +107,10 @@ export function aggregatePackagingDemand(input: AggregateInput): SupplierGroup[]
       perProduct.totalDemand += qty
       row.demandByMonth.set(m, (row.demandByMonth.get(m) ?? 0) + qty)
       row.totalDemand += qty
-      any = true
     }
-    if (any) row.products.push(perProduct)
+    // Always include linked products on the row, even at 0 demand, so the
+    // user can see the BOM connection from the demand page.
+    row.products.push(perProduct)
   }
 
   // Fold arrivals
@@ -121,12 +126,15 @@ export function aggregatePackagingDemand(input: AggregateInput): SupplierGroup[]
     }
   }
 
-  // Group by supplier
+  // Group by supplier — include any packaging that has demand, opening stock,
+  // arrivals, OR a product BOM link (so the user can see the link even when
+  // there's no production schedule yet).
   const groups = new Map<string | null, SupplierGroup>()
   for (const pk of packaging) {
     const row = rows.get(pk.id)!
     const anyArriving = Array.from(row.arrivingByMonth.values()).some((v) => v > 0)
-    if (row.totalDemand === 0 && row.packaging.opening_stock_override == null && !anyArriving) continue
+    const hasLink = linkedPackaging.has(pk.id)
+    if (row.totalDemand === 0 && row.packaging.opening_stock_override == null && !anyArriving && !hasLink) continue
 
     const sKey = pk.supplier_id
     if (!groups.has(sKey)) {
