@@ -160,6 +160,60 @@ export async function updatePackaging(formData: FormData) {
 }
 
 // ============================================================
+// Delete packaging item
+// Blocks if PO lines or stock movements reference it (operational data).
+// Cleans up product_packaging links + inventory_balances (BOM / derived).
+// ============================================================
+export async function deletePackaging(id: string): Promise<{ ok: boolean; error?: string }> {
+  if (!id) return { ok: false, error: 'Missing packaging id' }
+
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  // Operational refs: block delete
+  const [poRes, smRes] = await Promise.all([
+    supabase.from('purchase_order_lines').select('id', { count: 'exact', head: true }).eq('packaging_id', id),
+    supabase.from('stock_movements').select('id', { count: 'exact', head: true }).eq('packaging_id', id),
+  ])
+  const blockers: string[] = []
+  if ((poRes.count ?? 0) > 0) blockers.push(`${poRes.count} purchase-order line${poRes.count === 1 ? '' : 's'}`)
+  if ((smRes.count ?? 0) > 0) blockers.push(`${smRes.count} stock movement${smRes.count === 1 ? '' : 's'}`)
+  if (blockers.length > 0) {
+    return {
+      ok: false,
+      error: `Cannot delete: this packaging item is referenced by ${blockers.join(' and ')}. Mark it inactive instead.`,
+    }
+  }
+
+  // Capture affected products so we can recompute their packaging cost after the delete
+  const { data: priorLinks } = await supabase
+    .from('product_packaging').select('product_id').eq('packaging_id', id) as
+    { data: Array<{ product_id: string }> | null }
+  const productIds = Array.from(new Set((priorLinks ?? []).map((l) => l.product_id)))
+
+  // Clean up derived tables first
+  const { error: ppErr } = await supabase.from('product_packaging').delete().eq('packaging_id', id)
+  if (ppErr) return { ok: false, error: ppErr.message }
+  const { error: ibErr } = await supabase.from('inventory_balances').delete().eq('packaging_id', id)
+  if (ibErr) return { ok: false, error: ibErr.message }
+
+  const { error: delErr } = await supabase.from('packaging').delete().eq('id', id)
+  if (delErr) return { ok: false, error: delErr.message }
+
+  // Recompute affected products' packaging cost
+  for (const pid of productIds) {
+    await recomputeProductPackagingCost(supabase, pid)
+    revalidatePath(`/products/${pid}`)
+    revalidatePath(`/products/${pid}/edit`)
+  }
+
+  revalidatePath('/packaging')
+  revalidatePath('/packaging/demand')
+  return { ok: true }
+}
+
+// ============================================================
 // Batch create — packaging items + product BOM links in one go
 // Called from the new product-first /packaging/new form.
 // ============================================================
