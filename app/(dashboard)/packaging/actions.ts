@@ -174,3 +174,46 @@ export async function setProductPackagingBom(input: {
   revalidatePath('/packaging/demand')
   return { ok: true }
 }
+
+// ============================================================
+// Packaging → Products (called from the packaging edit page)
+// Same join table, opposite direction. Replaces the set wholesale.
+// ============================================================
+export async function setPackagingProducts(input: {
+  packaging_id: string
+  rows: Array<{ product_id: string; quantity_per_unit: number; notes: string | null }>
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not_authenticated' }
+
+  const { error: delErr } = await supabase
+    .from('product_packaging').delete().eq('packaging_id', input.packaging_id)
+  if (delErr) return { ok: false, error: delErr.message }
+
+  const inserts = input.rows
+    .filter((r) => r.product_id && r.quantity_per_unit > 0)
+    .map((r) => ({
+      product_id:        r.product_id,
+      packaging_id:      input.packaging_id,
+      quantity_per_unit: r.quantity_per_unit,
+      notes:             r.notes,
+    }))
+
+  if (inserts.length === 0) {
+    revalidatePath(`/packaging/${input.packaging_id}`)
+    revalidatePath('/packaging')
+    revalidatePath('/packaging/demand')
+    return { ok: true }
+  }
+
+  const { error: insErr } = await supabase.from('product_packaging').insert(inserts)
+  if (insErr) return { ok: false, error: insErr.message }
+
+  revalidatePath(`/packaging/${input.packaging_id}`)
+  revalidatePath('/packaging')
+  revalidatePath('/packaging/demand')
+  // Each affected product page should refresh its packaging cost too
+  for (const row of inserts) revalidatePath(`/products/${row.product_id}`)
+  return { ok: true }
+}
