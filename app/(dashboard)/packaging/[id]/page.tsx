@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PackagingForm, type PackagingInitial } from '@/components/packaging/packaging-form'
 import { PackagingProductsBom } from '@/components/packaging/packaging-products-bom'
+import { DeletePackagingButton } from '@/components/packaging/delete-packaging-button'
 import { updatePackaging } from '@/app/(dashboard)/packaging/actions'
 import type { FxRates } from '@/lib/packaging-cost'
 
@@ -69,6 +70,14 @@ export default async function EditPackagingPage({ params, searchParams }: PagePr
           }))}
           products={allProducts ?? []}
         />
+      </div>
+
+      <div className="mt-5 bg-white border border-red-200 rounded-lg p-5">
+        <h2 className="text-sm font-semibold text-red-700 mb-1">Danger zone</h2>
+        <p className="text-xs text-gray-500 mb-3">
+          Permanent. Product BOM links and inventory balances are cleared. Blocked if any PO lines or stock movements reference this packaging item — mark it inactive instead.
+        </p>
+        <DeletePackagingButton id={data.id!} name={data.name} />
       </div>
     </div>
   )
