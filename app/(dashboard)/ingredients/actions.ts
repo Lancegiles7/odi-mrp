@@ -138,6 +138,12 @@ interface IngredientPayload {
   description: string | null
   is_organic: boolean
   is_active: boolean
+  // Original Order baseline (migration 018)
+  original_order_qty:   number | null
+  original_order_date:  string | null
+  original_order_notes: string | null
+  current_soh:          number | null
+  current_soh_as_of:    string | null
 }
 
 function buildPayloadFromForm(
@@ -161,6 +167,11 @@ function buildPayloadFromForm(
     description:        str(formData.get('description')),
     is_organic:         (formData.get('is_organic') as string) !== 'false',
     is_active:          true,
+    original_order_qty:   parseNumeric(formData.get('original_order_qty')),
+    original_order_date:  str(formData.get('original_order_date')),
+    original_order_notes: str(formData.get('original_order_notes')),
+    current_soh:          parseNumeric(formData.get('current_soh')),
+    current_soh_as_of:    str(formData.get('current_soh_as_of')),
   }
 }
 

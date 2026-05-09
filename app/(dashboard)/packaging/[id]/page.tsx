@@ -19,14 +19,14 @@ export default async function EditPackagingPage({ params, searchParams }: PagePr
 
   const [{ data }, { data: suppliers }, { data: settings }, { data: usedIn }, { data: balance }, { data: allProducts }] = await Promise.all([
     supabase.from('packaging')
-      .select('id, sku_code, name, type, unit_of_measure, description, supplier_id, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price, currency, fx_rate_override, freight_per_unit_nzd, opening_stock_override, reorder_point, is_active, notes')
+      .select('id, sku_code, name, type, unit_of_measure, description, supplier_id, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price, currency, fx_rate_override, freight_per_unit_nzd, opening_stock_override, reorder_point, is_active, notes, original_order_qty, original_order_date, original_order_notes, current_soh, current_soh_as_of')
       .eq('id', params.id)
       .maybeSingle() as { data: PackagingInitial | null },
     supabase.from('suppliers').select('id, name').order('name') as { data: Array<{ id: string; name: string }> | null },
     supabase.from('app_settings').select('fx_rates').eq('id', 1).maybeSingle() as { data: { fx_rates: FxRates } | null },
     supabase.from('product_packaging')
-      .select('product_id, quantity_per_unit, notes')
-      .eq('packaging_id', params.id) as { data: Array<{ product_id: string; quantity_per_unit: number; notes: string | null }> | null },
+      .select('product_id, quantity_per_unit, include_in_cost, notes')
+      .eq('packaging_id', params.id) as { data: Array<{ product_id: string; quantity_per_unit: number; include_in_cost: boolean; notes: string | null }> | null },
     supabase.from('inventory_balances').select('quantity_on_hand').eq('packaging_id', params.id).maybeSingle() as { data: { quantity_on_hand: number } | null },
     supabase.from('products').select('id, sku_code, name').order('name') as { data: Array<{ id: string; sku_code: string | null; name: string }> | null },
   ])
@@ -64,6 +64,7 @@ export default async function EditPackagingPage({ params, searchParams }: PagePr
           initialRows={(usedIn ?? []).map((u) => ({
             product_id: u.product_id,
             quantity_per_unit: Number(u.quantity_per_unit),
+            include_in_cost: u.include_in_cost ?? true,
             notes: u.notes,
           }))}
           products={allProducts ?? []}

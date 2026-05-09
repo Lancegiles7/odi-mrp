@@ -57,8 +57,8 @@ export default async function EditProductPage({ params, searchParams }: PageProp
       .order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string; total_loaded_cost_nzd: number | null }> | null },
     supabase
       .from('product_packaging')
-      .select('packaging_id, quantity_per_unit, notes')
-      .eq('product_id', params.id) as { data: Array<{ packaging_id: string; quantity_per_unit: number; notes: string | null }> | null },
+      .select('packaging_id, quantity_per_unit, include_in_cost, notes')
+      .eq('product_id', params.id) as { data: Array<{ packaging_id: string; quantity_per_unit: number; include_in_cost: boolean; notes: string | null }> | null },
   ])
 
   if (!product) notFound()
@@ -126,7 +126,12 @@ export default async function EditProductPage({ params, searchParams }: PageProp
         productId={params.id}
         productName={product.name}
         packaging={packaging ?? []}
-        initialRows={productPackaging ?? []}
+        initialRows={(productPackaging ?? []).map((r) => ({
+          packaging_id: r.packaging_id,
+          quantity_per_unit: Number(r.quantity_per_unit),
+          include_in_cost: r.include_in_cost ?? true,
+          notes: r.notes,
+        }))}
       />
     </div>
   )

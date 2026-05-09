@@ -44,6 +44,12 @@ export interface ProductFormData {
   wastage_pct_input?: string
   manufacturer?: string
   opening_stock_override?: string
+  // Original Order baseline (migration 018)
+  original_order_qty?: string
+  original_order_date?: string
+  original_order_notes?: string
+  current_soh?: string
+  current_soh_as_of?: string
 }
 
 const VALID_GROUPS = new Set([
@@ -134,6 +140,11 @@ function buildProductPayload(data: ProductFormData) {
     manufacturer:    data.manufacturer?.trim() || null,
     opening_stock_override: parseNum(data.opening_stock_override),
     is_active:       true,
+    original_order_qty:    parseNum(data.original_order_qty),
+    original_order_date:   data.original_order_date?.trim() || null,
+    original_order_notes:  data.original_order_notes?.trim() || null,
+    current_soh:           parseNum(data.current_soh),
+    current_soh_as_of:     data.current_soh_as_of?.trim() || null,
   }
 }
 
@@ -158,6 +169,11 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     wastage_pct_input: formData.get('wastage_pct_input') as string,
     manufacturer:      formData.get('manufacturer') as string,
     opening_stock_override: formData.get('opening_stock_override') as string,
+    original_order_qty:    formData.get('original_order_qty') as string,
+    original_order_date:   formData.get('original_order_date') as string,
+    original_order_notes:  formData.get('original_order_notes') as string,
+    current_soh:           formData.get('current_soh') as string,
+    current_soh_as_of:     formData.get('current_soh_as_of') as string,
   }
 }
 

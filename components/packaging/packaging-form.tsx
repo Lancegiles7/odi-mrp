@@ -5,6 +5,7 @@ import {
   PACKAGING_TYPES, packagingTypeLabel, SUPPORTED_CURRENCIES, type CurrencyCode,
 } from '@/lib/constants'
 import { computeLoadedNzd, type FxRates } from '@/lib/packaging-cost'
+import { OriginalOrderSection } from '@/components/shared/original-order-section'
 
 interface SupplierOption {
   id: string
@@ -30,6 +31,12 @@ interface Initial {
   reorder_point: number | null
   is_active: boolean
   notes: string | null
+  // Original Order baseline (added in migration 018)
+  original_order_qty: number | null
+  original_order_date: string | null
+  original_order_notes: string | null
+  current_soh: number | null
+  current_soh_as_of: string | null
 }
 
 export function PackagingForm({
@@ -165,6 +172,15 @@ export function PackagingForm({
           </Field>
         </div>
       </div>
+
+      {/* ORIGINAL ORDER */}
+      <OriginalOrderSection
+        initialOriginalQty={initial.original_order_qty}
+        initialOriginalDate={initial.original_order_date}
+        initialOriginalNotes={initial.original_order_notes}
+        initialCurrentSoh={initial.current_soh}
+        initialCurrentSohDate={initial.current_soh_as_of}
+      />
 
       <Field label="Notes">
         <textarea name="notes" rows={2} defaultValue={initial.notes ?? ''} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
