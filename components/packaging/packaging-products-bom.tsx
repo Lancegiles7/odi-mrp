@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { setPackagingProducts } from '@/app/(dashboard)/packaging/actions'
+import { type EntryMode } from '@/lib/packaging-entry'
 
 interface ProductOption {
   id: string
@@ -13,7 +14,8 @@ interface ProductOption {
 
 interface BomRow {
   product_id: string
-  quantity_per_unit: number
+  entry_mode: EntryMode
+  entry_value: number
   include_in_cost: boolean
   notes: string | null
 }
@@ -23,6 +25,11 @@ interface Props {
   packagingName: string
   initialRows: BomRow[]
   products: ProductOption[]
+}
+
+function resolveQty(mode: EntryMode, value: number): number {
+  if (!value || value <= 0) return 0
+  return mode === 'per_group' ? 1 / value : value
 }
 
 export function PackagingProductsBom({ packagingId, packagingName, initialRows, products }: Props) {
@@ -39,7 +46,7 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { product_id: '', quantity_per_unit: 1, include_in_cost: true, notes: null }])
+    setRows((prev) => [...prev, { product_id: '', entry_mode: 'per_pack', entry_value: 1, include_in_cost: true, notes: null }])
   }
 
   function removeRow(idx: number) {
@@ -58,8 +65,17 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
       seen.add(r.product_id)
     }
     start(async () => {
-      const filtered = rows.filter((r) => r.product_id && r.quantity_per_unit > 0)
-      const res = await setPackagingProducts({ packaging_id: packagingId, rows: filtered })
+      const filtered = rows.filter((r) => r.product_id && r.entry_value > 0)
+      const res = await setPackagingProducts({
+        packaging_id: packagingId,
+        rows: filtered.map((r) => ({
+          product_id:      r.product_id,
+          entry_mode:      r.entry_mode,
+          entry_value:     r.entry_value,
+          include_in_cost: r.include_in_cost,
+          notes:           r.notes,
+        })),
+      })
       if (!res.ok) { setError(res.error ?? 'Save failed'); return }
       setSavedAt(Date.now())
       router.refresh()
@@ -72,7 +88,7 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Used in (products)</h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            Products that consume {packagingName}. Set the quantity used per product unit (e.g. flow wrap × 4 for a 4-pack).
+            Products that consume {packagingName}. Pick the natural direction per row: <span className="font-medium">per product</span> (e.g. flow wrap × 4) or <span className="font-medium">products per packaging</span> (e.g. 5 brownies per SRT).
           </p>
         </div>
       </div>
@@ -84,7 +100,8 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
         <thead>
           <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
             <th className="text-left px-3 py-2">Product</th>
-            <th className="text-right px-3 py-2 w-[140px]">Qty per product unit</th>
+            <th className="text-right px-3 py-2 w-[80px]">Qty</th>
+            <th className="text-left px-3 py-2 w-[180px]">Mode</th>
             <th className="text-center px-3 py-2 w-[80px]" title="Include this packaging in the product's BOM cost calculation">In&nbsp;cost?</th>
             <th className="px-3 py-2 w-[40px]"></th>
           </tr>
@@ -92,7 +109,7 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={4} className="px-3 py-4 text-center text-xs text-gray-400">
+              <td colSpan={5} className="px-3 py-4 text-center text-xs text-gray-400">
                 Not on any product&rsquo;s BOM yet. Click &ldquo;Add product&rdquo; to link one.
               </td>
             </tr>
@@ -100,6 +117,7 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
           {rows.map((r, i) => {
             const p = productById.get(r.product_id)
             const excluded = !r.include_in_cost
+            const qty = resolveQty(r.entry_mode, r.entry_value)
             return (
               <tr key={i} className={`border-t border-gray-100 ${excluded ? 'bg-amber-50/40' : ''}`}>
                 <td className="px-3 py-1.5">
@@ -124,10 +142,23 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
                 <td className="px-3 py-1.5">
                   <input
                     type="number" step="any" min={0}
-                    value={r.quantity_per_unit}
-                    onChange={(e) => update(i, { quantity_per_unit: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    value={r.entry_value}
+                    onChange={(e) => update(i, { entry_value: e.target.value === '' ? 0 : Number(e.target.value) })}
                     className="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums"
                   />
+                </td>
+                <td className="px-3 py-1.5">
+                  <select
+                    value={r.entry_mode}
+                    onChange={(e) => update(i, { entry_mode: e.target.value as EntryMode })}
+                    className="w-full text-xs border border-gray-200 rounded px-1.5 py-1"
+                  >
+                    <option value="per_pack">per product</option>
+                    <option value="per_group">products per packaging</option>
+                  </select>
+                  {r.entry_mode === 'per_group' && r.entry_value > 0 && (
+                    <div className="text-[10px] text-gray-400 mt-0.5 tabular-nums">→ {qty.toFixed(4)} per product</div>
+                  )}
                 </td>
                 <td className="px-3 py-1.5 text-center">
                   <input
