@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Odi MRP — Packaging mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .tabular-nums { font-variant-numeric: tabular-nums; }</style>
+</head>
+<body class="bg-gray-100 p-8">
+<div class="max-w-[1500px] mx-auto space-y-8">
+
+<header>
+  <h1 class="text-xl font-semibold">Packaging — mockup</h1>
+  <p class="text-sm text-gray-600 mt-1">Mirrors ingredients structurally. New cost section: price in supplier currency → FX → + freight → fully-loaded NZD cost. Linked to products via a small join (one product, one or more packaging items).</p>
+</header>
+
+<!-- ============================================================ -->
+<!-- 1 · PACKAGING LIST                                           -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">1 · Packaging list</h2>
+      <p class="text-xs text-gray-500 mt-0.5">Filter by type / supplier · loaded cost shown in NZD</p>
+    </div>
+    <button class="px-3 py-1.5 text-xs bg-gray-900 text-white rounded-md">+ New packaging item</button>
+  </div>
+  <div class="px-5 py-2 border-b border-gray-100 flex items-center gap-3 text-xs">
+    <span class="text-gray-500">Filter:</span>
+    <select class="border border-gray-300 rounded-md px-2 py-1">
+      <option>All types</option>
+      <option>Flow wrap</option>
+      <option>Box</option>
+      <option>Pouch — snacks</option>
+      <option>Pouch</option>
+      <option>SRT</option>
+      <option>Other</option>
+    </select>
+    <select class="border border-gray-300 rounded-md px-2 py-1">
+      <option>All suppliers</option>
+      <option>Brand Nation</option>
+      <option>Pack Co AU</option>
+    </select>
+    <button class="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200">Apply</button>
+  </div>
+  <table class="w-full text-xs">
+    <thead>
+      <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <th class="text-left px-4 py-2 w-[160px]">Code</th>
+        <th class="text-left px-3 py-2 w-[120px]">Type</th>
+        <th class="text-left px-4 py-2">Name</th>
+        <th class="text-left px-3 py-2">Supplier</th>
+        <th class="text-right px-3 py-2 w-[100px]">Price</th>
+        <th class="text-left px-3 py-2 w-[60px]">Ccy</th>
+        <th class="text-right px-3 py-2 w-[80px]">Freight</th>
+        <th class="text-right px-3 py-2 w-[110px]">Loaded NZD</th>
+        <th class="text-right px-3 py-2 w-[80px]">SOH</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-mono">PAK-ODI-SAC-CAR</td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Pouch — snacks</span></td><td class="px-4 py-2 font-medium">Odi Sachet — Carrot artwork</td><td class="px-3 py-2">Brand Nation</td><td class="px-3 py-2 text-right tabular-nums">$0.180</td><td class="px-3 py-2">USD</td><td class="px-3 py-2 text-right tabular-nums">$0.024</td><td class="px-3 py-2 text-right tabular-nums font-medium">$0.318</td><td class="px-3 py-2 text-right tabular-nums">9,000</td></tr>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-mono">PAK-ODI-SAC-BET</td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">Pouch — snacks</span></td><td class="px-4 py-2 font-medium">Odi Sachet — Beetroot artwork</td><td class="px-3 py-2">Brand Nation</td><td class="px-3 py-2 text-right tabular-nums">$0.180</td><td class="px-3 py-2">USD</td><td class="px-3 py-2 text-right tabular-nums">$0.024</td><td class="px-3 py-2 text-right tabular-nums font-medium">$0.318</td><td class="px-3 py-2 text-right tabular-nums">8,558</td></tr>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-mono">PAK-ODI-TUB-BBB</td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Pouch</span></td><td class="px-4 py-2 font-medium">Odi Tub 125 g — BBB artwork</td><td class="px-3 py-2">Pack Co AU</td><td class="px-3 py-2 text-right tabular-nums">$0.85</td><td class="px-3 py-2">AUD</td><td class="px-3 py-2 text-right tabular-nums">$0.12</td><td class="px-3 py-2 text-right tabular-nums font-medium">$1.18</td><td class="px-3 py-2 text-right tabular-nums">5,999</td></tr>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-mono">PAK-BRW-FW</td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Flow wrap</span></td><td class="px-4 py-2 font-medium">Brownie flow wrap (30 g)</td><td class="px-3 py-2">Brand Nation</td><td class="px-3 py-2 text-right tabular-nums">$0.080</td><td class="px-3 py-2">NZD</td><td class="px-3 py-2 text-right tabular-nums">—</td><td class="px-3 py-2 text-right tabular-nums font-medium">$0.080</td><td class="px-3 py-2 text-right tabular-nums">12,400</td></tr>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-mono">PAK-BRW-BOX4</td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">Box</span></td><td class="px-4 py-2 font-medium">Brownie outer box (4-pack)</td><td class="px-3 py-2">Brand Nation</td><td class="px-3 py-2 text-right tabular-nums">$0.420</td><td class="px-3 py-2">NZD</td><td class="px-3 py-2 text-right tabular-nums">—</td><td class="px-3 py-2 text-right tabular-nums font-medium">$0.420</td><td class="px-3 py-2 text-right tabular-nums">3,200</td></tr>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2 font-mono">PAK-BRW-SRT</td><td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">SRT</span></td><td class="px-4 py-2 font-medium">Brownie shelf-ready tray</td><td class="px-3 py-2">Pack Co AU</td><td class="px-3 py-2 text-right tabular-nums">$1.10</td><td class="px-3 py-2">AUD</td><td class="px-3 py-2 text-right tabular-nums">$0.15</td><td class="px-3 py-2 text-right tabular-nums font-medium">$1.342</td><td class="px-3 py-2 text-right tabular-nums">820</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 2 · PACKAGING DETAIL — NEW COST SECTION                     -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">2 · Packaging detail — new "Loaded cost" section</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Price in supplier's currency → FX → + freight → fully-loaded NZD cost. The loaded NZD value flows into PO totals and product cost rollups.</p>
+  </div>
+
+  <div class="p-5 grid grid-cols-2 gap-6">
+    <div class="space-y-4">
+      <h3 class="text-[11px] uppercase tracking-wider text-gray-500">Identity</h3>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-[11px] text-gray-500 mb-1">Code</label><input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm font-mono" value="PAK-ODI-TUB-BBB" /></div>
+        <div><label class="block text-[11px] text-gray-500 mb-1">UoM</label><input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value="each" /></div>
+      </div>
+      <div><label class="block text-[11px] text-gray-500 mb-1">Type</label>
+        <select class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+          <option>Flow wrap</option>
+          <option>Box</option>
+          <option>Pouch — snacks</option>
+          <option selected>Pouch</option>
+          <option>SRT (shelf-ready tray)</option>
+          <option>Other (specify)</option>
+        </select>
+      </div>
+      <div><label class="block text-[11px] text-gray-500 mb-1">Name</label><input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value="Odi Tub 125 g — BBB artwork" /></div>
+      <div><label class="block text-[11px] text-gray-500 mb-1">Supplier</label>
+        <select class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"><option>Pack Co AU</option></select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-[11px] text-gray-500 mb-1">Supplier code</label><input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value="PCO-TUB-125-BBB" /></div>
+        <div><label class="block text-[11px] text-gray-500 mb-1">Pack size</label><input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm tabular-nums" value="500" /></div>
+      </div>
+    </div>
+
+    <div class="space-y-3">
+      <h3 class="text-[11px] uppercase tracking-wider text-gray-500">Loaded cost (per unit)</h3>
+
+      <div class="grid grid-cols-3 gap-3">
+        <div><label class="block text-[11px] text-gray-500 mb-1">Supplier price</label><input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm text-right tabular-nums" value="0.850" /></div>
+        <div><label class="block text-[11px] text-gray-500 mb-1">Currency</label>
+          <select class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+            <option>NZD</option><option selected>AUD</option><option>USD</option><option>EUR</option>
+          </select>
+        </div>
+        <div><label class="block text-[11px] text-gray-500 mb-1">FX → NZD <span class="font-normal text-gray-400">(auto)</span></label>
+          <input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm text-right tabular-nums bg-gray-50" value="1.0833" readonly />
+        </div>
+      </div>
+      <p class="text-[11px] text-gray-500 -mt-1">FX rates pulled from Settings → Currency table. Editable per-item if needed (overrides the default).</p>
+
+      <div><label class="block text-[11px] text-gray-500 mb-1">Freight (NZD per unit)</label><input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm text-right tabular-nums" value="0.120" /></div>
+
+      <div class="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">Fully loaded cost (NZD)</div>
+            <div class="text-[10px] text-emerald-700">price × FX + freight</div>
+          </div>
+          <div class="text-2xl font-semibold text-emerald-900 tabular-nums">$1.181</div>
+        </div>
+        <div class="mt-2 pt-2 border-t border-emerald-200 grid grid-cols-3 gap-2 text-[10px] text-emerald-800">
+          <div><div class="text-emerald-700">In NZD</div><div class="font-medium tabular-nums">0.850 × 1.0833 = $0.921</div></div>
+          <div><div class="text-emerald-700">+ Freight</div><div class="font-medium tabular-nums">$0.120</div></div>
+          <div><div class="text-emerald-700">= Loaded</div><div class="font-medium tabular-nums">$1.181</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="px-5 py-3 border-t border-gray-100">
+    <h3 class="text-[11px] uppercase tracking-wider text-gray-500 mb-2">Inventory</h3>
+    <div class="grid grid-cols-3 gap-3 text-sm">
+      <div><label class="block text-[11px] text-gray-500 mb-1">Opening SOH override</label><input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm text-right tabular-nums" value="5999" /></div>
+      <div><label class="block text-[11px] text-gray-500 mb-1">Current SOH</label><div class="px-2 py-1.5 text-sm text-right tabular-nums bg-gray-50 border border-gray-200 rounded-md">5,999</div></div>
+      <div><label class="block text-[11px] text-gray-500 mb-1">Reorder point</label><input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm text-right tabular-nums" placeholder="—" /></div>
+    </div>
+  </div>
+
+  <div class="px-5 py-3 border-t border-gray-100">
+    <h3 class="text-[11px] uppercase tracking-wider text-gray-500 mb-2">Used in (products)</h3>
+    <table class="w-full text-xs">
+      <thead><tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500"><th class="text-left px-3 py-1.5">Product</th><th class="text-right px-3 py-1.5 w-[160px]">Qty per product unit</th></tr></thead>
+      <tbody>
+        <tr class="border-t border-gray-100"><td class="px-3 py-1.5">Odi Beef Bone Broth · ODI-ODI-ORGA-BEEF-TUB-125G</td><td class="px-3 py-1.5"><input class="w-24 text-right text-xs border border-gray-200 rounded px-1.5 py-0.5 tabular-nums" value="1" /></td></tr>
+      </tbody>
+      <tfoot><tr><td colspan="2" class="px-3 py-2"><button class="text-xs text-blue-600 hover:underline">+ Link to another product</button></td></tr></tfoot>
+    </table>
+    <p class="text-[11px] text-gray-500 mt-2">Each row links one packaging item to one product. Add multiple rows for products that need several packaging items (e.g. Brownie uses Flow wrap + Box but not SRT — SRT stays in the catalogue without a product link).</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 2b · BROWNIE BOM — TWO PACKAGING ITEMS, SRT NOT ON THE BOM   -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">2b · Brownie BOM — pick the packaging that's consumed when the product is made</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Edited from the Product → Packaging panel. Add only what's needed at production time. Retail-dispatch packaging (e.g. SRT) lives in the catalogue but stays off the BOM.</p>
+  </div>
+<div class="px-5 pb-2 text-[11px] text-gray-600">
+    <b>Product unit:</b> Brownie 4-pack (one product unit = one box containing 4 × 30 g bars). The qty-per-unit numbers below reflect that definition.
+  </div>
+  <table class="w-full text-xs">
+    <thead><tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+      <th class="text-left px-4 py-2">Packaging item</th>
+      <th class="text-left px-3 py-2 w-[140px]">Code</th>
+      <th class="text-right px-3 py-2 w-[180px]">Qty per Brownie 4-pack</th>
+      <th class="text-right px-3 py-2 w-[110px]">Loaded NZD</th>
+      <th class="text-right px-3 py-2 w-[140px]">Cost contribution</th>
+      <th class="px-3 py-2 w-[40px]"></th>
+    </tr></thead>
+    <tbody class="tabular-nums">
+      <tr class="border-t border-gray-100"><td class="px-4 py-2"><div class="font-medium">Flow wrap (30 g sleeve)</div><div class="text-[10px] text-gray-500">one per bar · 4 bars per 4-pack</div></td><td class="px-3 py-2 font-mono">PAK-BRW-FW</td><td class="px-3 py-2"><input class="w-24 text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" value="4" /></td><td class="px-3 py-2 text-right text-gray-600">$0.080</td><td class="px-3 py-2 text-right text-gray-700">$0.3200</td><td class="px-3 py-2 text-center"><button class="text-gray-400 hover:text-red-600">×</button></td></tr>
+      <tr class="border-t border-gray-100"><td class="px-4 py-2"><div class="font-medium">Outer box (4-pack)</div><div class="text-[10px] text-gray-500">one box per 4-pack</div></td><td class="px-3 py-2 font-mono">PAK-BRW-BOX4</td><td class="px-3 py-2"><input class="w-24 text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" value="1" /></td><td class="px-3 py-2 text-right text-gray-600">$0.420</td><td class="px-3 py-2 text-right text-gray-700">$0.4200</td><td class="px-3 py-2 text-center"><button class="text-gray-400 hover:text-red-600">×</button></td></tr>
+      <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold"><td class="px-4 py-2" colspan="4">Packaging cost per Brownie 4-pack (BOM)</td><td class="px-3 py-2 text-right">$0.7400</td><td></td></tr>
+      <tr><td colspan="6" class="px-4 py-2"><button class="text-xs text-blue-600 hover:underline">+ Add packaging</button> <span class="text-[11px] text-gray-500 ml-2">picker shows all catalogue items, filtered to ones not already on the BOM</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="px-5 py-3 border-t border-gray-100 bg-gray-50/40 text-[11px] text-gray-600 leading-relaxed space-y-1">
+    <p><b>Demand calc</b> for 1,000 Brownie 4-packs produced in May:
+      Flow wrap = 1,000 × 4 = <b>4,000</b> · Box = 1,000 × 1 = <b>1,000</b>.
+      Each packaging item's <i>Packaging demand</i> page shows its monthly draw summed across every product that links to it.
+    </p>
+    <p><b>SRT (PAK-BRW-SRT)</b> isn't on this BOM — it's a retail-dispatch item that stays in the catalogue with its own SOH and POs but no auto-demand. If you decide to track it via the BOM later (e.g. ratio 0.2 = 1 SRT per 5 four-packs), just add it as a third row.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3 · PO LINE FOR PACKAGING                                    -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">3 · PO line — packaging type</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Same pre-fill mechanic as ingredients. Unit price defaults to the loaded NZD cost.</p>
+  </div>
+  <table class="w-full text-xs">
+    <thead><tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+      <th class="text-left px-3 py-2">Type</th><th class="text-left px-3 py-2">Item</th><th class="text-left px-3 py-2 w-[120px]">Supplier code</th><th class="text-right px-3 py-2 w-[80px]">Qty</th><th class="text-left px-3 py-2 w-[60px]">UoM</th><th class="text-right px-3 py-2 w-[80px]">Pack size</th><th class="text-right px-3 py-2 w-[100px]">Unit price</th><th class="text-right px-3 py-2 w-[100px]">Total</th>
+    </tr></thead>
+    <tbody>
+      <tr class="border-t border-gray-100">
+        <td class="px-3 py-2"><select class="text-xs border-gray-200 rounded px-1 py-0.5"><option selected>Packaging</option><option>Ingredient</option><option>Product</option><option>Other</option></select></td>
+        <td class="px-3 py-2"><select class="w-full text-xs border-gray-200 rounded px-1.5 py-1"><option>Odi Tub 125 g — BBB artwork · PAK-ODI-TUB-BBB</option></select></td>
+        <td class="px-3 py-2"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" value="PCO-TUB-125-BBB" /></td>
+        <td class="px-3 py-2"><input class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="2000" /></td>
+        <td class="px-3 py-2"><input class="w-full text-xs border-gray-200 rounded px-1.5 py-1" value="each" /></td>
+        <td class="px-3 py-2"><input class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="500" /></td>
+        <td class="px-3 py-2"><input class="w-full text-right text-xs border-gray-200 rounded px-1.5 py-1 tabular-nums" value="1.181" /></td>
+        <td class="px-3 py-2 text-right tabular-nums">$2,362.00</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="px-5 py-2 text-[11px] text-gray-500 border-t border-gray-100">PO totals stay in NZD. The unit price stored against the PO line is the loaded-NZD figure (so receipts and stock valuation use the same number).</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 4 · PACKAGING DEMAND PAGE                                    -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">4 · Packaging demand page</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Mirror of /ingredients/demand — monthly usage from production schedule, opening SOH editable inline, blue "Arriving" lane from open POs, shortfalls flagged red.</p>
+  </div>
+  <table class="w-full text-xs" style="min-width: 1100px;">
+    <thead>
+      <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <th class="text-left px-4 py-2 w-[280px]">Packaging</th>
+        <th class="text-right px-3 py-2 w-[90px]">Opening</th>
+        <th class="text-right px-2 py-2">May-26</th>
+        <th class="text-right px-2 py-2">Jun-26</th>
+        <th class="text-right px-2 py-2">Jul-26</th>
+        <th class="text-right px-2 py-2">Aug-26</th>
+        <th class="text-right px-2 py-2">Sep-26</th>
+        <th class="text-right px-2 py-2">Oct-26</th>
+        <th class="text-right px-2 py-2">Nov-26</th>
+        <th class="text-right px-3 py-2 bg-gray-100 w-[90px]">12-mo</th>
+      </tr>
+    </thead>
+    <tbody class="tabular-nums">
+      <tr class="border-t border-gray-100">
+        <td class="px-4 py-2"><div class="font-medium">Odi Tub 125 g — BBB</div><div class="text-[10px] text-gray-500 font-mono">PAK-ODI-TUB-BBB</div></td>
+        <td class="px-3 py-2 text-right"><input class="w-20 text-right border border-gray-300 rounded px-1.5 py-1 text-xs" value="5999" /></td>
+        <td class="px-2 py-2 text-right text-gray-700">450</td><td class="px-2 py-2 text-right text-gray-700">580</td><td class="px-2 py-2 text-right text-gray-700">720</td><td class="px-2 py-2 text-right text-gray-700">790</td><td class="px-2 py-2 text-right text-gray-700">820</td><td class="px-2 py-2 text-right text-gray-700">900</td><td class="px-2 py-2 text-right bg-red-50 text-red-700 font-semibold">1,150</td>
+        <td class="px-3 py-2 text-right bg-gray-50 font-semibold">9,640</td>
+      </tr>
+      <tr class="border-t border-blue-100 bg-blue-50/30 text-[11px]"><td class="px-4 py-1.5 pl-12 text-blue-700 font-medium">Arriving (POs)</td><td class="px-3 py-1.5 text-right text-gray-400">—</td><td class="px-2 py-1.5 text-right text-blue-700 font-semibold">+2,000</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-blue-700 font-semibold">+3,000</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-2 py-1.5 text-right text-gray-300">—</td><td class="px-3 py-1.5 text-right text-blue-700">+5,000</td></tr>
+      <tr class="border-t border-gray-100">
+        <td class="px-4 py-2"><div class="font-medium">Odi Sachet — Beetroot</div><div class="text-[10px] text-gray-500 font-mono">PAK-ODI-SAC-BET</div></td>
+        <td class="px-3 py-2 text-right"><input class="w-20 text-right border border-gray-300 rounded px-1.5 py-1 text-xs" value="8558" /></td>
+        <td class="px-2 py-2 text-right text-gray-700">435</td><td class="px-2 py-2 text-right text-gray-700">602</td><td class="px-2 py-2 text-right text-gray-700">604</td><td class="px-2 py-2 text-right text-gray-700">638</td><td class="px-2 py-2 text-right text-gray-700">752</td><td class="px-2 py-2 text-right text-gray-700">893</td><td class="px-2 py-2 text-right text-gray-700">1,001</td>
+        <td class="px-3 py-2 text-right bg-gray-50 font-semibold">10,200</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="px-5 py-3 border-t border-gray-100 text-[11px] text-gray-500">Demand = production_plan × quantity_per_product_unit. Once production runs are wired, this becomes "actual usage" automatically.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- IMPLEMENTATION                                              -->
+<!-- ============================================================ -->
+<section class="bg-blue-50 border border-blue-200 rounded-lg p-5 space-y-2 text-sm">
+  <h2 class="font-semibold text-blue-900">Implementation summary</h2>
+  <ul class="list-disc pl-5 space-y-1.5 text-blue-900">
+    <li>Migration 017: <code class="bg-white px-1 rounded">packaging</code> table (parallel to ingredients with currency, freight, fx_rate fields), <code class="bg-white px-1 rounded">product_packaging</code> join, plus nullable <code class="bg-white px-1 rounded">packaging_id</code> on <code class="bg-white px-1 rounded">stock_movements</code> + <code class="bg-white px-1 rounded">inventory_balances</code>, plus <code class="bg-white px-1 rounded">app_settings.fx_rates</code> JSON for the currency table.</li>
+    <li>Loaded cost computed in <code class="bg-white px-1 rounded">lib/packaging-cost.ts</code> as: <code class="bg-white px-1 rounded">price × fx_rate + freight_per_unit</code>. Same helper is used by the form, list, PO line pre-fill, and product cost rollups.</li>
+    <li>New pages: <code class="bg-white px-1 rounded">/packaging</code> (list / new / edit) and <code class="bg-white px-1 rounded">/packaging/demand</code>.</li>
+    <li>PO line gains a <code class="bg-white px-1 rounded">packaging</code> type (4th option). Pre-fills supplier code / pack size / loaded NZD price.</li>
+    <li>Receipt flow: when a packaging line is received, write to <code class="bg-white px-1 rounded">stock_movements</code> with <code class="bg-white px-1 rounded">packaging_id</code>; the existing trigger updates <code class="bg-white px-1 rounded">inventory_balances</code> at Main Warehouse.</li>
+    <li>Sidebar: new "Packaging" + "Packaging demand" entries under Planning.</li>
+  </ul>
+</section>
+
+</div>
+</body>
+</html>

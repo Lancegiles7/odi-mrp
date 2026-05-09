@@ -8,9 +8,10 @@ export type POStatus = 'draft' | 'submitted' | 'partially_received' | 'received'
 
 export interface POLineInput {
   id?: string                    // existing line id (when editing)
-  line_type: 'ingredient' | 'product' | 'other'
+  line_type: 'ingredient' | 'product' | 'packaging' | 'other'
   ingredient_id: string | null
   product_id: string | null
+  packaging_id: string | null
   description: string | null
   quantity_ordered: number
   unit_cost: number | null
@@ -261,12 +262,12 @@ export async function receivePoLines(input: {
     .maybeSingle() as { data: { id: string } | null }
   if (!mainLoc) return { ok: false, error: 'Main Warehouse location is missing — please contact admin' }
 
-  // Pull current lines (we need ingredient_id, qty info, agreed price, uom)
+  // Pull current lines (we need ingredient_id, packaging_id, qty info, agreed price, uom)
   const { data: lines } = await supabase
     .from('purchase_order_lines')
-    .select('id, ingredient_id, product_id, quantity_ordered, quantity_received, unit_cost, unit_of_measure')
+    .select('id, ingredient_id, product_id, packaging_id, quantity_ordered, quantity_received, unit_cost, unit_of_measure')
     .eq('purchase_order_id', input.po_id) as { data: Array<{
-      id: string; ingredient_id: string | null; product_id: string | null;
+      id: string; ingredient_id: string | null; product_id: string | null; packaging_id: string | null;
       quantity_ordered: number; quantity_received: number; unit_cost: number | null;
       unit_of_measure: string;
     }> | null }
@@ -293,9 +294,9 @@ export async function receivePoLines(input: {
       .from('purchase_order_lines').update(updates).eq('id', r.line_id)
     if (lineErr) return { ok: false, error: lineErr.message }
 
-    // Stock movement — only for ingredient lines (product / 'other' lines
-    // don't increment ingredient inventory).
-    if (line.ingredient_id) {
+    // Stock movement — for ingredient OR packaging lines. Product / 'other'
+    // lines don't increment inventory.
+    if (line.ingredient_id || line.packaging_id) {
       const invoiceCost = (r.invoice_unit_cost != null && Number.isFinite(r.invoice_unit_cost) && r.invoice_unit_cost >= 0)
         ? r.invoice_unit_cost
         : line.unit_cost
@@ -303,6 +304,7 @@ export async function receivePoLines(input: {
         .from('stock_movements')
         .insert({
           ingredient_id:          line.ingredient_id,
+          packaging_id:           line.packaging_id,
           location_id:            mainLoc.id,
           movement_type:          'purchase_received',
           quantity:               actualReceiving,
@@ -345,6 +347,7 @@ function sanitiseLine(l: POLineInput, poId: string) {
     purchase_order_id: poId,
     ingredient_id:     t === 'ingredient' ? l.ingredient_id : null,
     product_id:        t === 'product'    ? l.product_id    : null,
+    packaging_id:      t === 'packaging'  ? l.packaging_id  : null,
     description:       t === 'other'      ? (l.description?.trim() || null) : null,
     quantity_ordered:  Number(l.quantity_ordered) || 0,
     quantity_received: 0,
@@ -357,8 +360,8 @@ function sanitiseLine(l: POLineInput, poId: string) {
 function validateLines(rows: ReturnType<typeof sanitiseLine>[]): string | null {
   if (rows.length === 0) return 'Add at least one line.'
   for (const r of rows) {
-    const targets = [r.ingredient_id, r.product_id, r.description].filter(Boolean).length
-    if (targets !== 1) return 'Each line must have exactly one of: ingredient, product, or description.'
+    const targets = [r.ingredient_id, r.product_id, r.packaging_id, r.description].filter(Boolean).length
+    if (targets !== 1) return 'Each line must have exactly one of: ingredient, product, packaging, or description.'
     if (!Number.isFinite(r.quantity_ordered) || r.quantity_ordered <= 0) return 'Each line needs a positive quantity.'
   }
   return null

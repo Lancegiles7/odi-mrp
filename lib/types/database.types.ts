@@ -639,7 +639,8 @@ export type Database = {
       inventory_balances: {
         Row: {
           id: string
-          ingredient_id: string
+          ingredient_id: string | null
+          packaging_id: string | null
           location_id: string
           quantity_on_hand: number
           last_movement_at: string | null
@@ -667,7 +668,8 @@ export type Database = {
       stock_movements: {
         Row: {
           id: string
-          ingredient_id: string
+          ingredient_id: string | null
+          packaging_id: string | null
           location_id: string
           movement_type:
             | 'purchase_received'

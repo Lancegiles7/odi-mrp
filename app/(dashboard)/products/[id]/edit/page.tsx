@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { updateProduct } from '../../actions'
 import { ProductForm } from '@/components/products/product-form'
 import { BomEditor } from '@/components/products/bom-editor'
+import { ProductPackagingBom } from '@/components/packaging/product-packaging-bom'
 import { getAppSettings } from '@/lib/settings'
 import type {
   BomItemWithIngredient,
@@ -28,7 +29,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function EditProductPage({ params, searchParams }: PageProps) {
   const supabase = createClient()
 
-  const [{ data: product }, { data: ingredients }, settings] = await Promise.all([
+  const [{ data: product }, { data: ingredients }, settings, { data: packaging }, { data: productPackaging }] = await Promise.all([
     supabase
       .from('products')
       .select(`
@@ -49,6 +50,15 @@ export default async function EditProductPage({ params, searchParams }: PageProp
       .eq('is_active', true)
       .order('name', { ascending: true }),
     getAppSettings(),
+    supabase
+      .from('packaging')
+      .select('id, sku_code, name, type, unit_of_measure, total_loaded_cost_nzd')
+      .eq('is_active', true)
+      .order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string; total_loaded_cost_nzd: number | null }> | null },
+    supabase
+      .from('product_packaging')
+      .select('packaging_id, quantity_per_unit, notes')
+      .eq('product_id', params.id) as { data: Array<{ packaging_id: string; quantity_per_unit: number; notes: string | null }> | null },
   ])
 
   if (!product) notFound()
@@ -111,6 +121,13 @@ export default async function EditProductPage({ params, searchParams }: PageProp
           <p className="text-sm text-gray-500">No active BOM found.</p>
         )}
       </div>
+
+      <ProductPackagingBom
+        productId={params.id}
+        productName={product.name}
+        packaging={packaging ?? []}
+        initialRows={productPackaging ?? []}
+      />
     </div>
   )
 }

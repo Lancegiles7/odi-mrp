@@ -13,7 +13,7 @@ interface PageProps {
 export default async function PurchaseOrderDetailPage({ params }: PageProps) {
   const supabase = createClient()
 
-  const [{ data: po }, { data: lines }, { data: suppliers }, { data: ingredients }, { data: products }, { data: addresses }] = await Promise.all([
+  const [{ data: po }, { data: lines }, { data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }] = await Promise.all([
     supabase.from('purchase_orders')
       .select('id, po_number, supplier_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes')
       .eq('id', params.id)
@@ -25,10 +25,10 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         notes: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
-      .select('id, ingredient_id, product_id, description, quantity_ordered, unit_cost, unit_of_measure, notes')
+      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes')
       .eq('purchase_order_id', params.id)
       .order('created_at') as unknown as Promise<{ data: Array<{
-        id: string; ingredient_id: string | null; product_id: string | null;
+        id: string; ingredient_id: string | null; product_id: string | null; packaging_id: string | null;
         description: string | null; quantity_ordered: number; unit_cost: number | null;
         unit_of_measure: string; notes: string | null;
       }> | null }>,
@@ -43,6 +43,10 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       .select('id, sku_code, name')
       .is('deleted_at', null)
       .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string }> | null }>,
+    supabase.from('packaging')
+      .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, total_loaded_cost_nzd')
+      .eq('is_active', true)
+      .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string; supplier_sku_code: string | null; supplier_pack_size: number | null; supplier_pack_unit: string | null; total_loaded_cost_nzd: number | null }> | null }>,
     supabase.from('delivery_addresses')
       .select('id, label, street, contact_name, phone, country, is_default')
       .eq('is_active', true)
@@ -53,9 +57,13 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
 
   const initialLines: POLineInput[] = (lines ?? []).map((l) => ({
     id: l.id,
-    line_type: l.ingredient_id ? 'ingredient' : l.product_id ? 'product' : 'other',
+    line_type:
+      l.ingredient_id ? 'ingredient' :
+      l.packaging_id  ? 'packaging'  :
+      l.product_id    ? 'product'    : 'other',
     ingredient_id: l.ingredient_id,
     product_id: l.product_id,
+    packaging_id: l.packaging_id,
     description: l.description,
     quantity_ordered: Number(l.quantity_ordered),
     unit_cost: l.unit_cost != null ? Number(l.unit_cost) : null,
@@ -79,6 +87,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       suppliers={suppliers ?? []}
       ingredients={ingredients ?? []}
       products={products ?? []}
+      packaging={packaging ?? []}
       deliveryAddresses={addresses ?? []}
     />
   )

@@ -35,6 +35,17 @@ interface ProductOption {
   name: string
 }
 
+interface PackagingOption {
+  id: string
+  sku_code: string
+  name: string
+  unit_of_measure: string
+  supplier_sku_code: string | null
+  supplier_pack_size: number | null
+  supplier_pack_unit: string | null
+  total_loaded_cost_nzd: number | null
+}
+
 interface DeliveryAddressOption {
   id: string
   label: string
@@ -60,6 +71,7 @@ export interface POFormProps {
   suppliers: SupplierOption[]
   ingredients: IngredientOption[]
   products: ProductOption[]
+  packaging: PackagingOption[]
   deliveryAddresses: DeliveryAddressOption[]
 }
 
@@ -67,6 +79,7 @@ const NEW_LINE: POLineInput = {
   line_type: 'ingredient',
   ingredient_id: null,
   product_id: null,
+  packaging_id: null,
   description: null,
   quantity_ordered: 0,
   unit_cost: null,
@@ -116,21 +129,29 @@ export function POForm(props: POFormProps) {
       if (i !== idx) return l
       const next = { ...l, ...patch }
       // Clear off-target fields when type switches and reset UoM defaults:
-      // ingredient → kg (always), product → each, other → leave whatever's there.
+      // ingredient → kg, product → each, packaging → each, other → leave.
       if (patch.line_type) {
         next.ingredient_id = patch.line_type === 'ingredient' ? next.ingredient_id : null
         next.product_id    = patch.line_type === 'product'    ? next.product_id    : null
+        next.packaging_id  = patch.line_type === 'packaging'  ? next.packaging_id  : null
         next.description   = patch.line_type === 'other'      ? next.description   : null
         if (patch.line_type === 'ingredient') next.unit_of_measure = 'kg'
         if (patch.line_type === 'product')    next.unit_of_measure = 'each'
+        if (patch.line_type === 'packaging')  next.unit_of_measure = 'each'
       }
-      // Pre-fill from the selected ingredient's saved supplier reference
-      // data — but only when the user picks a different ingredient (or sets
-      // it for the first time), so we don't blow away their typed values.
+      // Pre-fill from the selected ingredient's saved supplier reference data
       if (patch.ingredient_id && patch.ingredient_id !== l.ingredient_id) {
         const ing = props.ingredients.find((x) => x.id === patch.ingredient_id)
         if (ing) {
           if (next.unit_cost == null && ing.price != null) next.unit_cost = Number(ing.price)
+        }
+      }
+      // Pre-fill from packaging item: loaded NZD price + UoM
+      if (patch.packaging_id && patch.packaging_id !== l.packaging_id) {
+        const pk = props.packaging.find((x) => x.id === patch.packaging_id)
+        if (pk) {
+          if (next.unit_cost == null && pk.total_loaded_cost_nzd != null) next.unit_cost = Number(pk.total_loaded_cost_nzd)
+          if (pk.unit_of_measure) next.unit_of_measure = pk.unit_of_measure
         }
       }
       return next
@@ -347,6 +368,7 @@ export function POForm(props: POFormProps) {
                       line={l}
                       ingredients={props.ingredients}
                       products={props.products}
+                      packaging={props.packaging}
                       readOnly={!isEditable}
                       onChange={(patch) => updateLine(i, patch)}
                       onRemove={isEditable && lines.length > 1 ? () => removeLine(i) : undefined}
@@ -477,11 +499,12 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function LineRow({
-  line, ingredients, products, readOnly, onChange, onRemove,
+  line, ingredients, products, packaging, readOnly, onChange, onRemove,
 }: {
   line: POLineInput
   ingredients: IngredientOption[]
   products: ProductOption[]
+  packaging: PackagingOption[]
   readOnly: boolean
   onChange: (patch: Partial<POLineInput>) => void
   onRemove?: () => void
@@ -531,6 +554,7 @@ function LineRow({
           className="w-full text-xs border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50"
         >
           <option value="ingredient">Ingredient</option>
+          <option value="packaging">Packaging</option>
           <option value="product">Product</option>
           <option value="other">Other</option>
         </select>
@@ -559,6 +583,19 @@ function LineRow({
             <option value="">— Select product —</option>
             {products.map((p) => (
               <option key={p.id} value={p.id}>{p.name} · {p.sku_code}</option>
+            ))}
+          </select>
+        )}
+        {line.line_type === 'packaging' && (
+          <select
+            disabled={readOnly}
+            value={line.packaging_id ?? ''}
+            onChange={(e) => onChange({ packaging_id: e.target.value || null })}
+            className="w-full text-xs border border-gray-200 rounded px-1.5 py-1 disabled:bg-gray-50"
+          >
+            <option value="">— Select packaging —</option>
+            {packaging.map((pk) => (
+              <option key={pk.id} value={pk.id}>{pk.name} · {pk.sku_code}</option>
             ))}
           </select>
         )}

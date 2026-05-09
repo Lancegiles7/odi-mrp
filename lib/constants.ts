@@ -86,6 +86,45 @@ export function isKnownPaymentTermsCode(value: string | null | undefined): boole
 
 
 // ============================================================
+// PACKAGING
+// ============================================================
+export const PACKAGING_TYPES = [
+  { code: 'FLOW_WRAP',    label: 'Flow wrap' },
+  { code: 'BOX',          label: 'Box' },
+  { code: 'POUCH_SNACKS', label: 'Pouch — snacks' },
+  { code: 'POUCH',        label: 'Pouch' },
+  { code: 'SRT',          label: 'SRT (shelf-ready tray)' },
+] as const
+
+export type PackagingTypeCode = (typeof PACKAGING_TYPES)[number]['code'] | 'OTHER'
+
+const PACKAGING_TYPE_KNOWN = new Set(PACKAGING_TYPES.map((p) => p.code))
+
+export function packagingTypeLabel(code: string | null | undefined): string {
+  if (!code) return '—'
+  if (code === 'OTHER') return 'Other'
+  const t = PACKAGING_TYPES.find((p) => p.code === code)
+  return t ? t.label : code
+}
+
+export function isKnownPackagingType(code: string | null | undefined): boolean {
+  return !!code && (code === 'OTHER' || PACKAGING_TYPE_KNOWN.has(code as Exclude<PackagingTypeCode, 'OTHER'>))
+}
+
+export const PACKAGING_TYPE_COLOURS: Record<string, string> = {
+  FLOW_WRAP:    'bg-blue-100 text-blue-700',
+  BOX:          'bg-emerald-100 text-emerald-700',
+  POUCH_SNACKS: 'bg-purple-100 text-purple-700',
+  POUCH:        'bg-amber-100 text-amber-700',
+  SRT:          'bg-rose-100 text-rose-700',
+  OTHER:        'bg-gray-100 text-gray-700',
+}
+
+export const SUPPORTED_CURRENCIES = ['NZD', 'AUD', 'USD', 'EUR', 'GBP'] as const
+export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]
+
+
+// ============================================================
 // STOCK MOVEMENT TYPES
 // ============================================================
 export const MOVEMENT_TYPE = {

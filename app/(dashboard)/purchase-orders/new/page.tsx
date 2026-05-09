@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'New purchase order' }
 export default async function NewPurchaseOrderPage() {
   const supabase = createClient()
 
-  const [{ data: suppliers }, { data: ingredients }, { data: products }, { data: addresses }] = await Promise.all([
+  const [{ data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }] = await Promise.all([
     supabase.from('suppliers')
       .select('id, name, payment_terms, email, phone')
       .eq('is_active', true)
@@ -21,6 +21,10 @@ export default async function NewPurchaseOrderPage() {
       .select('id, sku_code, name')
       .is('deleted_at', null)
       .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string }> | null }>,
+    supabase.from('packaging')
+      .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, total_loaded_cost_nzd')
+      .eq('is_active', true)
+      .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string; supplier_sku_code: string | null; supplier_pack_size: number | null; supplier_pack_unit: string | null; total_loaded_cost_nzd: number | null }> | null }>,
     supabase.from('delivery_addresses')
       .select('id, label, street, contact_name, phone, country, is_default')
       .eq('is_active', true)
@@ -46,6 +50,7 @@ export default async function NewPurchaseOrderPage() {
       suppliers={suppliers ?? []}
       ingredients={ingredients ?? []}
       products={products ?? []}
+      packaging={packaging ?? []}
       deliveryAddresses={addresses ?? []}
     />
   )
