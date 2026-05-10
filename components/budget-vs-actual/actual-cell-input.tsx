@@ -52,14 +52,15 @@ export function ActualCellInput({
   )
 }
 
-/** Inline-editable cell for opening SOH (uses monthly_stock_counts). */
+/** Inline-editable cell for opening SOH (writes to monthly_stock_counts.opening_soh). */
 export function OpeningCellInput({
-  entity_id, year_month, initial, isLocked,
+  entity_type = 'product', entity_id, year_month, initial, isLocked,
 }: {
-  entity_id:  string
-  year_month: string
-  initial:    number | null
-  isLocked:   boolean
+  entity_type?: 'product' | 'ingredient' | 'packaging'
+  entity_id:    string
+  year_month:   string
+  initial:      number | null
+  isLocked:     boolean
 }) {
   const router = useRouter()
   const [value, setValue] = useState<string>(initial != null ? String(initial) : '')
@@ -76,7 +77,7 @@ export function OpeningCellInput({
 
     start(async () => {
       const res = await setOpeningSoh({
-        entity_type: 'product',
+        entity_type,
         entity_id,
         year_month,
         opening_soh: newVal,

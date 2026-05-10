@@ -1,6 +1,7 @@
 'use client'
 
 import { CountedEomInput } from './counted-eom-input'
+import { OpeningCellInput } from './actual-cell-input'
 
 export interface IngredientRow {
   id: string
@@ -52,7 +53,9 @@ export function IngredientsTab({
                     <div className="text-[10px] font-mono text-gray-500">{r.sku}</div>
                   </td>
                   <td className="px-2 py-2 text-right text-gray-500">{r.uom ?? '—'}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{r.opening != null ? formatNum(r.opening) : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-1 py-1">
+                    <OpeningCellInput entity_type="ingredient" entity_id={r.id} year_month={year_month} initial={r.opening} isLocked={isLocked} />
+                  </td>
                   <td className="px-2 py-2 text-right tabular-nums bg-emerald-50/40">{noActivity && r.derived === 0 ? <span className="text-gray-300">—</span> : formatNum(r.derived)}</td>
                   <td className="px-2 py-2 text-right tabular-nums bg-amber-50/40">
                     {r.override != null ? <span className="font-semibold text-amber-900" title={r.override_comment ?? undefined}>{formatNum(r.override)}{r.override_comment ? ' 💬' : ''}</span> : <span className="text-gray-300 italic">—</span>}
