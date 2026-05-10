@@ -68,8 +68,8 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
     supabase.from('product_packaging')
       .select('product_id, packaging_id, quantity_per_unit, include_in_cost') as { data: Array<{ product_id: string; packaging_id: string; quantity_per_unit: number; include_in_cost: boolean }> | null },
     supabase.from('bva_budget_snapshots')
-      .select('product_id, year_month, units')
-      .eq('year_month', month) as { data: Array<{ product_id: string; year_month: string; units: number }> | null },
+      .select('product_id, channel, units')
+      .eq('year_month', month) as { data: Array<{ product_id: string; channel: Channel; units: number }> | null },
     supabase.from('product_actuals')
       .select('product_id, channel, units')
       .eq('year_month', month) as { data: Array<{ product_id: string; channel: Channel; units: number }> | null },
@@ -121,20 +121,21 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
     channelsByProduct.get(a.product_id)![a.channel] = Number(a.units)
   }
 
-  // ── Budget per product ──
-  const budgetByProduct = new Map<string, number>()
+  // ── Budget per product per channel ──
+  const budgetByProduct = new Map<string, Partial<Record<Channel, number>>>()
   for (const b of budgetSnap ?? []) {
-    budgetByProduct.set(b.product_id, Number(b.units))
+    if (!budgetByProduct.has(b.product_id)) budgetByProduct.set(b.product_id, {})
+    budgetByProduct.get(b.product_id)![b.channel] = Number(b.units)
   }
 
   // ── Build product rows ──
   const productRows: ProductRow[] = (products ?? []).map((p) => computeProductRow({
-    product:     { id: p.id, sku_code: p.sku_code, name: p.name },
-    opening:     openingForProduct(p.id, p.current_soh),
-    budget:      budgetByProduct.get(p.id) ?? 0,
-    channels:    channelsByProduct.get(p.id) ?? {},
-    receipts:    0,   // TODO Phase 2: fold in PO receipts via stock_movements
-    counted_eom: stockThisByEntity.get(p.id)?.counted ?? null,
+    product:           { id: p.id, sku_code: p.sku_code, name: p.name },
+    opening:           openingForProduct(p.id, p.current_soh),
+    budget_by_channel: budgetByProduct.get(p.id) ?? {},
+    channels:          channelsByProduct.get(p.id) ?? {},
+    receipts:          0,   // TODO Phase 2: fold in PO receipts via stock_movements
+    counted_eom:       stockThisByEntity.get(p.id)?.counted ?? null,
   }))
 
   // Map: product_id → total_out (used to derive ingredient/packaging consumption)
