@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Odi MRP — Budget vs Actual mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-gray-100 p-8">
+<div class="max-w-[1600px] mx-auto space-y-10">
+
+<header>
+  <h1 class="text-xl font-semibold">Budget vs Actual — mockup v2</h1>
+  <p class="text-sm text-gray-600 mt-1">FY-anchored monthly review across products, ingredients, packaging. Channels: NZ Retail (col F) / NZ D2C (col G) / NZ Samples (col H), Total = sum (col I). Opening SOH from col C on FY-start upload, auto-rolled thereafter. Two variance reads: sales-only (Retail+D2C vs budget) and total-out (incl. samples) for stock math.</p>
+</header>
+
+<!-- ============================================================ -->
+<!-- 1 · PAGE CHROME — TABS, FY/MONTH, ACTIONS                   -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">1 · Page chrome</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Tabs, FY + month picker, primary actions. Locked-month banner shown when month has been finalised.</p>
+  </div>
+  <div class="p-5 space-y-4">
+
+    <!-- Title row + actions -->
+    <div class="flex items-start justify-between flex-wrap gap-3">
+      <div>
+        <h2 class="text-2xl font-semibold">Budget vs Actual</h2>
+        <p class="text-sm text-gray-500 mt-1">FY 2026/27 (Apr 26 → Mar 27) · Reviewing <span class="font-semibold text-gray-800">April 2026</span></p>
+      </div>
+      <div class="flex gap-2 flex-wrap items-end">
+        <select class="text-xs border border-gray-300 rounded px-2 py-1.5">
+          <option>FY 2026/27 (current)</option>
+          <option>FY 2025/26</option>
+        </select>
+        <select class="text-xs border border-gray-300 rounded px-2 py-1.5">
+          <option>Apr 2026</option><option>May 2026</option><option>Jun 2026</option><option>… → Mar 2027</option>
+        </select>
+        <button class="text-xs px-3 py-1.5 bg-white border border-gray-300 rounded font-medium">Upload actuals</button>
+        <button class="text-xs px-3 py-1.5 bg-gray-900 text-white rounded font-medium">Lock April</button>
+      </div>
+    </div>
+
+    <!-- Tab nav -->
+    <div class="flex border-b border-gray-200">
+      <button class="px-4 py-2 text-sm font-medium border-b-2 border-gray-900 -mb-px">Products <span class="ml-1 text-[10px] text-gray-500">12</span></button>
+      <button class="px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent">Ingredients <span class="ml-1 text-[10px]">38</span></button>
+      <button class="px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent">Packaging <span class="ml-1 text-[10px]">9</span></button>
+    </div>
+
+    <!-- Status banner -->
+    <div class="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
+      <strong>April still open.</strong> Upload product actuals + enter closing SOH, then click <em>Lock April</em> to freeze the budget and prevent further edits to this month.
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 2 · PRODUCTS TAB — APRIL 2026                                -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">2 · Products tab — April 2026</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Channel-based actuals. Variance + stock variance colour-coded. Click a row to expand the per-day or per-channel breakdown (future).</p>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs" style="min-width: 1700px;">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+          <th class="text-left px-3 py-2 sticky left-0 bg-gray-50 min-w-[260px]">Product</th>
+          <th class="text-right px-2 py-2 w-[80px]" title="Opening SOH for the month (col C on FY-start upload, then auto-rolled)">Open</th>
+          <th class="text-right px-2 py-2 w-[80px] bg-blue-50/40" title="Demand forecast for April (snapshotted at FY start)">Budget</th>
+          <th class="text-right px-2 py-2 w-[80px] bg-emerald-50/40" title="col F · Shipped (Units) — wholesale derived from SRT × conv">Retail</th>
+          <th class="text-right px-2 py-2 w-[80px] bg-emerald-50/40" title="col G · Shopify (Units) — direct to consumer">D2C</th>
+          <th class="text-right px-2 py-2 w-[80px] bg-purple-50/60" title="col H · Samples — counted in totals for pipefill">Samples</th>
+          <th class="text-right px-2 py-2 w-[80px] bg-gray-100 text-gray-400">AU Retail <span class="block text-[9px] normal-case">soon</span></th>
+          <th class="text-right px-2 py-2 w-[80px] bg-gray-100 text-gray-400">AU D2C <span class="block text-[9px] normal-case">soon</span></th>
+          <th class="text-right px-2 py-2 w-[80px] bg-emerald-50" title="col I = Retail + D2C + Samples (auto-calculated)">Total out</th>
+          <th class="text-right px-2 py-2 w-[110px]" title="(Retail + D2C) − Budget — sales beat or miss vs forecast">Var sales</th>
+          <th class="text-right px-2 py-2 w-[110px]" title="Total out − Budget — includes samples; relevant for stock math">Var total</th>
+          <th class="text-right px-2 py-2 w-[100px] bg-amber-50/40" title="Opening − Total out (system's stock projection given actuals)">Calc EOM</th>
+          <th class="text-right px-2 py-2 w-[100px]" title="Counted closing stock (manually entered each month)">Counted EOM</th>
+          <th class="text-right px-2 py-2 w-[100px]">Stock var</th>
+          <th class="text-center px-2 py-2 w-[40px]" title="Notes / overrides">📝</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Brownie Bite — actual values from the user's spreadsheet -->
+        <tr class="border-b border-gray-100 hover:bg-gray-50">
+          <td class="px-3 py-2 sticky left-0 bg-white">
+            <div class="font-medium text-gray-900">Odi Organic Brownie Bite</div>
+            <div class="text-[10px] font-mono text-gray-500">FG-ODI-BITE-BRN</div>
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums">2,650</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-blue-50/40">1,800</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40">1,980</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40">218</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-purple-50/60">165</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50 font-medium">2,363</td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <span class="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">+398 (+22%)</span>
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <span class="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">+563 (+31%)</span>
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-medium">287</td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <input value="287" class="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-600">0</td>
+          <td class="px-2 py-2 text-center text-gray-400">—</td>
+        </tr>
+
+        <!-- Berry pouch -->
+        <tr class="border-b border-gray-100 hover:bg-gray-50">
+          <td class="px-3 py-2 sticky left-0 bg-white">
+            <div class="font-medium text-gray-900">Odi Organic Berry Breakfast</div>
+            <div class="text-[10px] font-mono text-gray-500">FG-ODI-PCH-BRY</div>
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums">5,394</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-blue-50/40">3,000</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40">2,250</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40">382</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-purple-50/60">729</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50 font-medium">3,361</td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <span class="inline-block px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-medium">−368 (−12%)</span>
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <span class="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">+361 (+12%)</span>
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-medium">2,033</td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <input value="2,000" class="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-600">−33</td>
+          <td class="px-2 py-2 text-center text-gray-400">—</td>
+        </tr>
+
+        <!-- Sachet — blank/not entered, demonstrates the "not entered" state -->
+        <tr class="border-b border-gray-100 hover:bg-gray-50">
+          <td class="px-3 py-2 sticky left-0 bg-white">
+            <div class="font-medium text-gray-900">Odi Organic Broccoli sachet</div>
+            <div class="text-[10px] font-mono text-gray-500">FG-ODI-SAC-BRO</div>
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums">980</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-blue-50/40">400</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40 text-gray-300 italic">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40 text-gray-300 italic">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-purple-50/60 text-gray-300 italic">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50 text-gray-300 italic">not entered</td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-300">—</td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-300">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 text-gray-300">—</td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <input placeholder="—" class="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-300">—</td>
+          <td class="px-2 py-2 text-center text-gray-400">—</td>
+        </tr>
+
+      </tbody>
+      <tfoot>
+        <tr class="bg-gray-50 border-t-2 border-gray-200 text-sm">
+          <td class="px-3 py-2 sticky left-0 bg-gray-50 font-semibold">Totals (3 of 20 shown · sample row excluded as not yet entered)</td>
+          <td class="px-2 py-2 text-right tabular-nums font-semibold">8,044</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-blue-50/40 font-semibold">4,800</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40 font-semibold">4,230</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40 font-semibold">600</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-purple-50/60 font-semibold">894</td>
+          <td colspan="2" class="px-2 py-2 text-right tabular-nums bg-gray-100 text-gray-300">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50 font-semibold">5,724</td>
+          <td class="px-2 py-2 text-right tabular-nums font-semibold">+30 (+1%)</td>
+          <td class="px-2 py-2 text-right tabular-nums font-semibold">+924 (+19%)</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-semibold">2,320</td>
+          <td class="px-2 py-2 text-right tabular-nums font-semibold">2,287</td>
+          <td class="px-2 py-2 text-right tabular-nums font-semibold">−33</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <div class="p-3 text-[11px] text-gray-500 bg-gray-50 border-t border-gray-100">
+    <strong>Legend:</strong>
+    <span class="ml-2 px-1.5 py-0.5 rounded bg-blue-50/40">Budget</span>
+    <span class="ml-1 px-1.5 py-0.5 rounded bg-emerald-50/40">Sales channels</span>
+    <span class="ml-1 px-1.5 py-0.5 rounded bg-purple-50/60">Samples (in totals, separate var)</span>
+    <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-50/40">Calculated</span>
+    <span class="ml-1 px-1.5 py-0.5 rounded text-gray-400 italic">— = not entered yet</span>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3 · INGREDIENTS TAB — APRIL 2026                             -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">3 · Ingredients tab — April 2026</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Consumption auto-derived from product actuals × BOM (g per pack ÷ 1000 × units sold). Override per row when needed (wastage, spoilage). Override + comment recorded.</p>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs" style="min-width: 1300px;">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+          <th class="text-left px-3 py-2 sticky left-0 bg-gray-50 min-w-[240px]">Ingredient</th>
+          <th class="text-right px-2 py-2 w-[80px]">UoM</th>
+          <th class="text-right px-2 py-2 w-[80px]">Open <span class="block text-[9px] font-normal normal-case text-gray-400">31 Mar</span></th>
+          <th class="text-right px-2 py-2 w-[90px] bg-blue-50/40">Budget use</th>
+          <th class="text-right px-2 py-2 w-[100px] bg-emerald-50/40" title="From products × BOM">Derived use</th>
+          <th class="text-right px-2 py-2 w-[100px] bg-amber-50/40">Override</th>
+          <th class="text-right px-2 py-2 w-[100px] bg-emerald-50">Effective use</th>
+          <th class="text-right px-2 py-2 w-[100px]">Forecast EOM</th>
+          <th class="text-right px-2 py-2 w-[100px] bg-amber-50/40">Calc EOM</th>
+          <th class="text-right px-2 py-2 w-[100px]">Counted EOM</th>
+          <th class="text-right px-2 py-2 w-[100px]">Stock var</th>
+          <th class="text-center px-2 py-2 w-[40px]">📝</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Cocoa powder — derived used as-is -->
+        <tr class="border-b border-gray-100 hover:bg-gray-50">
+          <td class="px-3 py-2 sticky left-0 bg-white">
+            <div class="font-medium text-gray-900">Cocoa Powder (organic)</div>
+            <div class="text-[10px] font-mono text-gray-500">ING-ORG-COC</div>
+          </td>
+          <td class="px-2 py-2 text-right text-gray-500">kg</td>
+          <td class="px-2 py-2 text-right tabular-nums">42.0</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-blue-50/40">8.0</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40">10.16</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 text-gray-300 italic">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50 font-medium">10.16</td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-500">34.0</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-medium">31.84</td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <input value="31.5" class="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-600">−0.34</td>
+          <td class="px-2 py-2 text-center text-gray-400">—</td>
+        </tr>
+
+        <!-- Quinoa — overridden because of spillage -->
+        <tr class="border-b border-gray-100 hover:bg-gray-50 bg-amber-50/30">
+          <td class="px-3 py-2 sticky left-0 bg-amber-50/30">
+            <div class="font-medium text-gray-900">Quinoa Powder</div>
+            <div class="text-[10px] font-mono text-gray-500">ING-ORG-QUIN-POW</div>
+          </td>
+          <td class="px-2 py-2 text-right text-gray-500">kg</td>
+          <td class="px-2 py-2 text-right tabular-nums">85.5</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-blue-50/40">22.0</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40 line-through text-gray-400">28.16</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-semibold text-amber-900">30.50</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50 font-medium">30.50</td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-500">63.5</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-medium">55.00</td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <input value="54.8" class="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-600">−0.20</td>
+          <td class="px-2 py-2 text-center"><button class="text-amber-700" title="Comment present">💬</button></td>
+        </tr>
+
+      </tbody>
+      <tfoot>
+        <tr class="bg-gray-50 border-t-2 border-gray-200 text-sm">
+          <td class="px-3 py-2 sticky left-0 bg-gray-50 font-semibold" colspan="3">Totals (2 of 38 shown)</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-blue-50/40 font-semibold">30.0</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40 font-semibold">38.32</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-semibold">30.50</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50 font-semibold">40.66</td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-500">97.5</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-semibold">86.84</td>
+          <td class="px-2 py-2 text-right tabular-nums font-semibold">86.30</td>
+          <td class="px-2 py-2 text-right tabular-nums font-semibold">−0.54</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 4 · PACKAGING TAB — APRIL 2026                               -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">4 · Packaging tab — April 2026</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Same shape as ingredients. Derived use = Σ (product actuals × per-product packaging qty). Override for wastage / damaged units etc.</p>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs" style="min-width: 1300px;">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+          <th class="text-left px-3 py-2 sticky left-0 bg-gray-50 min-w-[240px]">Packaging</th>
+          <th class="text-left px-2 py-2 w-[90px]">Type</th>
+          <th class="text-right px-2 py-2 w-[80px]">Open <span class="block text-[9px] font-normal normal-case text-gray-400">31 Mar</span></th>
+          <th class="text-right px-2 py-2 w-[90px] bg-blue-50/40">Budget use</th>
+          <th class="text-right px-2 py-2 w-[100px] bg-emerald-50/40">Derived use</th>
+          <th class="text-right px-2 py-2 w-[100px] bg-amber-50/40">Override</th>
+          <th class="text-right px-2 py-2 w-[100px] bg-emerald-50">Effective use</th>
+          <th class="text-right px-2 py-2 w-[100px]">Forecast EOM</th>
+          <th class="text-right px-2 py-2 w-[100px] bg-amber-50/40">Calc EOM</th>
+          <th class="text-right px-2 py-2 w-[100px]">Counted EOM</th>
+          <th class="text-right px-2 py-2 w-[100px]">Stock var</th>
+          <th class="text-center px-2 py-2 w-[40px]">📝</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b border-gray-100 hover:bg-gray-50">
+          <td class="px-3 py-2 sticky left-0 bg-white">
+            <div class="font-medium text-gray-900">Brownie flow wrap</div>
+            <div class="text-[10px] font-mono text-gray-500">PAK-BRN-FLW</div>
+          </td>
+          <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Flow wrap</span></td>
+          <td class="px-2 py-2 text-right tabular-nums">2,400</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-blue-50/40">4,000</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40">5,080</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 text-gray-300 italic">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50 font-medium">5,080</td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-500">−1,600</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-medium text-rose-700">−2,680</td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <input value="—" class="w-full text-right text-xs border border-rose-300 bg-rose-50 rounded px-1.5 py-1 tabular-nums" placeholder="enter" />
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums text-rose-700">stockout!</td>
+          <td class="px-2 py-2 text-center text-gray-400">—</td>
+        </tr>
+
+        <tr class="border-b border-gray-100 hover:bg-gray-50 bg-amber-50/30">
+          <td class="px-3 py-2 sticky left-0 bg-amber-50/30">
+            <div class="font-medium text-gray-900">Brownie 4-pack box</div>
+            <div class="text-[10px] font-mono text-gray-500">PAK-BRN-BOX</div>
+          </td>
+          <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">Box</span></td>
+          <td class="px-2 py-2 text-right tabular-nums">800</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-blue-50/40">1,000</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40 line-through text-gray-400">1,270</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-semibold text-amber-900">1,310</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50 font-medium">1,310</td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-500">−200</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-medium text-rose-700">−510</td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <input value="0" class="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-500">+510 PO?</td>
+          <td class="px-2 py-2 text-center"><button class="text-amber-700">💬</button></td>
+        </tr>
+
+        <tr class="border-b border-gray-100 hover:bg-gray-50">
+          <td class="px-3 py-2 sticky left-0 bg-white">
+            <div class="font-medium text-gray-900">Brownie SRT</div>
+            <div class="text-[10px] font-mono text-gray-500">PAK-BRN-SRT</div>
+          </td>
+          <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">SRT</span></td>
+          <td class="px-2 py-2 text-right tabular-nums">120</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-blue-50/40">200</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50/40">254</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 text-gray-300 italic">—</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-emerald-50 font-medium">254</td>
+          <td class="px-2 py-2 text-right tabular-nums text-gray-500">−80</td>
+          <td class="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-medium text-rose-700">−134</td>
+          <td class="px-2 py-2 text-right tabular-nums">
+            <input value="—" class="w-full text-right text-xs border border-rose-300 bg-rose-50 rounded px-1.5 py-1 tabular-nums" placeholder="enter" />
+          </td>
+          <td class="px-2 py-2 text-right tabular-nums text-rose-700">stockout!</td>
+          <td class="px-2 py-2 text-center text-gray-400">—</td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 5 · UPLOAD ACTUALS — MODAL                                   -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">5 · Upload actuals modal</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Spreadsheet-paste grid. Auto-recognises product SKUs. Saves channel-by-channel actuals for the selected month.</p>
+  </div>
+  <div class="p-5 max-w-4xl">
+    <div class="bg-gray-50 border border-gray-200 rounded p-4">
+      <h3 class="text-sm font-semibold mb-1">Upload monthly actuals — April 2026</h3>
+      <p class="text-xs text-gray-500 mb-2">Paste columns A · C · F · G · H from your <em>SOH_Balance_dd_M_YY.xlsx</em> export. Total Out is auto-calculated (= Retail + D2C + Samples). Opening only used on the FY-start month upload — subsequent months auto-roll from the previous month's closing.</p>
+      <table class="w-full text-xs border border-gray-200 rounded overflow-hidden mb-3">
+        <thead>
+          <tr class="bg-gray-100 text-[10px] uppercase tracking-wider text-gray-500">
+            <th class="text-left px-2 py-2">SKU<span class="block text-[9px] normal-case font-normal text-gray-400">col A</span></th>
+            <th class="text-right px-2 py-2 w-[110px]">Opening<span class="block text-[9px] normal-case font-normal text-gray-400">col C (FY start only)</span></th>
+            <th class="text-right px-2 py-2 w-[100px] bg-emerald-50/60">NZ Retail<span class="block text-[9px] normal-case font-normal text-gray-400">col F</span></th>
+            <th class="text-right px-2 py-2 w-[100px] bg-emerald-50/60">NZ D2C<span class="block text-[9px] normal-case font-normal text-gray-400">col G</span></th>
+            <th class="text-right px-2 py-2 w-[100px] bg-purple-50/60">NZ Samples<span class="block text-[9px] normal-case font-normal text-gray-400">col H</span></th>
+            <th class="text-right px-2 py-2 w-[100px] bg-emerald-50/40 text-gray-500">Total<span class="block text-[9px] normal-case font-normal text-gray-400">auto = F+G+H</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-t border-gray-100">
+            <td class="px-2 py-1.5 font-mono">FG-ODI-BITE-BRN</td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="2650" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="1980" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="218" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="165" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums bg-emerald-50/40 font-medium">2,363</td>
+          </tr>
+          <tr class="border-t border-gray-100">
+            <td class="px-2 py-1.5 font-mono">FG-ODI-PCH-BRY</td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="5394" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="2250" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="382" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="729" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums bg-emerald-50/40 font-medium">3,361</td>
+          </tr>
+          <tr class="border-t border-gray-100">
+            <td class="px-2 py-1.5 font-mono">FG-ODI-SAC-BLU</td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="6128" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="3675" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="845" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="315" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums bg-emerald-50/40 font-medium">4,835</td>
+          </tr>
+          <tr class="border-t border-gray-100 bg-gray-100/50">
+            <td class="px-2 py-1.5 font-mono">FG-ODI-SAC-BRO</td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input value="980" class="w-full text-right border border-gray-200 rounded px-1.5 py-1" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input class="w-full text-right border border-gray-200 rounded px-1.5 py-1" placeholder="—" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input class="w-full text-right border border-gray-200 rounded px-1.5 py-1" placeholder="—" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums"><input class="w-full text-right border border-gray-200 rounded px-1.5 py-1" placeholder="—" /></td>
+            <td class="px-2 py-1.5 text-right tabular-nums bg-emerald-50/40 text-gray-300 italic">not entered</td>
+          </tr>
+          <tr class="border-t border-gray-100"><td class="px-2 py-1.5 font-mono text-gray-300 italic">…paste more rows here</td><td colspan="5" class="px-2 py-1.5"></td></tr>
+        </tbody>
+      </table>
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-[11px] text-gray-500">
+          <strong>3 rows</strong> ready to import · 1 row left blank (treated as <em>not entered yet</em>)
+          · Match key: <code class="font-mono">products.sku_code</code> = column A
+        </p>
+        <div class="flex gap-2">
+          <button class="text-xs px-3 py-1.5 border border-gray-300 rounded">Cancel</button>
+          <button class="text-xs px-3 py-1.5 bg-gray-900 text-white rounded font-medium">Save 3 rows for April</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 6 · OVERRIDE / COMMENT POPOVER                                -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">6 · Override + comment popover</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Inline popover when you click the 📝 in any row. Records who, when, original derived value, override value, and why.</p>
+  </div>
+  <div class="p-5 max-w-md">
+    <div class="bg-amber-50 border border-amber-200 rounded p-4">
+      <div class="text-[10px] uppercase tracking-wider text-amber-800 font-semibold mb-1">Override · Quinoa Powder · April 2026</div>
+      <div class="grid grid-cols-2 gap-3 text-xs mb-3">
+        <div>
+          <div class="text-[10px] text-amber-700 uppercase tracking-wider">Derived (from BOM)</div>
+          <div class="font-semibold tabular-nums">28.16 kg</div>
+        </div>
+        <div>
+          <div class="text-[10px] text-amber-700 uppercase tracking-wider">Your override</div>
+          <input value="30.50" class="w-full text-right border border-amber-300 rounded px-2 py-1 tabular-nums font-semibold" />
+        </div>
+      </div>
+      <label class="text-[10px] text-amber-800 uppercase tracking-wider block mb-1">Reason / comment</label>
+      <textarea rows="2" class="w-full text-xs border border-amber-300 rounded px-2 py-1">Spillage on the 18th — production logged extra 2.34 kg.</textarea>
+      <div class="flex gap-2 justify-end mt-2">
+        <button class="text-xs px-2.5 py-1 border border-gray-300 rounded">Clear override</button>
+        <button class="text-xs px-2.5 py-1 bg-gray-900 text-white rounded">Save</button>
+      </div>
+      <div class="text-[10px] text-gray-500 mt-2">Last edit: <em>Lance · 2026-05-02 14:21</em></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 7 · FY SUMMARY HEATMAP                                       -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">7 · FY summary heatmap (Apr → Mar)</h2>
+    <p class="text-xs text-gray-500 mt-0.5">12-month row per entity. Each cell coloured by sales variance (green = beat budget, red = missed). Click a cell to jump to that month's detail.</p>
+  </div>
+  <div class="p-5 overflow-x-auto">
+    <table class="w-full text-xs" style="min-width: 1100px;">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+          <th class="text-left px-3 py-2 min-w-[220px]">Product</th>
+          <th class="text-right px-2 py-2 w-[60px]">Apr</th>
+          <th class="text-right px-2 py-2 w-[60px]">May</th>
+          <th class="text-right px-2 py-2 w-[60px]">Jun</th>
+          <th class="text-right px-2 py-2 w-[60px]">Jul</th>
+          <th class="text-right px-2 py-2 w-[60px]">Aug</th>
+          <th class="text-right px-2 py-2 w-[60px]">Sep</th>
+          <th class="text-right px-2 py-2 w-[60px]">Oct</th>
+          <th class="text-right px-2 py-2 w-[60px]">Nov</th>
+          <th class="text-right px-2 py-2 w-[60px]">Dec</th>
+          <th class="text-right px-2 py-2 w-[60px]">Jan</th>
+          <th class="text-right px-2 py-2 w-[60px]">Feb</th>
+          <th class="text-right px-2 py-2 w-[60px]">Mar</th>
+          <th class="text-right px-2 py-2 w-[80px] bg-gray-100">FY Var</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b border-gray-100">
+          <td class="px-3 py-1.5 font-medium">Brownie 4-pack</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-emerald-100 text-emerald-900">+27%</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-emerald-50 font-semibold">+27%</td>
+        </tr>
+        <tr class="border-b border-gray-100">
+          <td class="px-3 py-1.5 font-medium">Bone Broth Tub 500ml</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-rose-100 text-rose-900">−13%</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-rose-50 font-semibold">−13%</td>
+        </tr>
+        <tr class="border-b border-gray-100">
+          <td class="px-3 py-1.5 font-medium">Greens Sachet 5g</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-emerald-100 text-emerald-900">+28%</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
+          <td class="px-2 py-1.5 text-right tabular-nums bg-emerald-50 font-semibold">+28%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DECISIONS                                                     -->
+<!-- ============================================================ -->
+<section class="bg-emerald-50 border border-emerald-300 rounded-lg p-5">
+  <h2 class="text-base font-semibold text-emerald-900">Locked in this round</h2>
+  <ul class="mt-3 space-y-1 text-sm text-emerald-900">
+    <li>✓ Three NZ channels: Retail (col F) / D2C (col G) / Samples (col H), Total auto-calculated (col I)</li>
+    <li>✓ Two variance reads on each row — <em>Var sales</em> = (Retail+D2C) − Budget · <em>Var total</em> = Total out − Budget</li>
+    <li>✓ Blank cells = <em>not entered yet</em> (excluded from totals, italic em-dash in UI)</li>
+    <li>✓ Opening from col C on FY-start upload, auto-rolled May→Mar from prior month's closing</li>
+    <li>✓ <strong>Effective EOM</strong> = Counted EOM if entered, otherwise Calc EOM (the predicted number is assumed correct when no count given)</li>
+    <li>✓ Next month's Opening = previous month's Effective EOM (so missing counts cascade cleanly without breaking the chain)</li>
+    <li>✓ AU Retail / AU D2C / AU Samples greyed-out for now, same shape</li>
+    <li>✓ SKU style: <code>FG-ODI-...</code> matched to <code>products.sku_code</code></li>
+  </ul>
+</section>
+
+<section class="bg-yellow-50 border border-yellow-300 rounded-lg p-5">
+  <h2 class="text-base font-semibold text-yellow-900">Still to lock before I build</h2>
+  <ul class="mt-3 space-y-2 text-sm text-yellow-900">
+    <li><span class="font-semibold">A.</span> The Calc EOM uses <em>opening − total out</em>. Should PO receipts during the month be included (i.e. opening + receipts − total out)? I'd recommend yes — they're real stock-in.</li>
+    <li><span class="font-semibold">B.</span> Variance colour thresholds — &gt;10% = amber, &gt;25% = red? Or just direction (+/−), no thresholds?</li>
+    <li><span class="font-semibold">C.</span> "Lock April" — once locked, totally read-only, or admin-override if you spot a mistake later?</li>
+    <li><span class="font-semibold">D.</span> One page with three tabs (as shown) vs three separate pages under a "Reporting" sidebar group?</li>
+    <li><span class="font-semibold">E.</span> What about products that are in your SOH file but not in the system as <code>products</code> (or vice versa)? I'd default to: list the unmatched SKUs at the top of the import preview with a "skip" / "create stub" choice.</li>
+  </ul>
+</section>
+
+</div>
+</body>
+</html>
