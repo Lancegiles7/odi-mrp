@@ -251,25 +251,34 @@ export async function snapshotBudgetForFY(fyStart: string): Promise<{ ok: boolea
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
-  // Pull demand forecasts for all months in this FY
+  // Pull demand forecasts (with channel) for all months in this FY
   const { data: forecasts, error: fcErr } = await supabase
     .from('demand_forecasts')
-    .select('product_id, year_month, units')
+    .select('product_id, year_month, channel, units')
     .gte('year_month', firstMonth).lte('year_month', lastMonth) as
-    { data: Array<{ product_id: string; year_month: string; units: number }> | null; error: { message: string } | null }
+    { data: Array<{ product_id: string; year_month: string; channel: string; units: number }> | null; error: { message: string } | null }
   if (fcErr) return { ok: false, error: fcErr.message }
 
-  // Aggregate to grand-total-per-(product, month)
-  const grandTotal = new Map<string, number>()
-  for (const f of forecasts ?? []) {
-    const key = `${f.product_id}|${f.year_month}`
-    grandTotal.set(key, (grandTotal.get(key) ?? 0) + Number(f.units))
+  // Map demand_forecasts.channel → bva_budget_snapshots.channel
+  // (pipefill is region-agnostic on the demand side; for now route to NZ samples)
+  function mapChannel(src: string): Channel | null {
+    switch (src) {
+      case 'ecomm_nz':  return 'nz_d2c'
+      case 'retail_nz': return 'nz_retail'
+      case 'pipefill':  return 'nz_samples'
+      case 'ecomm_au':  return 'au_d2c'
+      case 'retail_au': return 'au_retail'
+      default:          return null
+    }
   }
 
-  const inserts = Array.from(grandTotal.entries()).map(([key, units]) => {
-    const [product_id, year_month] = key.split('|')
-    return { product_id, year_month, units, snapshot_by: profile?.id ?? null }
-  })
+  const inserts = (forecasts ?? [])
+    .map((f) => {
+      const ch = mapChannel(f.channel)
+      if (!ch) return null
+      return { product_id: f.product_id, year_month: f.year_month, channel: ch, units: Number(f.units), snapshot_by: profile?.id ?? null }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
 
   if (inserts.length === 0) {
     revalidatePath(REVAL)
@@ -278,7 +287,7 @@ export async function snapshotBudgetForFY(fyStart: string): Promise<{ ok: boolea
 
   const { error: snapErr } = await supabase
     .from('bva_budget_snapshots')
-    .upsert(inserts, { onConflict: 'product_id,year_month' })
+    .upsert(inserts, { onConflict: 'product_id,year_month,channel' })
   if (snapErr) return { ok: false, error: snapErr.message }
 
   revalidatePath(REVAL)

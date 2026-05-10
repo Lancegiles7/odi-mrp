@@ -134,7 +134,13 @@ export interface ProductRow {
   sku: string
   name: string
   opening: number | null
-  budget: number
+  /** Budget by channel (mapped from demand_forecasts: ecomm→d2c, pipefill→samples). */
+  budget_by_channel: Record<Channel, number>
+  /** Sum of all channel budgets. */
+  budget_total: number
+  /** Sum of D2C + Retail budgets (excludes pipefill/samples). */
+  budget_sales: number
+  /** Actual units by channel (from product_actuals). */
   channels: Record<Channel, number>
   total_out: number
   total_sales: number   // (retail + d2c) NZ + AU
@@ -145,25 +151,37 @@ export interface ProductRow {
   stock_variance: number | null  // counted − calc (only when counted is set)
 }
 
+const ZERO_BY_CHANNEL: Record<Channel, number> = {
+  nz_retail: 0, nz_d2c: 0, nz_samples: 0, au_retail: 0, au_d2c: 0, au_samples: 0,
+}
+
+function fillChannels(partial: Partial<Record<Channel, number>>): Record<Channel, number> {
+  return {
+    nz_retail:  partial.nz_retail  ?? 0,
+    nz_d2c:     partial.nz_d2c     ?? 0,
+    nz_samples: partial.nz_samples ?? 0,
+    au_retail:  partial.au_retail  ?? 0,
+    au_d2c:     partial.au_d2c     ?? 0,
+    au_samples: partial.au_samples ?? 0,
+  }
+}
+
 export function computeProductRow(input: {
   product:   { id: string; sku_code: string; name: string }
   opening:   number | null
-  budget:    number
+  budget_by_channel: Partial<Record<Channel, number>>
   channels:  Partial<Record<Channel, number>>
   receipts:  number
   counted_eom: number | null
 }): ProductRow {
-  const channelsFull: Record<Channel, number> = {
-    nz_retail:  input.channels.nz_retail  ?? 0,
-    nz_d2c:     input.channels.nz_d2c     ?? 0,
-    nz_samples: input.channels.nz_samples ?? 0,
-    au_retail:  input.channels.au_retail  ?? 0,
-    au_d2c:     input.channels.au_d2c     ?? 0,
-    au_samples: input.channels.au_samples ?? 0,
-  }
-  const total_out   = Object.values(channelsFull).reduce((s, v) => s + v, 0)
-  const total_sales = SALES_CHANNELS.reduce((s, c) => s + (channelsFull[c] ?? 0), 0)
-  const calc_eom    = input.opening != null ? input.opening + input.receipts - total_out : null
+  const budgetFull   = fillChannels(input.budget_by_channel)
+  const channelsFull = fillChannels(input.channels)
+
+  const budget_total = Object.values(budgetFull).reduce((s, v) => s + v, 0)
+  const budget_sales = SALES_CHANNELS.reduce((s, c) => s + budgetFull[c], 0)
+  const total_out    = Object.values(channelsFull).reduce((s, v) => s + v, 0)
+  const total_sales  = SALES_CHANNELS.reduce((s, c) => s + channelsFull[c], 0)
+  const calc_eom     = input.opening != null ? input.opening + input.receipts - total_out : null
   const effective_eom = input.counted_eom ?? calc_eom
   const stock_variance = input.counted_eom != null && calc_eom != null
     ? input.counted_eom - calc_eom
@@ -174,7 +192,9 @@ export function computeProductRow(input: {
     sku:        input.product.sku_code,
     name:       input.product.name,
     opening:    input.opening,
-    budget:     input.budget,
+    budget_by_channel: budgetFull,
+    budget_total,
+    budget_sales,
     channels:   channelsFull,
     total_out,
     total_sales,
@@ -185,6 +205,9 @@ export function computeProductRow(input: {
     stock_variance,
   }
 }
+
+// Avoid unused-warning for the const consumers may not import
+void ZERO_BY_CHANNEL
 
 // ============================================================
 // Ingredient / packaging derivation
