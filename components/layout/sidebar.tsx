@@ -19,6 +19,7 @@ import {
   Inbox,
   MapPin,
   Box as BoxIcon,
+  ClipboardCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROLES } from '@/lib/constants'
@@ -39,6 +40,7 @@ const ICON_MAP = {
   '/delivery-addresses':MapPin,
   '/inventory':       Warehouse,
   '/stock-movements': ArrowLeftRight,
+  '/reporting/budget-vs-actual': ClipboardCheck,
   '/settings':        SettingsIcon,
   '/users':           Users,
 } as const
@@ -73,6 +75,12 @@ const NAV_GROUPS = [
     items: [
       { name: 'Stock Levels',    href: '/inventory' },
       { name: 'Stock Movements', href: '/stock-movements' },
+    ],
+  },
+  {
+    label: 'Reporting',
+    items: [
+      { name: 'Budget vs Actual', href: '/reporting/budget-vs-actual' },
     ],
   },
 ]
