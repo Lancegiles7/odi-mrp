@@ -1,6 +1,7 @@
 'use client'
 
 import { CountedEomInput } from './counted-eom-input'
+import { OpeningCellInput } from './actual-cell-input'
 import { packagingTypeLabel, PACKAGING_TYPE_COLOURS } from '@/lib/constants'
 
 export interface PackagingTabRow {
@@ -17,6 +18,8 @@ export interface PackagingTabRow {
   calc_eom: number | null
   counted_eom: number | null
   stock_variance: number | null
+  /** 'retail-only' for SRT (wholesale shipper); 'total' for everything else. */
+  derivation_basis?: 'retail-only' | 'total'
 }
 
 export function PackagingTab({
@@ -57,8 +60,17 @@ export function PackagingTab({
                   <td className="px-2 py-2">
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${PACKAGING_TYPE_COLOURS[r.type] ?? PACKAGING_TYPE_COLOURS['OTHER']}`}>{packagingTypeLabel(r.type)}</span>
                   </td>
-                  <td className="px-2 py-2 text-right tabular-nums">{r.opening != null ? formatNum(r.opening) : <span className="text-gray-300">—</span>}</td>
-                  <td className="px-2 py-2 text-right tabular-nums bg-emerald-50/40">{noActivity && r.derived === 0 ? <span className="text-gray-300">—</span> : formatNum(r.derived)}</td>
+                  <td className="px-1 py-1">
+                    <OpeningCellInput entity_type="packaging" entity_id={r.id} year_month={year_month} initial={r.opening} isLocked={isLocked} />
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums bg-emerald-50/40" title={r.derivation_basis === 'retail-only' ? 'SRT — derived from retail actuals only (samples + D2C excluded)' : 'Derived from total product actuals × qty per unit'}>
+                    {noActivity && r.derived === 0 ? <span className="text-gray-300">—</span> : (
+                      <>
+                        {formatNum(r.derived)}
+                        {r.derivation_basis === 'retail-only' && <span className="block text-[9px] normal-case text-gray-500 font-normal">retail only</span>}
+                      </>
+                    )}
+                  </td>
                   <td className="px-2 py-2 text-right tabular-nums bg-amber-50/40">
                     {r.override != null ? <span className="font-semibold text-amber-900" title={r.override_comment ?? undefined}>{formatNum(r.override)}{r.override_comment ? ' 💬' : ''}</span> : <span className="text-gray-300 italic">—</span>}
                   </td>
@@ -82,7 +94,7 @@ export function PackagingTab({
         </table>
       </div>
       <div className="p-3 text-[11px] text-gray-500 bg-gray-50 border-t border-gray-100">
-        Derived use comes from product actuals × packaging qty-per-unit on each product&rsquo;s Packaging BOM. Negative Calc EOM = stockout (used more than available).
+        Derived use = product actuals × packaging qty-per-unit on each product&rsquo;s Packaging BOM. <strong>SRT</strong> packaging types use <em>retail-only</em> actuals (D2C and samples excluded — SRTs only ship to wholesale). Open falls back to packaging.current_soh when no monthly count is set. Negative Calc EOM = stockout.
       </div>
     </div>
   )

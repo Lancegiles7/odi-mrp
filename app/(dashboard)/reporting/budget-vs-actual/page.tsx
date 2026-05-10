@@ -55,13 +55,13 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
       .eq('is_active', true)
       .order('sku_code') as { data: Array<{ id: string; sku_code: string; name: string; current_soh: number | null; product_type: string | null }> | null },
     supabase.from('ingredients')
-      .select('id, sku_code, name, unit_of_measure, current_soh')
+      .select('id, sku_code, name, unit_of_measure, current_soh, opening_stock_override')
       .eq('is_active', true)
-      .order('name') as { data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; current_soh: number | null }> | null },
+      .order('name') as { data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; current_soh: number | null; opening_stock_override: number | null }> | null },
     supabase.from('packaging')
-      .select('id, sku_code, name, type, unit_of_measure, current_soh')
+      .select('id, sku_code, name, type, unit_of_measure, current_soh, opening_stock_override')
       .eq('is_active', true)
-      .order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string | null; current_soh: number | null }> | null },
+      .order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string | null; current_soh: number | null; opening_stock_override: number | null }> | null },
     supabase.from('bom_items')
       .select('bom_id, ingredient_id, quantity_g, boms!inner(product_id, is_active)')
       .eq('boms.is_active', true) as unknown as { data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number; boms: { product_id: string; is_active: boolean } }> | null },
@@ -206,7 +206,7 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
               const effective = override?.units ?? derived
               const this_ = stockByIngredient.get(i.id)
               const prev = stockPrevByIngredient.get(i.id)
-              const opening = this_?.opening ?? prev ?? i.current_soh
+              const opening = this_?.opening ?? prev ?? i.current_soh ?? i.opening_stock_override
               const calc_eom = opening != null ? opening - effective : null
               const counted = this_?.counted ?? null
               return {
@@ -223,12 +223,29 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
       })()}
 
       {tab === 'packaging' && (() => {
+        // SRT packaging types are retail-only (wholesale shipper trays — never used
+        // for D2C orders or samples). All other packaging types use total_out.
+        const SRT_TYPES = new Set(['SRT'])
+        const srtPackagingIds = new Set((packaging ?? []).filter((p) => SRT_TYPES.has(p.type)).map((p) => p.id))
+
+        // Per-product totals (already in productTotals) and per-product RETAIL only
+        const productRetail: Record<string, number> = {}
+        for (const p of products ?? []) {
+          const ch = channelsByProduct.get(p.id) ?? {}
+          productRetail[p.id] = (Number(ch.nz_retail) || 0) + (Number(ch.au_retail) || 0)
+        }
+
         const links = (productPackaging ?? []).map((pp) => ({
           product_id: pp.product_id,
           entity_id: pp.packaging_id,
           qty_per_product_unit: Number(pp.quantity_per_unit),
         }))
-        const derivedById = deriveConsumption(productTotals, links)
+        const srtLinks    = links.filter((l) => srtPackagingIds.has(l.entity_id))
+        const otherLinks  = links.filter((l) => !srtPackagingIds.has(l.entity_id))
+        const derivedSrt  = deriveConsumption(productRetail, srtLinks)
+        const derivedOther = deriveConsumption(productTotals, otherLinks)
+        const derivedById: Record<string, number> = { ...derivedOther, ...derivedSrt }
+
         const overrideById = new Map((consumptionOverrides ?? []).filter((o) => o.entity_type === 'packaging').map((o) => [o.entity_id, { units: Number(o.override_units), comment: o.comment }]))
         const stockByPak = new Map<string, { opening: number | null; counted: number | null }>()
         for (const s of stockCountsThis ?? []) {
@@ -246,14 +263,16 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
               const effective = override?.units ?? derived
               const this_ = stockByPak.get(p.id)
               const prev = stockPrevByPak.get(p.id)
-              const opening = this_?.opening ?? prev ?? p.current_soh
+              const opening = this_?.opening ?? prev ?? p.current_soh ?? p.opening_stock_override
               const calc_eom = opening != null ? opening - effective : null
               const counted = this_?.counted ?? null
+              const isSrt = SRT_TYPES.has(p.type)
               return {
                 id: p.id, sku: p.sku_code, name: p.name, type: p.type, uom: p.unit_of_measure,
                 opening, derived, override: override?.units ?? null, override_comment: override?.comment ?? null,
                 effective, calc_eom, counted_eom: counted,
                 stock_variance: counted != null && calc_eom != null ? counted - calc_eom : null,
+                derivation_basis: isSrt ? 'retail-only' : 'total',
               }
             })}
             year_month={month}
