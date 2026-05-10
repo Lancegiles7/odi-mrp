@@ -35,9 +35,9 @@ export function ProductsTab({
           <thead>
             {/* Group header row */}
             <tr className="bg-gray-100 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-              <th className="px-3 py-1 sticky left-0 bg-gray-100"></th>
-              <th className="px-2 py-1"></th>
-              <th colSpan={2} className="px-2 py-1 text-center border-l border-r border-gray-200 bg-emerald-50/40">NZ Retail</th>
+              <th className="px-3 py-1 sticky left-0 bg-gray-100 z-20 border-r-2 border-gray-300"></th>
+              <th className="px-2 py-1 sticky left-[230px] bg-gray-100 z-20 border-r-2 border-gray-300"></th>
+              <th colSpan={2} className="px-2 py-1 text-center border-r border-gray-200 bg-emerald-50/40">NZ Retail</th>
               <th colSpan={2} className="px-2 py-1 text-center border-r border-gray-200 bg-emerald-50/40">NZ D2C</th>
               <th colSpan={2} className="px-2 py-1 text-center border-r border-gray-200 bg-purple-50/60">NZ Pipefill / Samples</th>
               <th colSpan={2} className="px-2 py-1 text-center border-r border-gray-200 bg-gray-100 text-gray-400">AU (soon)</th>
@@ -46,9 +46,9 @@ export function ProductsTab({
               <th colSpan={3} className="px-2 py-1 text-center bg-amber-50/40">Stock</th>
             </tr>
             <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-              <th className="text-left px-3 py-2 sticky left-0 bg-gray-50 min-w-[230px]">Product</th>
-              <th className="text-right px-2 py-2 w-[80px]" title="Opening SOH for the month">Open</th>
-              <th className="text-right px-2 py-2 w-[80px] bg-blue-50/40 border-l border-gray-200">Bud</th>
+              <th className="text-left px-3 py-2 sticky left-0 bg-gray-50 min-w-[230px] z-20">Product</th>
+              <th className="text-right px-2 py-2 w-[80px] sticky left-[230px] bg-gray-50 z-20 border-r-2 border-gray-300" title="Opening SOH for the month">Open</th>
+              <th className="text-right px-2 py-2 w-[80px] bg-blue-50/40">Bud</th>
               <th className="text-right px-2 py-2 w-[80px] bg-emerald-50/40">Act</th>
               <th className="text-right px-2 py-2 w-[80px] bg-blue-50/40">Bud</th>
               <th className="text-right px-2 py-2 w-[80px] bg-emerald-50/40">Act</th>
@@ -76,12 +76,12 @@ export function ProductsTab({
             {rows.map((r) => {
               const noActuals = r.total_out === 0 && r.budget_total === 0
               return (
-                <tr key={r.product_id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-3 py-2 sticky left-0 bg-white">
+                <tr key={r.product_id} className="group border-b border-gray-100 hover:bg-gray-50">
+                  <td className="px-3 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10">
                     <div className="font-medium text-gray-900">{r.name}</div>
                     <div className="text-[10px] font-mono text-gray-500">{r.sku}</div>
                   </td>
-                  <td className="px-2 py-2 text-right tabular-nums">{r.opening != null ? r.opening.toLocaleString() : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-2 py-2 text-right tabular-nums sticky left-[230px] bg-white group-hover:bg-gray-50 z-10 border-r-2 border-gray-300">{r.opening != null ? r.opening.toLocaleString() : <span className="text-gray-300">—</span>}</td>
                   {/* Retail */}
                   <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40 border-l border-gray-200">{cellOrDash(r.budget_by_channel.nz_retail)}</td>
                   <td className="px-2 py-2 text-right tabular-nums bg-emerald-50/40">{cellOrDash(r.channels.nz_retail)}</td>
@@ -125,9 +125,9 @@ export function ProductsTab({
           {rows.length > 0 && (
             <tfoot>
               <tr className="bg-gray-50 border-t-2 border-gray-200 text-sm">
-                <td className="px-3 py-2 sticky left-0 bg-gray-50 font-semibold">Totals</td>
-                <td className="px-2 py-2 text-right tabular-nums font-semibold">{totals.opening.toLocaleString()}</td>
-                <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40 font-semibold border-l border-gray-200">{totals.bud_retail.toLocaleString()}</td>
+                <td className="px-3 py-2 sticky left-0 bg-gray-50 font-semibold z-10">Totals</td>
+                <td className="px-2 py-2 text-right tabular-nums font-semibold sticky left-[230px] bg-gray-50 z-10 border-r-2 border-gray-300">{totals.opening.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40 font-semibold">{totals.bud_retail.toLocaleString()}</td>
                 <td className="px-2 py-2 text-right tabular-nums bg-emerald-50/40 font-semibold">{totals.retail.toLocaleString()}</td>
                 <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40 font-semibold">{totals.bud_d2c.toLocaleString()}</td>
                 <td className="px-2 py-2 text-right tabular-nums bg-emerald-50/40 font-semibold">{totals.d2c.toLocaleString()}</td>
