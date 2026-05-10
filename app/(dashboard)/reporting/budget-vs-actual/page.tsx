@@ -88,6 +88,17 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
     supabase.from('user_profiles').select('roles(name)').eq('id', (await supabase.auth.getUser()).data.user?.id ?? '').maybeSingle() as { data: { roles: { name: string } | null } | null },
   ])
 
+  // Live inventory balances (matches what the Packaging list / Ingredients list show as SOH).
+  // Only used as a fallback for the FY-start month opening when no explicit count is set.
+  const [{ data: pakBalances }, { data: ingBalances }] = await Promise.all([
+    supabase.from('inventory_balances').select('packaging_id, quantity_on_hand').not('packaging_id', 'is', null) as { data: Array<{ packaging_id: string; quantity_on_hand: number }> | null },
+    supabase.from('inventory_balances').select('ingredient_id, quantity_on_hand').not('ingredient_id', 'is', null) as { data: Array<{ ingredient_id: string; quantity_on_hand: number }> | null },
+  ])
+  const pakBalanceById = new Map<string, number>()
+  for (const b of pakBalances ?? []) pakBalanceById.set(b.packaging_id, Number(b.quantity_on_hand))
+  const ingBalanceById = new Map<string, number>()
+  for (const b of ingBalances ?? []) ingBalanceById.set(b.ingredient_id, Number(b.quantity_on_hand))
+
   const isAdmin    = profile?.roles?.name === 'admin'
   const isLocked   = !!monthLock
   const isFyStart  = month === months[0]
@@ -206,7 +217,11 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
               const effective = override?.units ?? derived
               const this_ = stockByIngredient.get(i.id)
               const prev = stockPrevByIngredient.get(i.id)
-              const opening = this_?.opening ?? prev ?? i.current_soh ?? i.opening_stock_override
+              // FY-start month falls back to live inventory balance (matches the Ingredients list SOH)
+              const fyStartFallback = isFyStart
+                ? (ingBalanceById.get(i.id) ?? i.opening_stock_override ?? i.current_soh)
+                : (i.current_soh ?? i.opening_stock_override)
+              const opening = this_?.opening ?? prev ?? fyStartFallback
               const calc_eom = opening != null ? opening - effective : null
               const counted = this_?.counted ?? null
               return {
@@ -263,7 +278,11 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
               const effective = override?.units ?? derived
               const this_ = stockByPak.get(p.id)
               const prev = stockPrevByPak.get(p.id)
-              const opening = this_?.opening ?? prev ?? p.current_soh ?? p.opening_stock_override
+              // FY-start month falls back to live inventory balance (matches the Packaging list SOH)
+              const fyStartFallback = isFyStart
+                ? (pakBalanceById.get(p.id) ?? p.opening_stock_override ?? p.current_soh)
+                : (p.current_soh ?? p.opening_stock_override)
+              const opening = this_?.opening ?? prev ?? fyStartFallback
               const calc_eom = opening != null ? opening - effective : null
               const counted = this_?.counted ?? null
               const isSrt = SRT_TYPES.has(p.type)
