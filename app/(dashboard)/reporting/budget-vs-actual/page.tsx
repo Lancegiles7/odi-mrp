@@ -55,13 +55,13 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
       .eq('is_active', true)
       .order('sku_code') as { data: Array<{ id: string; sku_code: string; name: string; current_soh: number | null; product_type: string | null }> | null },
     supabase.from('ingredients')
-      .select('id, sku_code, name, unit_of_measure, current_soh, opening_stock_override')
+      .select('id, sku_code, name, unit_of_measure, current_soh, opening_stock_override, original_order_qty')
       .eq('is_active', true)
-      .order('name') as { data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; current_soh: number | null; opening_stock_override: number | null }> | null },
+      .order('name') as { data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; current_soh: number | null; opening_stock_override: number | null; original_order_qty: number | null }> | null },
     supabase.from('packaging')
-      .select('id, sku_code, name, type, unit_of_measure, current_soh, opening_stock_override')
+      .select('id, sku_code, name, type, unit_of_measure, current_soh, opening_stock_override, original_order_qty')
       .eq('is_active', true)
-      .order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string | null; current_soh: number | null; opening_stock_override: number | null }> | null },
+      .order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string | null; current_soh: number | null; opening_stock_override: number | null; original_order_qty: number | null }> | null },
     supabase.from('bom_items')
       .select('bom_id, ingredient_id, quantity_g, boms!inner(product_id, is_active)')
       .eq('boms.is_active', true) as unknown as { data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number; boms: { product_id: string; is_active: boolean } }> | null },
@@ -217,11 +217,12 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
               const effective = override?.units ?? derived
               const this_ = stockByIngredient.get(i.id)
               const prev = stockPrevByIngredient.get(i.id)
-              // FY-start month falls back to live inventory balance (matches the Ingredients list SOH)
-              const fyStartFallback = isFyStart
-                ? (ingBalanceById.get(i.id) ?? i.opening_stock_override ?? i.current_soh)
-                : (i.current_soh ?? i.opening_stock_override)
-              const opening = this_?.opening ?? prev ?? fyStartFallback
+              // FY-start (April): use the launch baseline (original_order_qty)
+              // Other months: roll from prev counted EOM, else fall back to live SOH
+              const fallback = isFyStart
+                ? (i.original_order_qty ?? i.opening_stock_override ?? i.current_soh)
+                : (ingBalanceById.get(i.id) ?? i.current_soh ?? i.opening_stock_override)
+              const opening = this_?.opening ?? prev ?? fallback
               const calc_eom = opening != null ? opening - effective : null
               const counted = this_?.counted ?? null
               return {
@@ -278,11 +279,12 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
               const effective = override?.units ?? derived
               const this_ = stockByPak.get(p.id)
               const prev = stockPrevByPak.get(p.id)
-              // FY-start month falls back to live inventory balance (matches the Packaging list SOH)
-              const fyStartFallback = isFyStart
-                ? (pakBalanceById.get(p.id) ?? p.opening_stock_override ?? p.current_soh)
-                : (p.current_soh ?? p.opening_stock_override)
-              const opening = this_?.opening ?? prev ?? fyStartFallback
+              // FY-start (April): use the launch baseline (original_order_qty)
+              // Other months: roll from prev counted EOM, else fall back to live SOH
+              const fallback = isFyStart
+                ? (p.original_order_qty ?? p.opening_stock_override ?? p.current_soh)
+                : (pakBalanceById.get(p.id) ?? p.current_soh ?? p.opening_stock_override)
+              const opening = this_?.opening ?? prev ?? fallback
               const calc_eom = opening != null ? opening - effective : null
               const counted = this_?.counted ?? null
               const isSrt = SRT_TYPES.has(p.type)
