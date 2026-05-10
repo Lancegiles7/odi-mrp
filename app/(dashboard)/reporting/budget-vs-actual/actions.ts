@@ -106,6 +106,97 @@ export async function uploadProductActuals(input: {
 }
 
 // ============================================================
+// setOpeningSoh — only touches opening_soh, leaves counted_eom alone
+// ============================================================
+export async function setOpeningSoh(input: {
+  entity_type: EntityType
+  entity_id:   string
+  year_month:  string
+  opening_soh: number | null
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+  const createdBy = profile?.id ?? null
+
+  const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', input.year_month).maybeSingle()
+  if (lock) return { ok: false, error: 'Month is locked.' }
+
+  // Read existing row so we preserve counted_eom + comment when patching opening_soh
+  const { data: existing } = await supabase.from('monthly_stock_counts')
+    .select('counted_eom, comment')
+    .eq('entity_type', input.entity_type)
+    .eq('entity_id', input.entity_id)
+    .eq('year_month', input.year_month)
+    .maybeSingle() as { data: { counted_eom: number | null; comment: string | null } | null }
+
+  // If everything would be null after this update, just delete
+  if (input.opening_soh == null && existing?.counted_eom == null && !existing?.comment) {
+    const { error } = await supabase.from('monthly_stock_counts').delete()
+      .eq('entity_type', input.entity_type)
+      .eq('entity_id', input.entity_id)
+      .eq('year_month', input.year_month)
+    if (error) return { ok: false, error: error.message }
+  } else {
+    const { error } = await supabase.from('monthly_stock_counts').upsert({
+      entity_type: input.entity_type,
+      entity_id:   input.entity_id,
+      year_month:  input.year_month,
+      opening_soh: input.opening_soh,
+      counted_eom: existing?.counted_eom ?? null,
+      comment:     existing?.comment ?? null,
+      created_by:  createdBy,
+    }, { onConflict: 'entity_type,entity_id,year_month' })
+    if (error) return { ok: false, error: error.message }
+  }
+
+  revalidatePath(REVAL)
+  return { ok: true }
+}
+
+// ============================================================
+// setProductActual — single-cell upsert for inline editing
+// ============================================================
+export async function setProductActual(input: {
+  product_id: string
+  year_month: string
+  channel:    Channel
+  units:      number | null    // null deletes the row
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+  const createdBy = profile?.id ?? null
+
+  const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', input.year_month).maybeSingle()
+  if (lock) return { ok: false, error: 'Month is locked.' }
+
+  if (input.units == null) {
+    const { error } = await supabase.from('product_actuals').delete()
+      .eq('product_id', input.product_id)
+      .eq('year_month', input.year_month)
+      .eq('channel', input.channel)
+    if (error) return { ok: false, error: error.message }
+  } else {
+    const { error } = await supabase.from('product_actuals').upsert({
+      product_id: input.product_id,
+      year_month: input.year_month,
+      channel:    input.channel,
+      units:      input.units,
+      created_by: createdBy,
+    }, { onConflict: 'product_id,year_month,channel' })
+    if (error) return { ok: false, error: error.message }
+  }
+
+  revalidatePath(REVAL)
+  return { ok: true }
+}
+
+// ============================================================
 // setMonthlyStockCount — counted EOM (and optionally opening_soh)
 // ============================================================
 export async function setMonthlyStockCount(input: {

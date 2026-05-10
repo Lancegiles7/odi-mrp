@@ -1,6 +1,7 @@
 'use client'
 
 import { CountedEomInput } from './counted-eom-input'
+import { ActualCellInput, OpeningCellInput } from './actual-cell-input'
 import { varBadgeClass, type ProductRow } from '@/lib/budget-vs-actual'
 
 export function ProductsTab({
@@ -81,16 +82,24 @@ export function ProductsTab({
                     <div className="font-medium text-gray-900">{r.name}</div>
                     <div className="text-[10px] font-mono text-gray-500">{r.sku}</div>
                   </td>
-                  <td className="px-2 py-2 text-right tabular-nums sticky left-[320px] bg-white group-hover:bg-gray-50 z-10 border-r-2 border-gray-300">{r.opening != null ? r.opening.toLocaleString() : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-1 py-1 text-right tabular-nums sticky left-[320px] bg-white group-hover:bg-gray-50 z-10 border-r-2 border-gray-300">
+                    <OpeningCellInput entity_id={r.product_id} year_month={year_month} initial={r.opening} isLocked={isLocked} />
+                  </td>
                   {/* Retail */}
-                  <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40 border-l border-gray-200">{cellOrDash(r.budget_by_channel.nz_retail)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums bg-emerald-50/40">{cellOrDash(r.channels.nz_retail)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40">{cellOrDash(r.budget_by_channel.nz_retail)}</td>
+                  <td className="px-1 py-1 bg-emerald-50/40">
+                    <ActualCellInput product_id={r.product_id} year_month={year_month} channel="nz_retail" initial={r.channels.nz_retail} isLocked={isLocked} />
+                  </td>
                   {/* D2C */}
                   <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40">{cellOrDash(r.budget_by_channel.nz_d2c)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums bg-emerald-50/40">{cellOrDash(r.channels.nz_d2c)}</td>
+                  <td className="px-1 py-1 bg-emerald-50/40">
+                    <ActualCellInput product_id={r.product_id} year_month={year_month} channel="nz_d2c" initial={r.channels.nz_d2c} isLocked={isLocked} />
+                  </td>
                   {/* Pipefill / Samples */}
                   <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40">{cellOrDash(r.budget_by_channel.nz_samples)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums bg-purple-50/60">{cellOrDash(r.channels.nz_samples)}</td>
+                  <td className="px-1 py-1 bg-purple-50/60">
+                    <ActualCellInput product_id={r.product_id} year_month={year_month} channel="nz_samples" initial={r.channels.nz_samples} isLocked={isLocked} />
+                  </td>
                   {/* AU placeholders */}
                   <td className="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
                   <td className="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
