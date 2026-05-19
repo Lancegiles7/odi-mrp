@@ -1,0 +1,21 @@
+soh_sku,soh_name,my_best_guess_system_sku,confidence,opening,nz_retail,nz_d2c,nz_samples
+FG-ODI-PCH-BRY,Odi Organic Berry Breakfast,ODI-BABY-PURE-BERR-POUCH-120G,high,5394,2250,382,729
+FG-ODI-PCH-CKN,Odi Organic Chicken,ODI-BABY-PURE-CHIC-POUCH-120G,high,5454,2418,336,735
+FG-ODI-PCH-VAN,Odi Organic Vanilla Smoothie,ODI-BABY-PURE-VANI-POUCH-120G,high,5310,2220,372,741
+FG-ODI-PCH-VEG,Odi Organic Spring Vegies,ODI-BABY-PURE-VEG-POUCH-120G,medium,5526,2250,283,735
+FG-ODI-SAC-BET,Odi Organic Beetroot,ODI-BABY-PURE-BEET-SACHET-20G,high,1442,150,53,157
+FG-ODI-SAC-BLU,Odi Organic Blueberry,ODI-BABY-PURE-BLUE-SACHET-20G,high,6030,4500,46,289
+FG-ODI-SAC-BRO,Odi Organic Broccoli,ODI-BABY-PURE-BROC-SACHET-20G,high,5895,945,43,53
+FG-ODI-SAC-CAR,Odi Organic Carrot,ODI-BABY-PURE-CARR-SACHET-20G,high,1440,195,37,53
+FG-ODI-SAC-BCR,Odi Organic Baby Cereal sach,ODI-BABY-PURE-BCR-SACHET-20G,medium,1443,0,34,141
+FG-ODI-BAL-CAS,Odi Organic Berry and Collagen Balls,?,unknown,320,0,225,32
+FG-ODI-BAL-COA,Odi Organic Cacoa and Collagen Balls,?,unknown,494,12,216,47
+FG-ODI-BITE-BAN,Odi Organic Banana and Oat Bar,?,unknown,447,10,176,63
+FG-ODI-BITE-BRN,Odi Organic Brownie Bite,?,unknown,2650,1980,218,165
+FG-ODI-BITE-CHC,Odi Cherry Chocolate Bar,?,unknown,427,0,172,48
+FG-ODI-CCO-SUN,Odi Sunflower Chock Chip Cookie,?,unknown,285,0,166,33
+FG-ODI-CCO-VAN,Odi Vanilla Choc Chip Cookies,?,unknown,492,30,196,48
+FG-ODI-TUB-BBB,Odi Organic BBB,?,unknown,1001,84,61,43
+FG-ODI-TUB-BC,Odi Organic BC Tub,?,unknown,801,136,38,29
+FG-ODI-TUB-MB,Odi Organic MB,?,unknown,995,0,54,37
+FG-ODI-TUB-SB,Odi Organic SB,?,unknown,999,156,61,40

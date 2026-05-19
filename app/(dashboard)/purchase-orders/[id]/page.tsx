@@ -15,10 +15,10 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
 
   const [{ data: po }, { data: lines }, { data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('id, po_number, supplier_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes')
+      .select('id, po_number, supplier_id, currency, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
-        id: string; po_number: string; supplier_id: string;
+        id: string; po_number: string; supplier_id: string; currency: string | null;
         status: 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled';
         order_date: string; expected_delivery_date: string | null;
         delivery_address_id: string | null; delivery_notes: string | null;
@@ -33,8 +33,8 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         unit_of_measure: string; notes: string | null;
       }> | null }>,
     supabase.from('suppliers')
-      .select('id, name, payment_terms, email, phone')
-      .order('name') as unknown as Promise<{ data: Array<{ id: string; name: string; payment_terms: string | null; email: string | null; phone: string | null }> | null }>,
+      .select('id, name, payment_terms, email, phone, currency')
+      .order('name') as unknown as Promise<{ data: Array<{ id: string; name: string; payment_terms: string | null; email: string | null; phone: string | null; currency: string | null }> | null }>,
     supabase.from('ingredients')
       .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price')
       .eq('is_active', true)
@@ -77,6 +77,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       poId={po.id}
       initialPoNumber={po.po_number}
       initialSupplierId={po.supplier_id}
+      initialCurrency={po.currency ?? 'NZD'}
       initialOrderDate={po.order_date.slice(0, 10)}
       initialExpected={po.expected_delivery_date?.slice(0, 10) ?? null}
       initialDeliveryAddressId={po.delivery_address_id}

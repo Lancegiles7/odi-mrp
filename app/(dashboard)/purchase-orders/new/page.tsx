@@ -10,9 +10,9 @@ export default async function NewPurchaseOrderPage() {
 
   const [{ data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }] = await Promise.all([
     supabase.from('suppliers')
-      .select('id, name, payment_terms, email, phone')
+      .select('id, name, payment_terms, email, phone, currency')
       .eq('is_active', true)
-      .order('name') as unknown as Promise<{ data: Array<{ id: string; name: string; payment_terms: string | null; email: string | null; phone: string | null }> | null }>,
+      .order('name') as unknown as Promise<{ data: Array<{ id: string; name: string; payment_terms: string | null; email: string | null; phone: string | null; currency: string | null }> | null }>,
     supabase.from('ingredients')
       .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price')
       .eq('is_active', true)
@@ -40,6 +40,7 @@ export default async function NewPurchaseOrderPage() {
       mode="new"
       initialPoNumber={poNumber}
       initialSupplierId=""
+      initialCurrency="NZD"
       initialOrderDate={todayStr}
       initialExpected={null}
       initialDeliveryAddressId={null}
