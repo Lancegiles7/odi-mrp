@@ -165,7 +165,9 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
           </div>
           <div>
             <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">Issued by</div>
-            <div className="text-[13px] font-semibold">orders@odinutrition.com</div>
+            <div className="text-[13px] font-semibold">Atma Okan</div>
+            <div className="text-[11px] text-gray-700">Operations Manager</div>
+            <div className="text-[11px] text-gray-700">orders@odinutrition.com</div>
           </div>
         </div>
 
