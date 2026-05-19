@@ -7,7 +7,7 @@ import {
   createPurchaseOrder, updatePurchaseOrder, deleteDraftPo, setPoStatus,
   type POLineInput,
 } from '@/app/(dashboard)/purchase-orders/actions'
-import { paymentTermsLabel } from '@/lib/constants'
+import { paymentTermsLabel, SUPPORTED_CURRENCIES } from '@/lib/constants'
 
 interface SupplierOption {
   id: string
@@ -15,6 +15,7 @@ interface SupplierOption {
   payment_terms: string | null
   email: string | null
   phone: string | null
+  currency: string | null
 }
 
 interface IngredientOption {
@@ -61,6 +62,7 @@ export interface POFormProps {
   poId?: string
   initialPoNumber: string
   initialSupplierId: string
+  initialCurrency: string          // 'NZD' default
   initialOrderDate: string         // 'YYYY-MM-DD'
   initialExpected: string | null   // 'YYYY-MM-DD' or null
   initialDeliveryAddressId: string | null
@@ -94,6 +96,8 @@ export function POForm(props: POFormProps) {
 
   const [poNumber, setPoNumber]     = useState(props.initialPoNumber)
   const [supplierId, setSupplierId] = useState(props.initialSupplierId)
+  const [currency, setCurrency]     = useState(props.initialCurrency || 'NZD')
+  const [currencyManuallySet, setCurrencyManuallySet] = useState(props.mode === 'edit')
   const [orderDate, setOrderDate]   = useState(props.initialOrderDate)
   const [expected, setExpected]     = useState(props.initialExpected ?? '')
   const [notes, setNotes]           = useState(props.initialNotes ?? '')
@@ -172,6 +176,7 @@ export function POForm(props: POFormProps) {
       const payload = {
         po_number: poNumber,
         supplier_id: supplierId,
+        currency,
         order_date: orderDate,
         expected_delivery_date: expected || null,
         delivery_address_id: deliveryAddressId || null,
@@ -263,17 +268,44 @@ export function POForm(props: POFormProps) {
               <select
                 disabled={!isEditable}
                 value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
+                onChange={(e) => {
+                  const newId = e.target.value
+                  setSupplierId(newId)
+                  // Auto-default currency to supplier's currency on supplier change
+                  // (only if user hasn't manually picked one yet).
+                  if (!currencyManuallySet) {
+                    const sup = props.suppliers.find((s) => s.id === newId)
+                    if (sup?.currency) setCurrency(sup.currency.toUpperCase())
+                  }
+                }}
                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
               >
                 <option value="">— Select a supplier —</option>
                 {props.suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id}>{s.name}{s.currency ? ` (${s.currency})` : ''}</option>
                 ))}
               </select>
               {supplier && (
                 <p className="text-[11px] text-gray-500 mt-1">
                   {supplier.payment_terms ? paymentTermsLabel(supplier.payment_terms) : 'Payment terms not set'}{supplier.email ? ` · ${supplier.email}` : ''}
+                </p>
+              )}
+            </Field>
+
+            <Field label={`Currency · prices in ${currency}`}>
+              <select
+                disabled={!isEditable}
+                value={currency}
+                onChange={(e) => { setCurrency(e.target.value); setCurrencyManuallySet(true) }}
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
+              >
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              {supplier?.currency && supplier.currency.toUpperCase() !== currency && (
+                <p className="text-[11px] text-amber-700 mt-1">
+                  ⚠ supplier&apos;s currency is {supplier.currency.toUpperCase()} — overriding to {currency}
                 </p>
               )}
             </Field>
@@ -375,7 +407,7 @@ export function POForm(props: POFormProps) {
                     />
                   ))}
                   <tr className="border-t-2 border-gray-200 bg-gray-50 text-sm">
-                    <td colSpan={7} className="px-3 py-2 text-right font-medium text-gray-700">Subtotal (NZD ex-GST)</td>
+                    <td colSpan={7} className="px-3 py-2 text-right font-medium text-gray-700">Subtotal ({currency} ex-GST)</td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold">${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     {isEditable && <td></td>}
                   </tr>

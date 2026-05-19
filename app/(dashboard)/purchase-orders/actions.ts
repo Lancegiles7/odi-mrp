@@ -59,6 +59,7 @@ export async function generatePoNumber(): Promise<string> {
 export async function createPurchaseOrder(input: {
   po_number: string
   supplier_id: string
+  currency?: string
   order_date: string
   expected_delivery_date: string | null
   delivery_address_id: string | null
@@ -83,6 +84,7 @@ export async function createPurchaseOrder(input: {
     .insert({
       po_number:              input.po_number.trim(),
       supplier_id:            input.supplier_id,
+      currency:               (input.currency ?? 'NZD').toUpperCase(),
       status:                 'draft',
       order_date:             input.order_date,
       expected_delivery_date: input.expected_delivery_date,
@@ -125,6 +127,7 @@ export async function updatePurchaseOrder(input: {
   id: string
   po_number: string
   supplier_id: string
+  currency?: string
   order_date: string
   expected_delivery_date: string | null
   delivery_address_id: string | null
@@ -150,6 +153,7 @@ export async function updatePurchaseOrder(input: {
     .update({
       po_number:              input.po_number.trim(),
       supplier_id:            input.supplier_id,
+      currency:               (input.currency ?? 'NZD').toUpperCase(),
       order_date:             input.order_date,
       expected_delivery_date: input.expected_delivery_date,
       delivery_address_id:    input.delivery_address_id,

@@ -30,12 +30,12 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
 
   const [{ data: po }, { data: lines }, settings] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('po_number, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, supplier_id')
+      .select('po_number, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, supplier_id, currency')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
         po_number: string; status: string; order_date: string; expected_delivery_date: string | null;
         delivery_address_id: string | null; delivery_notes: string | null;
-        notes: string | null; supplier_id: string;
+        notes: string | null; supplier_id: string; currency: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
       .select('id, ingredient_id, product_id, description, quantity_ordered, unit_cost, unit_of_measure, notes')
@@ -222,7 +222,7 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
           </tbody>
           <tfoot>
             <tr className="text-[12px]">
-              <td colSpan={4} className="px-2 py-2 text-right font-semibold">Total (NZD ex-GST)</td>
+              <td colSpan={4} className="px-2 py-2 text-right font-semibold">Total ({po.currency ?? 'NZD'} ex-GST)</td>
               <td className="px-2 py-2 text-right tabular-nums font-bold">{fmtMoney(subtotal)}</td>
             </tr>
           </tfoot>
