@@ -138,6 +138,8 @@ interface IngredientPayload {
   description: string | null
   is_organic: boolean
   is_active: boolean
+  // Supplier's own SKU/code for this ingredient (migration 016)
+  supplier_sku_code: string | null
   // Original Order baseline (migration 018)
   original_order_qty:   number | null
   original_order_date:  string | null
@@ -167,6 +169,7 @@ function buildPayloadFromForm(
     description:        str(formData.get('description')),
     is_organic:         (formData.get('is_organic') as string) !== 'false',
     is_active:          true,
+    supplier_sku_code:  str(formData.get('supplier_sku_code')),
     original_order_qty:   parseNumeric(formData.get('original_order_qty')),
     original_order_date:  str(formData.get('original_order_date')),
     original_order_notes: str(formData.get('original_order_notes')),
