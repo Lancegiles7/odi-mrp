@@ -208,7 +208,7 @@ export function IngredientForm({
         />
         <div>
           <label htmlFor="supplier_sku_code" className="block text-sm font-medium text-gray-700 mb-1.5">
-            Supplier code
+            Supplier SKU code
             <span className="ml-1 text-xs text-gray-400">(the supplier&apos;s own SKU for this ingredient)</span>
           </label>
           <input
