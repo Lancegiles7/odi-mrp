@@ -47,6 +47,7 @@ export default async function DeliveryAddressesPage() {
               <th className="text-left px-3 py-2 font-medium w-[60px]">Country</th>
               <th className="text-left px-3 py-2 font-medium w-[100px]">Default</th>
               <th className="text-left px-3 py-2 font-medium w-[80px]">Status</th>
+              <th className="text-right px-3 py-2 font-medium w-[60px]"></th>
             </tr>
           </thead>
           <tbody>
@@ -71,10 +72,13 @@ export default async function DeliveryAddressesPage() {
                     ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Active</span>
                     : <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Inactive</span>}
                 </td>
+                <td className="px-3 py-2 text-right">
+                  <Link href={`/delivery-addresses/${a.id}`} className="text-xs text-blue-600 hover:underline font-medium">Edit</Link>
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500">No saved addresses yet.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-500">No saved addresses yet.</td></tr>
             )}
           </tbody>
         </table>

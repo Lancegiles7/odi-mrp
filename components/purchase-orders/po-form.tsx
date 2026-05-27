@@ -215,7 +215,7 @@ export function POForm(props: POFormProps) {
 
   function onDelete() {
     if (!props.poId) return
-    if (!confirm('Delete this draft PO? This cannot be undone.')) return
+    if (!confirm(`Permanently delete PO ${poNumber}? This cannot be undone. (Blocked if any stock receipts have been recorded against it.)`)) return
     setError(null)
     start(async () => {
       const res = await deleteDraftPo(props.poId!)
@@ -490,15 +490,13 @@ export function POForm(props: POFormProps) {
                   Cancel PO
                 </button>
               )}
-              {isDraft && (
-                <button
-                  disabled={pending}
-                  onClick={onDelete}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-white text-red-600 disabled:opacity-50"
-                >
-                  Delete draft
-                </button>
-              )}
+              <button
+                disabled={pending}
+                onClick={onDelete}
+                className="w-full px-3 py-1.5 text-xs border border-red-300 rounded-md bg-white hover:bg-red-50 text-red-700 disabled:opacity-50"
+              >
+                {isDraft ? 'Delete draft' : 'Delete PO'}
+              </button>
             </div>
           )}
         </div>

@@ -223,14 +223,44 @@ export async function setPoStatus(id: string, status: POStatus): Promise<{ ok: b
 }
 
 export async function deleteDraftPo(id: string): Promise<{ ok: boolean; error?: string }> {
+  // Retained as a thin alias for backwards compatibility with old call sites.
+  return deletePurchaseOrder(id)
+}
+
+/**
+ * Delete a PO at any status, as long as no stock movements reference its lines.
+ * - draft / submitted / cancelled → deletable (lines cascade-delete by FK)
+ * - partially_received / received → blocked, since stock_movements have already
+ *   adjusted inventory. User must reverse the stock adjustment first.
+ */
+export async function deletePurchaseOrder(id: string): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
 
   const { data: existing } = await supabase
-    .from('purchase_orders').select('status').eq('id', id).maybeSingle() as { data: { status: POStatus } | null }
-  if (existing?.status !== 'draft') return { ok: false, error: 'Only drafts can be deleted.' }
+    .from('purchase_orders').select('po_number, status').eq('id', id).maybeSingle() as { data: { po_number: string; status: POStatus } | null }
+  if (!existing) return { ok: false, error: 'PO not found' }
 
+  // Find line IDs first so we can check for stock movement references
+  const { data: lines } = await supabase
+    .from('purchase_order_lines').select('id').eq('purchase_order_id', id) as { data: Array<{ id: string }> | null }
+  const lineIds = (lines ?? []).map((l) => l.id)
+
+  if (lineIds.length > 0) {
+    const { count } = await supabase
+      .from('stock_movements')
+      .select('id', { count: 'exact', head: true })
+      .in('purchase_order_line_id', lineIds)
+    if ((count ?? 0) > 0) {
+      return {
+        ok: false,
+        error: `Cannot delete: ${count} stock movement${count === 1 ? '' : 's'} reference${count === 1 ? 's' : ''} this PO's lines (inventory has already been adjusted). Reverse the receipts first, or cancel the PO and leave it in place for audit history.`,
+      }
+    }
+  }
+
+  // Lines cascade-delete via FK ON DELETE CASCADE (migration 001).
   const { error } = await supabase.from('purchase_orders').delete().eq('id', id)
   if (error) return { ok: false, error: error.message }
 
