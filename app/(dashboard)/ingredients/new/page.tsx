@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { createIngredient } from '../actions'
 import { IngredientForm } from '@/components/ingredients/ingredient-form'
+import { getAppSettings } from '@/lib/settings'
 
 export const metadata: Metadata = {
   title: 'Add Ingredient',
@@ -20,11 +21,14 @@ interface PageProps {
 
 export default async function NewIngredientPage({ searchParams }: PageProps) {
   const supabase = createClient()
-  const { data: suppliers } = await supabase
-    .from('suppliers')
-    .select('id, code, name, contact_name, email, phone, country_of_origin, country_of_purchase, currency')
-    .eq('is_active', true)
-    .order('name', { ascending: true })
+  const [{ data: suppliers }, settings] = await Promise.all([
+    supabase
+      .from('suppliers')
+      .select('id, code, name, contact_name, email, phone, country_of_origin, country_of_purchase, currency')
+      .eq('is_active', true)
+      .order('name', { ascending: true }),
+    getAppSettings(),
+  ])
 
   const errorKey = searchParams.error
   const errorMessage = errorKey ? ERROR_MESSAGES[errorKey] ?? 'An error occurred.' : null
@@ -58,6 +62,7 @@ export default async function NewIngredientPage({ searchParams }: PageProps) {
         suppliers={suppliers ?? []}
         errorMessage={errorMessage}
         returnTo={returnTo}
+        fxRates={settings.fx_rates}
       />
     </div>
   )

@@ -10,7 +10,12 @@ export const DEFAULT_FX_RATE = 1.2
 export const DEFAULT_GST_NZ = 0.15
 export const DEFAULT_GST_AU = 0.10
 
-export type SettingsSnapshot = Pick<AppSettings, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct' | 'planning_start_month' | 'updated_at' | 'updated_by'>
+export type FxRatesJson = { NZD: number; AUD: number; USD: number; EUR: number; GBP: number }
+export const DEFAULT_FX_RATES: FxRatesJson = { NZD: 1.0, AUD: 1.0833, USD: 1.62, EUR: 1.78, GBP: 2.05 }
+
+export type SettingsSnapshot = Pick<AppSettings, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct' | 'planning_start_month' | 'updated_at' | 'updated_by'> & {
+  fx_rates: FxRatesJson
+}
 
 /**
  * Read the settings singleton. Returns DB defaults if the row is
@@ -21,9 +26,9 @@ export async function getAppSettings(): Promise<SettingsSnapshot> {
   const supabase = createClient()
   const { data } = await supabase
     .from('app_settings')
-    .select('fx_rate, gst_nz_pct, gst_au_pct, planning_start_month, updated_at, updated_by')
+    .select('fx_rate, gst_nz_pct, gst_au_pct, planning_start_month, updated_at, updated_by, fx_rates')
     .eq('id', 1)
-    .maybeSingle()
+    .maybeSingle() as { data: (SettingsSnapshot & { fx_rates: FxRatesJson | null }) | null }
 
   if (!data) {
     return {
@@ -33,9 +38,10 @@ export async function getAppSettings(): Promise<SettingsSnapshot> {
       planning_start_month: null,
       updated_at: new Date().toISOString(),
       updated_by: null,
+      fx_rates: DEFAULT_FX_RATES,
     }
   }
-  return data
+  return { ...data, fx_rates: { ...DEFAULT_FX_RATES, ...(data.fx_rates ?? {}) } }
 }
 
 /**

@@ -140,6 +140,9 @@ interface IngredientPayload {
   is_active: boolean
   // Supplier's own SKU/code for this ingredient (migration 016)
   supplier_sku_code: string | null
+  // Currency + FX (migration 023)
+  currency: string
+  fx_rate_override: number | null
   // Original Order baseline (migration 018)
   original_order_qty:   number | null
   original_order_date:  string | null
@@ -148,13 +151,40 @@ interface IngredientPayload {
   current_soh_as_of:    string | null
 }
 
-function buildPayloadFromForm(
+const SUPPORTED_CURRENCIES_SET = new Set(['NZD', 'AUD', 'USD', 'EUR', 'GBP'])
+
+async function buildPayloadFromForm(
   formData: FormData,
   supplierId: string | null,
   supplierName: string | null,
-): IngredientPayload {
+): Promise<IngredientPayload> {
   const sku    = ((formData.get('sku_code') as string) ?? '').trim().toUpperCase()
   const name   = ((formData.get('name') as string) ?? '').trim()
+  const price   = parseNumeric(formData.get('price'))
+  const freight = parseNumeric(formData.get('freight'))
+  const fxOverride = parseNumeric(formData.get('fx_rate_override'))
+  const currencyRaw = ((formData.get('currency') as string) ?? 'NZD').trim().toUpperCase()
+  const currency = SUPPORTED_CURRENCIES_SET.has(currencyRaw) ? currencyRaw : 'NZD'
+
+  // Resolve FX: per-ingredient override beats settings table
+  let fx = 1
+  if (currency !== 'NZD') {
+    if (fxOverride != null && fxOverride > 0) {
+      fx = fxOverride
+    } else {
+      const { getAppSettings } = await import('@/lib/settings')
+      const s = await getAppSettings()
+      fx = s.fx_rates[currency as keyof typeof s.fx_rates] ?? 1
+    }
+  }
+
+  // Authoritative total_loaded_cost = price × FX + freight (NZD)
+  // The form posts a computed value too but we recompute server-side to be safe.
+  const loadedNzd = (price ?? 0) * fx + (freight ?? 0)
+  const total_loaded_cost = price == null && freight == null
+    ? parseNumeric(formData.get('total_loaded_cost'))
+    : Number(loadedNzd.toFixed(4))
+
   return {
     sku_code:           sku,
     name,
@@ -162,14 +192,16 @@ function buildPayloadFromForm(
     supplier_id:        supplierId,
     lead_time:          str(formData.get('lead_time')),
     status:             ((formData.get('status') as IngredientStatus) || 'confirmed'),
-    price:              parseNumeric(formData.get('price')),
-    freight:            parseNumeric(formData.get('freight')),
-    total_loaded_cost:  parseNumeric(formData.get('total_loaded_cost')),
+    price,
+    freight,
+    total_loaded_cost,
     unit_of_measure:    str(formData.get('unit_of_measure')),
     description:        str(formData.get('description')),
     is_organic:         (formData.get('is_organic') as string) !== 'false',
     is_active:          true,
     supplier_sku_code:  str(formData.get('supplier_sku_code')),
+    currency,
+    fx_rate_override:   fxOverride,
     original_order_qty:   parseNumeric(formData.get('original_order_qty')),
     original_order_date:  str(formData.get('original_order_date')),
     original_order_notes: str(formData.get('original_order_notes')),
@@ -224,7 +256,7 @@ export async function createIngredient(formData: FormData) {
   const createdBy: string | null = profile ? user.id : null
 
   const { supplierId, supplierName } = await resolveSupplierId(supabase, formData, createdBy)
-  const payload = buildPayloadFromForm(formData, supplierId, supplierName)
+  const payload = await buildPayloadFromForm(formData, supplierId, supplierName)
 
   if (!payload.sku_code || !payload.name) {
     redirect('/ingredients/new?error=missing_fields')
@@ -262,7 +294,7 @@ export async function updateIngredient(id: string, formData: FormData) {
   const changedBy: string | null = profile ? user.id : null
 
   const { supplierId, supplierName } = await resolveSupplierId(supabase, formData, changedBy)
-  const payload = buildPayloadFromForm(formData, supplierId, supplierName)
+  const payload = await buildPayloadFromForm(formData, supplierId, supplierName)
 
   if (!payload.sku_code || !payload.name) {
     redirect(`/ingredients/${id}/edit?error=missing_fields`)

@@ -40,10 +40,24 @@ export async function updateSettings(formData: FormData) {
   const gstNzPct  = gstNzRaw != null ? Math.max(0, Math.min(1, gstNzRaw / 100)) : 0
   const gstAuPct  = gstAuRaw != null ? Math.max(0, Math.min(1, gstAuRaw / 100)) : 0
 
+  // Loaded-cost FX rates JSON (NZD always = 1, others editable)
+  const fxAud = parseRate(formData.get('fx_rate_aud'))
+  const fxUsd = parseRate(formData.get('fx_rate_usd'))
+  const fxEur = parseRate(formData.get('fx_rate_eur'))
+  const fxGbp = parseRate(formData.get('fx_rate_gbp'))
+  const fxRates = {
+    NZD: 1.0,
+    AUD: fxAud != null && fxAud > 0 ? fxAud : 1.0833,
+    USD: fxUsd != null && fxUsd > 0 ? fxUsd : 1.62,
+    EUR: fxEur != null && fxEur > 0 ? fxEur : 1.78,
+    GBP: fxGbp != null && fxGbp > 0 ? fxGbp : 2.05,
+  }
+
   const { error } = await supabase
     .from('app_settings')
     .update({
       fx_rate:    fxRate,
+      fx_rates:   fxRates,
       gst_nz_pct: gstNzPct,
       gst_au_pct: gstAuPct,
       updated_by: profile?.id ?? null,

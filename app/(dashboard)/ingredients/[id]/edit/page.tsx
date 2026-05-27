@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { updateIngredient } from '../../actions'
 import { IngredientForm } from '@/components/ingredients/ingredient-form'
 import type { Ingredient } from '@/lib/types/database.types'
+import { getAppSettings } from '@/lib/settings'
 
 export const metadata: Metadata = {
   title: 'Edit Ingredient',
@@ -24,7 +25,7 @@ interface PageProps {
 export default async function EditIngredientPage({ params, searchParams }: PageProps) {
   const supabase = createClient()
 
-  const [{ data: ingredient }, { data: suppliers }] = await Promise.all([
+  const [{ data: ingredient }, { data: suppliers }, settings] = await Promise.all([
     supabase
       .from('ingredients')
       .select('*')
@@ -35,6 +36,7 @@ export default async function EditIngredientPage({ params, searchParams }: PageP
       .select('id, code, name, contact_name, email, phone, country_of_origin, country_of_purchase, currency')
       .eq('is_active', true)
       .order('name', { ascending: true }),
+    getAppSettings(),
   ])
 
   if (!ingredient) notFound()
@@ -66,6 +68,7 @@ export default async function EditIngredientPage({ params, searchParams }: PageP
         suppliers={suppliers ?? []}
         action={updateWithId}
         errorMessage={errorMessage}
+        fxRates={settings.fx_rates}
       />
     </div>
   )

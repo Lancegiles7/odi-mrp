@@ -101,6 +101,21 @@ export default async function SettingsPage({ searchParams }: PageProps) {
 
         <div className="bg-white rounded-lg border border-gray-200">
           <div className="p-5 border-b border-gray-100">
+            <h2 className="text-sm font-semibold">Loaded-cost FX rates</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Used by ingredients + packaging when computing loaded NZD cost from a non-NZD supplier price. Each value is the multiplier to convert <em>from</em> the listed currency <em>to</em> NZD (e.g. AUD = 1.0833 means 1 AUD = 1.0833 NZD).
+            </p>
+          </div>
+          <div className="p-5 grid grid-cols-2 gap-4">
+            <FxRateInput label="AUD → NZD" name="fx_rate_aud" value={settings.fx_rates.AUD} />
+            <FxRateInput label="USD → NZD" name="fx_rate_usd" value={settings.fx_rates.USD} />
+            <FxRateInput label="EUR → NZD" name="fx_rate_eur" value={settings.fx_rates.EUR} />
+            <FxRateInput label="GBP → NZD" name="fx_rate_gbp" value={settings.fx_rates.GBP} />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200">
+          <div className="p-5 border-b border-gray-100">
             <h2 className="text-sm font-semibold">Tax / GST</h2>
             <p className="text-xs text-gray-500 mt-1">
               Used to strip GST from RRP when calculating COS %.
@@ -158,5 +173,22 @@ export default async function SettingsPage({ searchParams }: PageProps) {
         </div>
       </form>
     </div>
+  )
+}
+
+function FxRateInput({ label, name, value }: { label: string; name: string; value: number }) {
+  return (
+    <label className="block text-sm">
+      <span className="text-gray-600 text-xs font-medium">{label}</span>
+      <input
+        name={name}
+        type="number"
+        step="0.0001"
+        min="0"
+        required
+        defaultValue={Number(value).toFixed(4)}
+        className="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-900"
+      />
+    </label>
   )
 }
