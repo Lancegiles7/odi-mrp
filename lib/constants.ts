@@ -93,6 +93,8 @@ export const PACKAGING_TYPES = [
   { code: 'BOX',          label: 'Box' },
   { code: 'POUCH_SNACKS', label: 'Pouch — snacks' },
   { code: 'POUCH',        label: 'Pouch' },
+  { code: 'SACHET',       label: 'Sachet' },
+  { code: 'TUB',          label: 'Tub' },
   { code: 'SRT',          label: 'SRT' },
 ] as const
 
@@ -116,6 +118,8 @@ export const PACKAGING_TYPE_COLOURS: Record<string, string> = {
   BOX:          'bg-emerald-100 text-emerald-700',
   POUCH_SNACKS: 'bg-purple-100 text-purple-700',
   POUCH:        'bg-amber-100 text-amber-700',
+  SACHET:       'bg-teal-100 text-teal-700',
+  TUB:          'bg-orange-100 text-orange-700',
   SRT:          'bg-rose-100 text-rose-700',
   OTHER:        'bg-gray-100 text-gray-700',
 }
