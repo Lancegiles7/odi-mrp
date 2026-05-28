@@ -177,10 +177,20 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
           </div>
           <div>
             <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">Issued by</div>
-            <div className="text-[13px] font-semibold">{issuer?.name ?? 'Atma Okan'}</div>
-            {(issuer?.title ?? 'Operations Manager') && <div className="text-[11px] text-gray-700">{issuer?.title ?? 'Operations Manager'}</div>}
-            {(issuer?.phone ?? '+64 27 275 4329') && <div className="text-[11px] text-gray-700">{issuer?.phone ?? '+64 27 275 4329'}</div>}
-            {(issuer?.email ?? 'orders@odinutrition.com') && <div className="text-[11px] text-gray-700">{issuer?.email ?? 'orders@odinutrition.com'}</div>}
+            {(() => {
+              // Show the chosen issuer's fields as-is (blank fields stay blank).
+              // Only fall back to hardcoded Atma values if no issuer was found at all
+              // (e.g. legacy PO with no issuer_id and no default in the table).
+              const i = issuer ?? { name: 'Atma Okan', title: 'Operations Manager', phone: '+64 27 275 4329', email: 'orders@odinutrition.com' }
+              return (
+                <>
+                  <div className="text-[13px] font-semibold">{i.name}</div>
+                  {i.title && <div className="text-[11px] text-gray-700">{i.title}</div>}
+                  {i.phone && <div className="text-[11px] text-gray-700">{i.phone}</div>}
+                  {i.email && <div className="text-[11px] text-gray-700">{i.email}</div>}
+                </>
+              )
+            })()}
           </div>
         </div>
 
