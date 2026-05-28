@@ -91,6 +91,12 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             <DeleteProductButton productId={params.id} productName={product.name} />
           )}
           <Link
+            href={`/products/${params.id}/print`}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Export PDF
+          </Link>
+          <Link
             href={`/products/${params.id}/edit`}
             className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800"
           >

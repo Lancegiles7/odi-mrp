@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mockup · Product / BOM cost sheet PDF</title>
+<style>
+  :root { --odi-green:#5a8a3a; --odi-green-dark:#2f4d1f; --ink:#1f2937; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#eef0f1; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
+
+  /* Toolbar — hidden when printing */
+  .toolbar {
+    position:sticky; top:0; z-index:10; display:flex; align-items:center; justify-content:space-between;
+    background:#fff; border-bottom:1px solid #e5e7eb; padding:10px 20px; font-size:12px; color:#6b7280;
+  }
+  .toolbar .btn {
+    background:#111827; color:#fff; border:none; border-radius:6px; padding:7px 12px; font-size:12px; cursor:pointer;
+  }
+  .toolbar .btn.secondary { background:#fff; color:#111827; border:1px solid #d1d5db; }
+  .note { max-width:794px; margin:16px auto 0; padding:10px 14px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; font-size:12px; color:#92400e; }
+
+  /* The A4 page itself */
+  .pdf-page {
+    width:794px; min-height:1123px; background:#fff; margin:24px auto 48px; padding:56px 64px;
+    box-shadow:0 4px 24px rgba(0,0,0,.08); font-size:12px; line-height:1.55;
+  }
+
+  /* Letterhead */
+  .letterhead { display:flex; align-items:flex-start; justify-content:space-between; padding-bottom:20px; border-bottom:2px solid var(--odi-green); }
+  .letterhead img { height:60px; width:auto; }
+  .company { text-align:right; font-size:10px; color:#4b5563; line-height:1.35; }
+  .company .name { font-weight:600; color:#111827; font-size:11px; }
+
+  .title-row { display:flex; align-items:flex-end; justify-content:space-between; margin:24px 0; }
+  .title-row h1 { margin:0; font-size:28px; font-weight:300; letter-spacing:.5px; color:var(--odi-green-dark); }
+  .title-row .sku-label { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#6b7280; }
+  .title-row .sku { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:16px; font-weight:600; }
+
+  .badges { margin-top:6px; }
+  .badge { display:inline-block; font-size:10px; padding:2px 8px; border-radius:4px; margin-right:6px; }
+  .badge.type { background:#f3f4f6; color:#374151; }
+  .badge.active { background:#ecfdf5; color:#047857; }
+
+  /* Overview grid */
+  .section-label { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:#6b7280; margin:0 0 8px; }
+  .overview { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px 24px; margin:22px 0; }
+  .overview dt { font-size:9px; text-transform:uppercase; letter-spacing:.05em; color:#9ca3af; }
+  .overview dd { margin:1px 0 0; font-size:12px; font-weight:600; }
+  .overview .wide { grid-column:span 2; }
+
+  /* Cost summary tiles */
+  .tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:6px 0 4px; }
+  .tile { border-radius:6px; padding:9px 11px; background:#f9fafb; }
+  .tile.dark { background:#111827; color:#fff; }
+  .tile.accent { background:#fffbeb; color:#92400e; }
+  .tile.positive { background:#ecfdf5; color:#065f46; }
+  .tile .t-label { font-size:9px; text-transform:uppercase; letter-spacing:.06em; font-weight:600; opacity:.75; }
+  .tile .t-value { font-size:17px; font-weight:700; margin-top:2px; }
+  .tile .t-sub { font-size:9px; opacity:.7; margin-top:1px; }
+
+  /* BOM table */
+  table { width:100%; border-collapse:collapse; }
+  .bom thead th { background:#f0f4ec; color:var(--odi-green-dark); font-size:9px; text-transform:uppercase; letter-spacing:.05em; font-weight:700; padding:6px 8px; text-align:right; }
+  .bom thead th.l { text-align:left; }
+  .bom tbody td { border-bottom:1px solid #f1f1f1; padding:6px 8px; text-align:right; font-variant-numeric:tabular-nums; }
+  .bom tbody td.l { text-align:left; }
+  .bom tbody .name { font-weight:600; color:#111827; }
+  .bom tbody .skucell { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px; color:#6b7280; }
+  .tag-nonorg { font-size:8px; background:#fff7ed; color:#c2410c; padding:1px 5px; border-radius:3px; margin-left:5px; }
+
+  /* Cost build-up footer block */
+  .buildup { margin-top:18px; border-top:1px solid #e5e7eb; padding-top:14px; }
+  .buildup .row { display:flex; justify-content:space-between; padding:3px 0; }
+  .buildup .row.muted { color:#6b7280; font-size:11px; }
+  .buildup .row.sub { font-weight:600; border-top:1px solid #eee; margin-top:4px; padding-top:6px; }
+  .buildup .pkg-items { margin:2px 0 4px; padding-left:12px; border-left:2px solid #e5e7eb; }
+  .buildup .pkg-items .pi { display:flex; justify-content:space-between; font-size:10px; color:#6b7280; padding:2px 0; }
+  .buildup .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 40px; }
+  .buildup .base { display:flex; justify-content:space-between; border-top:1px solid #d1d5db; margin-top:8px; padding-top:8px; font-size:15px; font-weight:700; }
+  .buildup .fx { display:flex; justify-content:space-between; padding-top:4px; font-size:13px; font-weight:600; color:var(--odi-green-dark); }
+
+  .docfooter { margin-top:40px; padding-top:10px; border-top:1px solid #e5e7eb; font-size:9px; color:#9ca3af; }
+
+  @media print {
+    body { background:#fff; }
+    .toolbar, .note { display:none !important; }
+    .pdf-page { box-shadow:none; margin:0; width:100%; padding:24mm 18mm; }
+    @page { margin:0; size:A4; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <div>Preview · Product cost sheet — FG-QPB-18 &nbsp;(MOCKUP)</div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn secondary">← Back to product</button>
+      <button class="btn" onclick="window.print()">⤓ Save as PDF / print</button>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Mockup only.</strong> Sample data shown for layout. The real PDF pulls live figures from the product
+    and mirrors exactly what the on-screen Cost summary + BOM show. This page prints to A4 via the browser
+    (no new software), identical to how your Purchase Order PDF works.
+  </div>
+
+  <div class="pdf-page">
+
+    <!-- Letterhead -->
+    <div class="letterhead">
+      <img src="public/odi-logo@2x.png" alt="Odi" onerror="this.style.display='none'" />
+      <div class="company">
+        <div class="name">Odi Nutrition Ltd</div>
+        <div>NZBN: 9429000000000</div>
+        <div>GST: 123-456-789</div>
+        <div style="margin-top:6px;">12 Example Road, Auckland 1010, NZ</div>
+        <div style="margin-top:3px;">www.odinutrition.com</div>
+      </div>
+    </div>
+
+    <!-- Title -->
+    <div class="title-row">
+      <div>
+        <h1>PRODUCT COST SHEET</h1>
+        <div class="badges">
+          <span class="badge type">Quinoa Puffs</span>
+          <span class="badge active">Active</span>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div class="sku-label">SKU code</div>
+        <div class="sku">FG-QPB-18</div>
+      </div>
+    </div>
+
+    <div style="font-size:16px; font-weight:600; margin-bottom:4px;">Quinoa Puff Berry</div>
+
+    <!-- Overview -->
+    <dl class="overview">
+      <div><dt>Product type</dt><dd>Quinoa Puffs</dd></div>
+      <div><dt>Size</dt><dd>18 g</dd></div>
+      <div><dt>Serving size</dt><dd>18 g</dd></div>
+      <div><dt>RRP (inc GST)</dt><dd>$4.50</dd></div>
+      <div class="wide"><dt>Hero call-out</dt><dd>High-protein berry puffs</dd></div>
+      <div class="wide"><dt>FX</dt><dd>×1.0800 &nbsp;·&nbsp; applied to NZ</dd></div>
+    </dl>
+
+    <!-- Cost summary tiles -->
+    <p class="section-label">Cost summary &nbsp;·&nbsp; RRP ex-GST NZ $3.91 / AU $4.09</p>
+    <div class="tiles">
+      <div class="tile"><div class="t-label">Ingredient total</div><div class="t-value">$0.82</div><div class="t-sub">+1.0% wastage</div></div>
+      <div class="tile"><div class="t-label">Base cost</div><div class="t-value">$1.94</div><div class="t-sub">Ing + pkg + toll + margin + task + freight</div></div>
+      <div class="tile dark"><div class="t-label">NZ grand total</div><div class="t-value">$2.10</div><div class="t-sub">×1.0800 FX</div></div>
+      <div class="tile"><div class="t-label">AU grand total</div><div class="t-value">$1.94</div><div class="t-sub">Never has FX</div></div>
+    </div>
+    <div class="tiles">
+      <div class="tile accent"><div class="t-label">COS NZ</div><div class="t-value">53.7%</div><div class="t-sub">$2.10 of $3.91 ex-GST</div></div>
+      <div class="tile positive"><div class="t-label">GP NZ</div><div class="t-value">$1.81</div><div class="t-sub">46.3% of ex-GST RRP</div></div>
+      <div class="tile accent"><div class="t-label">COS AU</div><div class="t-value">47.4%</div><div class="t-sub">$1.94 of $4.09 ex-GST</div></div>
+      <div class="tile positive"><div class="t-label">GP AU</div><div class="t-value">$2.15</div><div class="t-sub">52.6% of ex-GST RRP</div></div>
+    </div>
+
+    <!-- BOM table -->
+    <p class="section-label" style="margin-top:22px;">Bill of materials &nbsp;·&nbsp; 5 ingredients · Version 3 (active)</p>
+    <table class="bom">
+      <thead>
+        <tr>
+          <th class="l">Ingredient</th>
+          <th class="l">Ing. SKU</th>
+          <th>g</th><th>kg</th><th>% of wt</th><th>Serve (g)</th><th>$/kg</th><th>$/unit</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="l"><span class="name">Quinoa Puff Base</span></td>
+          <td class="l skucell">RM-QPB-001</td>
+          <td>12.0</td><td>0.0120</td><td>66.7%</td><td>12.00</td><td>$32.00</td><td>$0.38</td>
+        </tr>
+        <tr>
+          <td class="l"><span class="name">Freeze-dried Berry Blend</span><span class="tag-nonorg">Non-Organic</span></td>
+          <td class="l skucell">RM-BER-014</td>
+          <td>3.0</td><td>0.0030</td><td>16.7%</td><td>3.00</td><td>$103.00</td><td>$0.31</td>
+        </tr>
+        <tr>
+          <td class="l"><span class="name">Coconut Sugar</span></td>
+          <td class="l skucell">RM-SUG-007</td>
+          <td>2.0</td><td>0.0020</td><td>11.1%</td><td>2.00</td><td>$9.50</td><td>$0.02</td>
+        </tr>
+        <tr>
+          <td class="l"><span class="name">Natural Berry Flavour</span></td>
+          <td class="l skucell">RM-FLV-022</td>
+          <td>0.8</td><td>0.0008</td><td>4.4%</td><td>0.80</td><td>$120.00</td><td>$0.10</td>
+        </tr>
+        <tr>
+          <td class="l"><span class="name">Sea Salt</span></td>
+          <td class="l skucell">RM-SLT-003</td>
+          <td>0.2</td><td>0.0002</td><td>1.1%</td><td>0.20</td><td>$4.00</td><td>$0.00</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Cost build-up -->
+    <div class="buildup">
+      <div class="row muted"><span>+ Contingency / wastage (1.0%)</span><span>$0.01</span></div>
+      <div class="row sub"><span>Ingredients subtotal (per pack) · 18.00 g</span><span>$0.82</span></div>
+
+      <div style="margin-top:10px;">
+        <div class="row" style="font-weight:600;"><span>Packaging</span><span>$0.90</span></div>
+        <div class="pkg-items">
+          <div class="pi"><span>· Pouch — Quinoa Puff Berry Pouch (1 per pack × $0.7700)</span><span>$0.77</span></div>
+          <div class="pi"><span>· SRT — Quinoa Puff Berry SRT (7 per SRT (= 0.1429 per pack) × $0.9100)</span><span>$0.13</span></div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="row muted"><span>Toll</span><span style="color:var(--ink); font-weight:600;">$0.22</span></div>
+        <div class="row muted"><span>Margin</span><span>—</span></div>
+        <div class="row muted"><span>Task / other</span><span style="color:var(--ink); font-weight:600;">$0.00</span></div>
+        <div class="row muted"><span>Freight</span><span>—</span></div>
+      </div>
+
+      <div class="base"><span>Base cost (AU total)</span><span>$1.94</span></div>
+      <div class="fx"><span>+ FX × 1.0800 → NZ total</span><span>$2.10</span></div>
+    </div>
+
+    <div class="docfooter">
+      Odi Nutrition Ltd · NZBN 9429000000000 · GST 123-456-789 · Generated 29 May 2026 ·
+      This cost sheet is computer-generated and for internal use.
+    </div>
+
+  </div>
+
+</body>
+</html>
