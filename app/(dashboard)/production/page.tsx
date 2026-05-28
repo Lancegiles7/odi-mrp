@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import {
   rollingMonths, indexDemand, indexProduction,
   getGrandTotal, getProductionCell, resolveOpeningStock, monthLabel,
@@ -33,18 +34,22 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
-  const [{ data: products }, { data: demand }, { data: production }, { data: inventory }] = await Promise.all([
+  const [{ data: products }, demand, { data: production }, { data: inventory }] = await Promise.all([
     supabase
       .from('products')
       .select('id, sku_code, name, manufacturer, opening_stock_override, is_active')
       .is('deleted_at', null)
       .order('manufacturer', { ascending: true, nullsFirst: false })
       .order('name', { ascending: true }) as unknown as Promise<{ data: ProductRow[] | null }>,
-    supabase
-      .from('demand_forecasts')
-      .select('product_id, year_month, channel, units, is_edited')
-      .gte('year_month', firstMonth)
-      .lte('year_month', lastMonth) as unknown as Promise<{ data: DemandForecast[] | null }>,
+    fetchAllRows<DemandForecast>((from, to) =>
+      supabase
+        .from('demand_forecasts')
+        .select('product_id, year_month, channel, units, is_edited')
+        .gte('year_month', firstMonth)
+        .lte('year_month', lastMonth)
+        .order('product_id').order('year_month').order('channel')
+        .range(from, to) as unknown as PromiseLike<{ data: DemandForecast[] | null; error: { message: string } | null }>,
+    ),
     supabase
       .from('production_plans')
       .select('product_id, year_month, units_planned')
@@ -56,7 +61,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   ])
 
   const allProducts = products ?? []
-  const demandIdx = indexDemand(demand ?? [])
+  const demandIdx = indexDemand(demand)
   const prodIdx   = indexProduction(production ?? [])
 
   // inventory_balances is keyed by ingredient_id — we don't currently have product-level stock.

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { DemandChannel, ProductGroup } from '@/lib/types/database.types'
 
 const PRODUCT_GROUP_MAP: Record<string, ProductGroup | null> = {
@@ -117,17 +118,20 @@ export async function commitDemandImport(payload: DemandImportPayload): Promise<
     }
   }
 
-  // 3. Load existing demand rows to know which cells are "edited" (preserve them)
-  const { data: existingDemand } = await supabase
-    .from('demand_forecasts')
-    .select('product_id, year_month, channel, is_edited') as unknown as {
-      data: Array<{ product_id: string; year_month: string; channel: string; is_edited: boolean }> | null
-    }
+  // 3. Load existing edited cells so we never overwrite a manual edit.
+  //    Paged + filtered to is_edited so the read isn't truncated at
+  //    PostgREST's per-request row cap (which would silently let an
+  //    import clobber preserved edits beyond the first ~1000 rows).
+  const existingDemand = await fetchAllRows<{ product_id: string; year_month: string; channel: string; is_edited: boolean }>((from, to) =>
+    supabase
+      .from('demand_forecasts')
+      .select('product_id, year_month, channel, is_edited')
+      .eq('is_edited', true)
+      .order('product_id').order('year_month').order('channel')
+      .range(from, to) as unknown as PromiseLike<{ data: Array<{ product_id: string; year_month: string; channel: string; is_edited: boolean }> | null; error: { message: string } | null }>)
   const editedCells = new Set<string>()
-  for (const d of existingDemand ?? []) {
-    if (d.is_edited) {
-      editedCells.add(`${d.product_id}|${d.year_month.slice(0, 10)}|${d.channel}`)
-    }
+  for (const d of existingDemand) {
+    editedCells.add(`${d.product_id}|${d.year_month.slice(0, 10)}|${d.channel}`)
   }
 
   // 4. Build upsert payload, skipping edited cells.

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { rollingMonths, indexProduction, getProductionCell, indexDemand, getGrandTotal, monthLabel } from '@/lib/demand'
 import { getPlanningAnchor } from '@/lib/settings'
 import { aggregatePackagingDemand, hasAnyShortfall, type PackagingRow } from '@/lib/packaging-demand'
@@ -28,7 +29,7 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
 
   const [
     { data: products }, { data: packaging }, { data: suppliers },
-    { data: pp }, { data: production }, { data: demand },
+    { data: pp }, { data: production }, demand,
     { data: openPos }, { data: openPoLines },
   ] = await Promise.all([
     supabase.from('products').select('id, sku_code, name, product_type').is('deleted_at', null) as { data: Array<{ id: string; sku_code: string; name: string; product_type: string | null }> | null },
@@ -38,9 +39,12 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     supabase.from('production_plans')
       .select('product_id, year_month, units_planned')
       .gte('year_month', firstMonth).lte('year_month', lastMonth) as { data: Array<{ product_id: string; year_month: string; units_planned: number }> | null },
-    supabase.from('demand_forecasts')
-      .select('product_id, year_month, channel, units, is_edited')
-      .gte('year_month', firstMonth).lte('year_month', lastMonth) as { data: Array<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }> | null },
+    fetchAllRows<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }>((from, to) =>
+      supabase.from('demand_forecasts')
+        .select('product_id, year_month, channel, units, is_edited')
+        .gte('year_month', firstMonth).lte('year_month', lastMonth)
+        .order('product_id').order('year_month').order('channel')
+        .range(from, to) as unknown as PromiseLike<{ data: Array<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }> | null; error: { message: string } | null }>),
     supabase.from('purchase_orders')
       .select('id, po_number, status, expected_delivery_date')
       .in('status', ['submitted', 'partially_received'])

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
 import { rollingMonths, indexDemand, monthLabel } from '@/lib/demand'
 import { getPlanningAnchor } from '@/lib/settings'
@@ -26,21 +27,24 @@ export default async function DemandPage() {
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
-  const [{ data: products }, { data: demand }] = await Promise.all([
+  const [{ data: products }, demandRows] = await Promise.all([
     supabase
       .from('products')
       .select('id, sku_code, name, product_type, is_active')
       .is('deleted_at', null)
       .order('name', { ascending: true }) as unknown as Promise<{ data: ProductRow[] | null }>,
-    supabase
-      .from('demand_forecasts')
-      .select('product_id, year_month, channel, units, is_edited')
-      .gte('year_month', firstMonth)
-      .lte('year_month', lastMonth) as unknown as Promise<{ data: DemandForecast[] | null }>,
+    fetchAllRows<DemandForecast>((from, to) =>
+      supabase
+        .from('demand_forecasts')
+        .select('product_id, year_month, channel, units, is_edited')
+        .gte('year_month', firstMonth)
+        .lte('year_month', lastMonth)
+        .order('product_id').order('year_month').order('channel')
+        .range(from, to) as unknown as PromiseLike<{ data: DemandForecast[] | null; error: { message: string } | null }>,
+    ),
   ])
 
   const allProducts = products ?? []
-  const demandRows  = demand ?? []
   const idx = indexDemand(demandRows)
 
   // Build per-product data block for the client component

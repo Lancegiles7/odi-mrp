@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { Channel, EntityType } from '@/lib/budget-vs-actual'
 import { fyMonths, fyStartFor } from '@/lib/budget-vs-actual'
 
@@ -342,13 +343,20 @@ export async function snapshotBudgetForFY(fyStart: string): Promise<{ ok: boolea
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
-  // Pull demand forecasts (with channel) for all months in this FY
-  const { data: forecasts, error: fcErr } = await supabase
-    .from('demand_forecasts')
-    .select('product_id, year_month, channel, units')
-    .gte('year_month', firstMonth).lte('year_month', lastMonth) as
-    { data: Array<{ product_id: string; year_month: string; channel: string; units: number }> | null; error: { message: string } | null }
-  if (fcErr) return { ok: false, error: fcErr.message }
+  // Pull demand forecasts (with channel) for all months in this FY.
+  // Paged so the read isn't truncated at PostgREST's per-request row cap.
+  let forecasts: Array<{ product_id: string; year_month: string; channel: string; units: number }>
+  try {
+    forecasts = await fetchAllRows<{ product_id: string; year_month: string; channel: string; units: number }>((from, to) =>
+      supabase
+        .from('demand_forecasts')
+        .select('product_id, year_month, channel, units')
+        .gte('year_month', firstMonth).lte('year_month', lastMonth)
+        .order('product_id').order('year_month').order('channel')
+        .range(from, to) as unknown as PromiseLike<{ data: Array<{ product_id: string; year_month: string; channel: string; units: number }> | null; error: { message: string } | null }>)
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed to load demand forecasts' }
+  }
 
   // Map demand_forecasts.channel → bva_budget_snapshots.channel
   // (pipefill is region-agnostic on the demand side; for now route to NZ samples)

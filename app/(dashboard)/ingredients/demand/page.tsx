@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import {
   rollingMonths, indexDemand, indexProduction,
   getGrandTotal, getProductionCell, monthLabel,
@@ -32,7 +33,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
   const [
     { data: products }, { data: ingredients }, { data: suppliers },
     { data: boms }, { data: bomItems },
-    { data: demand }, { data: production },
+    demand, { data: production },
     { data: openPos }, { data: openPoLines },
   ] = await Promise.all([
     supabase.from('products')
@@ -51,9 +52,12 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       .eq('is_active', true) as unknown as Promise<{ data: Array<{ id: string; product_id: string; is_active: boolean }> | null }>,
     supabase.from('bom_items')
       .select('bom_id, ingredient_id, quantity_g') as unknown as Promise<{ data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number }> | null }>,
-    supabase.from('demand_forecasts')
-      .select('product_id, year_month, channel, units, is_edited')
-      .gte('year_month', firstMonth).lte('year_month', lastMonth) as unknown as Promise<{ data: Array<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }> | null }>,
+    fetchAllRows<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }>((from, to) =>
+      supabase.from('demand_forecasts')
+        .select('product_id, year_month, channel, units, is_edited')
+        .gte('year_month', firstMonth).lte('year_month', lastMonth)
+        .order('product_id').order('year_month').order('channel')
+        .range(from, to) as unknown as PromiseLike<{ data: Array<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }> | null; error: { message: string } | null }>),
     supabase.from('production_plans')
       .select('product_id, year_month, units_planned')
       .gte('year_month', firstMonth).lte('year_month', lastMonth) as unknown as Promise<{ data: Array<{ product_id: string; year_month: string; units_planned: number }> | null }>,
