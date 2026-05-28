@@ -89,7 +89,6 @@ const ADMIN_GROUP = {
   label: 'Admin',
   items: [
     { name: 'Settings',           href: '/settings' },
-    { name: 'Delivery addresses', href: '/delivery-addresses' },
     { name: 'Product trash',      href: '/products/trash' },
     { name: 'Users',              href: '/users' },
   ],

@@ -30,12 +30,12 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
 
   const [{ data: po }, { data: lines }, settings] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('po_number, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, supplier_id, currency')
+      .select('po_number, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, supplier_id, currency, issuer_id')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
         po_number: string; status: string; order_date: string; expected_delivery_date: string | null;
         delivery_address_id: string | null; delivery_notes: string | null;
-        notes: string | null; supplier_id: string; currency: string | null;
+        notes: string | null; supplier_id: string; currency: string | null; issuer_id: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
       .select('id, ingredient_id, product_id, description, quantity_ordered, unit_cost, unit_of_measure, notes')
@@ -72,6 +72,18 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
           .maybeSingle() as unknown as Promise<{ data: { label: string; street: string; contact_name: string | null; phone: string | null; country: string } | null }>
       : Promise.resolve({ data: null }),
   ])
+
+  // Issuer: use PO's issuer_id if set, otherwise fall back to the default issuer.
+  // If the table is empty (pre-seed), fall back to hardcoded Atma defaults in the render.
+  const { data: issuer } = po.issuer_id
+    ? await supabase.from('po_issuers')
+        .select('name, title, phone, email')
+        .eq('id', po.issuer_id)
+        .maybeSingle() as { data: { name: string; title: string | null; phone: string | null; email: string | null } | null }
+    : await supabase.from('po_issuers')
+        .select('name, title, phone, email')
+        .eq('is_default', true)
+        .maybeSingle() as { data: { name: string; title: string | null; phone: string | null; email: string | null } | null }
 
   const ingMap  = new Map((ingredients ?? []).map((i) => [i.id, i]))
   const prodMap = new Map((products ?? []).map((p) => [p.id, p]))
@@ -165,10 +177,10 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
           </div>
           <div>
             <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">Issued by</div>
-            <div className="text-[13px] font-semibold">Atma Okan</div>
-            <div className="text-[11px] text-gray-700">Operations Manager</div>
-            <div className="text-[11px] text-gray-700">+64 27 275 4329</div>
-            <div className="text-[11px] text-gray-700">orders@odinutrition.com</div>
+            <div className="text-[13px] font-semibold">{issuer?.name ?? 'Atma Okan'}</div>
+            {(issuer?.title ?? 'Operations Manager') && <div className="text-[11px] text-gray-700">{issuer?.title ?? 'Operations Manager'}</div>}
+            {(issuer?.phone ?? '+64 27 275 4329') && <div className="text-[11px] text-gray-700">{issuer?.phone ?? '+64 27 275 4329'}</div>}
+            {(issuer?.email ?? 'orders@odinutrition.com') && <div className="text-[11px] text-gray-700">{issuer?.email ?? 'orders@odinutrition.com'}</div>}
           </div>
         </div>
 

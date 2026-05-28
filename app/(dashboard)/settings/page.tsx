@@ -172,7 +172,44 @@ export default async function SettingsPage({ searchParams }: PageProps) {
           </button>
         </div>
       </form>
+
+      {/* Reference data — admin-managed lists used elsewhere in the app */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="p-5 border-b border-gray-100">
+          <h2 className="text-sm font-semibold">Reference data</h2>
+          <p className="text-xs text-gray-500 mt-1">Lists used elsewhere in the app — keep these curated.</p>
+        </div>
+        <ul className="divide-y divide-gray-100">
+          <ReferenceLink
+            href="/delivery-addresses"
+            title="Delivery addresses"
+            description="NZ + AU delivery addresses available on the PO form."
+          />
+          <ReferenceLink
+            href="/settings/issuers"
+            title="PO issuers"
+            description="People who appear in the &ldquo;Issued by&rdquo; block on PO PDFs."
+          />
+        </ul>
+      </div>
     </div>
+  )
+}
+
+function ReferenceLink({ href, title, description }: { href: string; title: string; description: string }) {
+  return (
+    <li>
+      <Link
+        href={href}
+        className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors"
+      >
+        <div>
+          <div className="text-sm font-medium text-gray-900">{title}</div>
+          <div className="text-xs text-gray-500 mt-0.5">{description}</div>
+        </div>
+        <span className="text-gray-400">→</span>
+      </Link>
+    </li>
   )
 }
 
