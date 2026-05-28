@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'New purchase order' }
 export default async function NewPurchaseOrderPage() {
   const supabase = createClient()
 
-  const [{ data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }] = await Promise.all([
+  const [{ data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }, { data: issuers }] = await Promise.all([
     supabase.from('suppliers')
       .select('id, name, payment_terms, email, phone, currency')
       .eq('is_active', true)
@@ -29,6 +29,10 @@ export default async function NewPurchaseOrderPage() {
       .select('id, label, street, contact_name, phone, country, is_default')
       .eq('is_active', true)
       .order('country').order('label') as unknown as Promise<{ data: Array<{ id: string; label: string; street: string; contact_name: string | null; phone: string | null; country: 'NZ' | 'AU'; is_default: boolean }> | null }>,
+    supabase.from('po_issuers')
+      .select('id, name, title, is_default')
+      .eq('is_active', true)
+      .order('is_default', { ascending: false }).order('name') as unknown as Promise<{ data: Array<{ id: string; name: string; title: string | null; is_default: boolean }> | null }>,
   ])
 
   const today = new Date()
@@ -41,6 +45,7 @@ export default async function NewPurchaseOrderPage() {
       initialPoNumber={poNumber}
       initialSupplierId=""
       initialCurrency="NZD"
+      initialIssuerId={null}
       initialOrderDate={todayStr}
       initialExpected={null}
       initialDeliveryAddressId={null}
@@ -53,6 +58,7 @@ export default async function NewPurchaseOrderPage() {
       products={products ?? []}
       packaging={packaging ?? []}
       deliveryAddresses={addresses ?? []}
+      issuers={issuers ?? []}
     />
   )
 }

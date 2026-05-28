@@ -57,12 +57,15 @@ interface DeliveryAddressOption {
   is_default: boolean
 }
 
+export interface IssuerOption { id: string; name: string; title: string | null; is_default: boolean }
+
 export interface POFormProps {
   mode: 'new' | 'edit'
   poId?: string
   initialPoNumber: string
   initialSupplierId: string
   initialCurrency: string          // 'NZD' default
+  initialIssuerId: string | null
   initialOrderDate: string         // 'YYYY-MM-DD'
   initialExpected: string | null   // 'YYYY-MM-DD' or null
   initialDeliveryAddressId: string | null
@@ -75,6 +78,7 @@ export interface POFormProps {
   products: ProductOption[]
   packaging: PackagingOption[]
   deliveryAddresses: DeliveryAddressOption[]
+  issuers: IssuerOption[]
 }
 
 const NEW_LINE: POLineInput = {
@@ -98,6 +102,9 @@ export function POForm(props: POFormProps) {
   const [supplierId, setSupplierId] = useState(props.initialSupplierId)
   const [currency, setCurrency]     = useState(props.initialCurrency || 'NZD')
   const [currencyManuallySet, setCurrencyManuallySet] = useState(props.mode === 'edit')
+  const [issuerId, setIssuerId] = useState<string>(
+    props.initialIssuerId ?? props.issuers.find((i) => i.is_default)?.id ?? props.issuers[0]?.id ?? '',
+  )
   const [orderDate, setOrderDate]   = useState(props.initialOrderDate)
   const [expected, setExpected]     = useState(props.initialExpected ?? '')
   const [notes, setNotes]           = useState(props.initialNotes ?? '')
@@ -177,6 +184,7 @@ export function POForm(props: POFormProps) {
         po_number: poNumber,
         supplier_id: supplierId,
         currency,
+        issuer_id: issuerId || null,
         order_date: orderDate,
         expected_delivery_date: expected || null,
         delivery_address_id: deliveryAddressId || null,
@@ -308,6 +316,23 @@ export function POForm(props: POFormProps) {
                   ⚠ supplier&apos;s currency is {supplier.currency.toUpperCase()} — overriding to {currency}
                 </p>
               )}
+            </Field>
+
+            <Field label="Issued by">
+              <select
+                disabled={!isEditable}
+                value={issuerId}
+                onChange={(e) => setIssuerId(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
+              >
+                {props.issuers.length === 0 && <option value="">— no issuers set up —</option>}
+                {props.issuers.map((i) => (
+                  <option key={i.id} value={i.id}>{i.name}{i.title ? ` · ${i.title}` : ''}{i.is_default ? ' ★' : ''}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Manage the list in <a href="/settings/issuers" className="underline">Settings → PO issuers</a>.
+              </p>
             </Field>
 
             <Field label="PO number">
