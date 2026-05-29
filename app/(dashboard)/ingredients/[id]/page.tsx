@@ -3,8 +3,10 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { ROLES } from '@/lib/constants'
 import { StatusBadge } from '@/components/ingredients/status-badge'
 import { PriceHistory } from '@/components/ingredients/price-history'
+import { DeleteIngredientButton } from '@/components/ingredients/delete-ingredient-button'
 import type {
   IngredientStatus,
   IngredientWithSupplier,
@@ -15,10 +17,15 @@ export const metadata: Metadata = { title: 'Ingredient' }
 
 interface PageProps {
   params: { id: string }
+  searchParams: { restored?: string; error?: string }
 }
 
-export default async function IngredientDetailPage({ params }: PageProps) {
+export default async function IngredientDetailPage({ params, searchParams }: PageProps) {
   const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase
+    .from('user_profiles').select('roles(name)').eq('id', user?.id ?? '').maybeSingle() as { data: { roles: { name: string } | null } | null }
+  const isAdmin = profile?.roles?.name === ROLES.ADMIN
 
   const [{ data: ingredient }, { data: history }, { count: usedInCount }] = await Promise.all([
     supabase
@@ -46,6 +53,33 @@ export default async function IngredientDetailPage({ params }: PageProps) {
   ])
 
   if (!ingredient) notFound()
+
+  // List of ACTIVE products whose active BOM references this ingredient —
+  // shown in the Delete confirmation so the user can see what's affected.
+  // (Admin-only, but cheap enough to always fetch.)
+  const { data: activeBomLinks } = await supabase
+    .from('bom_items')
+    .select('boms!inner(product_id, is_active)')
+    .eq('ingredient_id', params.id)
+    .eq('boms.is_active', true) as unknown as { data: Array<{ boms: { product_id: string; is_active: boolean } | null }> | null }
+
+  const inUseProductIds = Array.from(new Set(
+    (activeBomLinks ?? [])
+      .map((r) => r.boms?.product_id)
+      .filter((id): id is string => !!id),
+  ))
+
+  const { data: inUseProductRows } = inUseProductIds.length === 0
+    ? { data: [] as Array<{ id: string; name: string }> }
+    : await supabase
+        .from('products')
+        .select('id, name')
+        .in('id', inUseProductIds)
+        .eq('is_active', true)
+        .is('deleted_at', null)
+        .order('name') as unknown as { data: Array<{ id: string; name: string }> | null }
+
+  const inUseProducts = inUseProductRows ?? []
 
   // Count distinct suppliers also-linked ingredients for the "shared with" line
   let sharedCount = 0
@@ -80,13 +114,33 @@ export default async function IngredientDetailPage({ params }: PageProps) {
           </div>
           <div className="mt-1 text-xs font-mono text-gray-600">{ingredient.sku_code}</div>
         </div>
-        <Link
-          href={`/ingredients/${ingredient.id}/edit`}
-          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-        >
-          Edit
-        </Link>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <DeleteIngredientButton
+              ingredientId={ingredient.id}
+              ingredientName={ingredient.name}
+              inUseProducts={inUseProducts}
+            />
+          )}
+          <Link
+            href={`/ingredients/${ingredient.id}/edit`}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Edit
+          </Link>
+        </div>
       </div>
+
+      {searchParams.restored && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
+          Ingredient restored from trash.
+        </div>
+      )}
+      {searchParams.error === 'delete_failed' && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          Could not delete — please try again.
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         {/* Basics */}

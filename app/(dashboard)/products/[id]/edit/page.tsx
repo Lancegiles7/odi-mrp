@@ -48,6 +48,7 @@ export default async function EditProductPage({ params, searchParams }: PageProp
       .from('ingredients')
       .select('id, name, sku_code, unit_of_measure, total_loaded_cost, is_organic')
       .eq('is_active', true)
+      .is('deleted_at', null)
       .order('name', { ascending: true }),
     getAppSettings(),
     supabase

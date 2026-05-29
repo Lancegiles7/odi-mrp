@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { ROLES, SOFT_DELETE_WINDOW_DAYS } from '@/lib/constants'
 import type { IngredientStatus, PriceChangeReason } from '@/lib/types/database.types'
 
 // ============================================================
@@ -413,4 +414,109 @@ export async function importIngredients(rows: ImportRow[]): Promise<ImportResult
 
   revalidatePath('/ingredients')
   return result
+}
+
+// ============================================================
+// Admin guard (mirrors the one in products/actions.ts)
+// ============================================================
+async function requireAdmin() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('id, roles(name)')
+    .eq('id', user.id)
+    .single() as { data: { id: string; roles: { name: string } | null } | null }
+
+  if (profile?.roles?.name !== ROLES.ADMIN) redirect('/?error=forbidden')
+  return { supabase, profileId: profile.id }
+}
+
+// ============================================================
+// SOFT DELETE — sets deleted_at. Admin only.
+// Recoverable from /ingredients/trash for 30 days. The row is
+// retained so existing recipes/POs/inventory still resolve it.
+// ============================================================
+export async function softDeleteIngredient(id: string) {
+  const { supabase, profileId } = await requireAdmin()
+
+  const { error } = await supabase
+    .from('ingredients')
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: profileId,
+    })
+    .eq('id', id)
+
+  if (error) redirect(`/ingredients/${id}?error=delete_failed`)
+
+  revalidatePath('/ingredients')
+  revalidatePath('/ingredients/trash')
+  redirect('/ingredients?deleted=1')
+}
+
+// ============================================================
+// RESTORE — clears deleted_at. Admin only.
+// ============================================================
+export async function restoreIngredient(id: string) {
+  const { supabase } = await requireAdmin()
+
+  const { error } = await supabase
+    .from('ingredients')
+    .update({ deleted_at: null, deleted_by: null })
+    .eq('id', id)
+
+  if (error) redirect('/ingredients/trash?error=restore_failed')
+
+  revalidatePath('/ingredients')
+  revalidatePath('/ingredients/trash')
+  redirect(`/ingredients/${id}?restored=1`)
+}
+
+// ============================================================
+// PERMANENT DELETE — hard delete. Admin only.
+// May fail if the ingredient is still referenced by bom_items /
+// purchase_order_lines / inventory_balances (FK restriction);
+// that's intentional — the soft-delete is for live cleanup, the
+// hard delete is only safe when nothing references the row.
+// ============================================================
+export async function permanentlyDeleteIngredient(id: string) {
+  const { supabase } = await requireAdmin()
+
+  const { error } = await supabase
+    .from('ingredients')
+    .delete()
+    .eq('id', id)
+
+  if (error) redirect(`/ingredients/trash?error=purge_failed&id=${id}`)
+
+  revalidatePath('/ingredients')
+  revalidatePath('/ingredients/trash')
+  redirect('/ingredients/trash?purged=1')
+}
+
+// ============================================================
+// PURGE EXPIRED — deletes everything past the 30-day window.
+// Called from the trash page on load so it self-cleans.
+// Failures (e.g. FK still references the row) are silently
+// skipped — they stay visible in the trash with the error.
+// ============================================================
+export async function purgeExpiredIngredients(): Promise<{ purged: number }> {
+  const { supabase } = await requireAdmin()
+
+  const cutoff = new Date(Date.now() - SOFT_DELETE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data, error } = await supabase
+    .from('ingredients')
+    .delete()
+    .lt('deleted_at', cutoff)
+    .not('deleted_at', 'is', null)
+    .select('id')
+
+  if (error) return { purged: 0 }
+
+  revalidatePath('/ingredients/trash')
+  return { purged: data?.length ?? 0 }
 }

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mockup · Delete ingredients</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#f4f5f6; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:#1f2937; }
+  .wrap { max-width:980px; margin:24px auto; padding:0 16px; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:18px; }
+  .card-h { padding:14px 18px; border-bottom:1px solid #f1f1f1; display:flex; align-items:center; justify-content:space-between; }
+  .card-h h2 { margin:0; font-size:14px; font-weight:600; color:#111827; }
+  .card-h .hint { font-size:11px; color:#6b7280; }
+  .card-b { padding:18px; font-size:13px; line-height:1.55; }
+
+  .btn { font-size:12px; padding:6px 12px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#111827; cursor:pointer; }
+  .btn.primary { background:#111827; color:#fff; border-color:#111827; }
+  .btn.danger { background:#dc2626; color:#fff; border-color:#dc2626; }
+  .btn.ghost { background:transparent; border-color:transparent; color:#6b7280; }
+
+  /* ── 1. Detail page header (top-right action area) */
+  .detail-head { display:flex; align-items:flex-start; justify-content:space-between; }
+  .crumb { font-size:12px; color:#6b7280; }
+  .h1 { font-size:22px; font-weight:600; margin:6px 0 4px; }
+  .badges span { display:inline-block; font-size:10px; padding:2px 8px; border-radius:4px; margin-right:6px; }
+  .badge-org { background:#ecfdf5; color:#047857; }
+  .badge-sup { background:#f3f4f6; color:#374151; }
+  .action-row { display:flex; gap:8px; align-items:center; }
+
+  /* ── 2. Confirmation modal */
+  .modal-bg { background:rgba(15,23,42,.35); padding:30px 24px; border-radius:8px; }
+  .modal { background:#fff; max-width:480px; margin:0 auto; border-radius:8px; box-shadow:0 14px 50px rgba(0,0,0,.18); overflow:hidden; }
+  .modal-h { padding:14px 18px; border-bottom:1px solid #f1f1f1; }
+  .modal-h h3 { margin:0; font-size:14px; font-weight:600; }
+  .modal-b { padding:16px 18px; font-size:13px; }
+  .modal-f { padding:12px 18px; border-top:1px solid #f1f1f1; display:flex; justify-content:flex-end; gap:8px; background:#fafafa; }
+
+  .alert { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:6px; padding:10px 12px; font-size:12px; margin:10px 0 4px; }
+  .alert ul { margin:6px 0 0 16px; padding:0; }
+  .alert li { font-size:12px; margin:2px 0; }
+
+  .meta { color:#6b7280; font-size:11px; margin-top:8px; }
+
+  /* ── 3. Ingredient list (showing deleted are hidden + trash link) */
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { text-align:left; background:#f9fafb; color:#6b7280; font-size:10px; text-transform:uppercase; letter-spacing:.05em; padding:8px 14px; font-weight:600; }
+  td { padding:8px 14px; border-top:1px solid #f1f1f1; }
+  td.sku { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:#6b7280; }
+  td.r { text-align:right; }
+  .info { font-size:11px; color:#6b7280; background:#f9fafb; border-top:1px solid #f1f1f1; padding:8px 14px; }
+  .trash-link { font-size:12px; color:#374151; text-decoration:underline; }
+
+  /* ── 4. Trash page */
+  .trash-row td { color:#6b7280; }
+  .trash-row td .name { color:#374151; font-weight:500; }
+  .countdown { font-size:10px; color:#9ca3af; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 1. INGREDIENT DETAIL — new Delete button in header -->
+  <div class="card">
+    <div class="card-h"><h2>1 · Ingredient detail page header (with new Delete)</h2><span class="hint">Mirrors the existing Products page header</span></div>
+    <div class="card-b">
+      <div class="detail-head">
+        <div>
+          <div class="crumb">← Ingredients</div>
+          <div class="h1">Freeze-dried Strawberry Powder</div>
+          <div class="badges">
+            <span class="badge-org">Organic</span>
+            <span class="badge-sup">Supplier: Berries Direct NZ</span>
+          </div>
+        </div>
+        <div class="action-row">
+          <button class="btn danger">Delete</button>
+          <button class="btn primary">Edit</button>
+        </div>
+      </div>
+      <div class="meta">Delete is admin-only and recoverable for 30 days.</div>
+    </div>
+  </div>
+
+  <!-- 2. CONFIRMATION MODAL — usage warning -->
+  <div class="card">
+    <div class="card-h"><h2>2 · Delete confirmation (used-in-recipes warning)</h2><span class="hint">Soft-delete: ingredient is hidden everywhere, recipes keep working</span></div>
+    <div class="card-b">
+      <div class="modal-bg">
+        <div class="modal">
+          <div class="modal-h"><h3>Delete "Freeze-dried Strawberry Powder"?</h3></div>
+          <div class="modal-b">
+            <div>This ingredient will be hidden from the ingredient list and from the BOM picker. Existing recipes that use it will continue to cost correctly — the record is retained.</div>
+            <div class="alert">
+              <strong>In use right now:</strong> 3 active recipes still reference this ingredient.
+              <ul>
+                <li>Odi Organic Puffs Berries, Banana &amp; Kelp</li>
+                <li>Odi Organic Melt Strawberry</li>
+                <li>Odi Organic Brownie</li>
+              </ul>
+            </div>
+            <div class="meta">You can restore from <strong>Ingredients → Trash</strong> within 30 days. After that it&rsquo;s purged automatically.</div>
+          </div>
+          <div class="modal-f">
+            <button class="btn ghost">Cancel</button>
+            <button class="btn danger">Delete (recoverable 30 days)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. INGREDIENT LIST — adds a Trash link, deleted are hidden -->
+  <div class="card">
+    <div class="card-h"><h2>3 · Ingredient list (deleted hidden + new Trash link)</h2><span class="hint">Existing "+ New ingredient" / "Import" stay where they are</span></div>
+    <div class="card-b" style="padding:0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px;">
+        <div><strong style="font-size:14px;">Ingredients</strong></div>
+        <div class="action-row">
+          <a href="#" class="trash-link">Trash (2)</a>
+          <button class="btn">+ Import XLSX</button>
+          <button class="btn primary">+ New ingredient</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>SKU</th><th>Name</th><th>Supplier</th><th class="r">$/kg loaded</th></tr></thead>
+        <tbody>
+          <tr><td class="sku">RM-QPB-001</td><td>Quinoa Puff Base</td><td>Grain Co</td><td class="r">$32.00</td></tr>
+          <tr><td class="sku">RM-BER-014</td><td>Freeze-dried Berry Blend</td><td>Berries Direct NZ</td><td class="r">$103.00</td></tr>
+          <tr><td class="sku">RM-SUG-007</td><td>Coconut Sugar</td><td>Sweet Imports</td><td class="r">$9.50</td></tr>
+        </tbody>
+      </table>
+      <div class="info">Deleted ingredients aren&rsquo;t shown here — open <strong>Trash</strong> to view or restore them.</div>
+    </div>
+  </div>
+
+  <!-- 4. TRASH PAGE -->
+  <div class="card">
+    <div class="card-h"><h2>4 · Ingredients · Trash</h2><span class="hint">Mirrors Products · Trash; auto-purges after 30 days</span></div>
+    <div class="card-b" style="padding:0;">
+      <div style="padding:12px 14px;"><div class="crumb">← Ingredients</div><div class="h1" style="font-size:18px;">Trash</div><div class="meta">Items here are restorable for 30 days, then permanently deleted.</div></div>
+      <table>
+        <thead><tr><th>SKU</th><th>Name</th><th>Deleted</th><th class="r">Action</th></tr></thead>
+        <tbody>
+          <tr class="trash-row"><td class="sku">RM-OLD-101</td><td><span class="name">Discontinued Vanilla Flavour</span></td><td>2 days ago <span class="countdown">(28 days left)</span></td><td class="r"><button class="btn">Restore</button> <button class="btn danger">Delete now</button></td></tr>
+          <tr class="trash-row"><td class="sku">RM-DUP-022</td><td><span class="name">Coconut Sugar (duplicate)</span></td><td>Yesterday <span class="countdown">(29 days left)</span></td><td class="r"><button class="btn">Restore</button> <button class="btn danger">Delete now</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

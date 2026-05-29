@@ -14,6 +14,7 @@ interface PageProps {
   searchParams: {
     q?: string
     status?: string
+    deleted?: string
   }
 }
 
@@ -26,6 +27,7 @@ export default async function IngredientsPage({ searchParams }: PageProps) {
     .from('ingredients')
     .select('id, sku_code, name, confirmed_supplier, lead_time, status, price, freight, total_loaded_cost, is_organic')
     .eq('is_active', true)
+    .is('deleted_at', null)
     .order('sku_code', { ascending: true })
 
   if (search) {
@@ -51,6 +53,12 @@ export default async function IngredientsPage({ searchParams }: PageProps) {
 
         <div className="flex gap-2">
           <Link
+            href="/ingredients/trash"
+            className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            Trash
+          </Link>
+          <Link
             href="/ingredients/import"
             className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
           >
@@ -64,6 +72,12 @@ export default async function IngredientsPage({ searchParams }: PageProps) {
           </Link>
         </div>
       </div>
+
+      {searchParams.deleted && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
+          Ingredient moved to <Link href="/ingredients/trash" className="underline font-medium">Trash</Link>. Recoverable for 30 days.
+        </div>
+      )}
 
       {/* Search and filter */}
       <div className="mb-4">
