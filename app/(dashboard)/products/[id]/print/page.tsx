@@ -288,12 +288,22 @@ export default async function ProductPrintPage({ params }: PageProps) {
             )}
           </div>
 
-          {/* Toll / margin / task / freight */}
-          <div className="grid grid-cols-2 gap-x-10 gap-y-0.5 mt-2.5">
+          {/* Other costs — own section with its own subtotal */}
+          <div className="mt-3 pt-2 border-t border-gray-200">
+            <div className="text-[9px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Other</div>
             <LineItem label="Toll"         value={product.toll} />
             <LineItem label="Margin"       value={product.margin} />
             <LineItem label="Task / other" value={product.other} />
             <LineItem label="Freight"      value={product.freight} />
+            <div className="flex justify-between pt-1 mt-0.5 border-t border-gray-200">
+              <span className="text-gray-700 font-medium">Other subtotal</span>
+              <span className="tabular-nums font-semibold">{formatCurrency(
+                (Number(product.toll)    || 0) +
+                (Number(product.margin)  || 0) +
+                (Number(product.other)   || 0) +
+                (Number(product.freight) || 0)
+              )}</span>
+            </div>
           </div>
 
           <div className="flex justify-between pt-2 mt-2 border-t border-gray-300 text-[15px] font-bold">

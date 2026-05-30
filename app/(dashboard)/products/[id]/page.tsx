@@ -300,27 +300,45 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
               </tfoot>
             </table>
 
-            <div className="grid grid-cols-2 gap-x-10 gap-y-1 px-5 py-4 text-sm border-t border-gray-100 bg-gray-50/50">
-              <PackagingBreakdown
-                links={packagingLinks ?? []}
-                total={Number(product.packaging) || 0}
-              />
-              <LineItem label="Toll"      value={product.toll} />
-              <LineItem label="Margin"    value={product.margin} />
-              <LineItem label="Task / other" value={product.other} />
-              <div className="flex justify-between col-span-2">
-                <span className="text-gray-600">Freight</span>
-                <span className="font-medium">{product.freight != null ? formatCurrency(product.freight) : '—'}</span>
-              </div>
-              <div className="flex justify-between col-span-2 pt-2 mt-1 border-t border-gray-200 text-base">
-                <span className="font-semibold">Base cost (NZ total)</span>
-                <span className="font-semibold">{formatCurrency(summary.nz_grand_total)}</span>
-              </div>
-              <div className="flex justify-between col-span-2 text-sm text-gray-600">
-                <span>÷ FX {Number(settings.fx_rates.AUD).toFixed(4)} → AU total</span>
-                <span>{formatCurrency(summary.au_grand_total)}</span>
-              </div>
-            </div>
+            {(() => {
+              const otherSubtotal =
+                (Number(product.toll)    || 0) +
+                (Number(product.margin)  || 0) +
+                (Number(product.other)   || 0) +
+                (Number(product.freight) || 0)
+              return (
+                <div className="px-5 py-4 text-sm border-t border-gray-100 bg-gray-50/50 space-y-1">
+                  {/* Packaging block (and its sub-items) */}
+                  <PackagingBreakdown
+                    links={packagingLinks ?? []}
+                    total={Number(product.packaging) || 0}
+                  />
+
+                  {/* Divider between packaging and the "other" items */}
+                  <div className="pt-3 mt-2 border-t border-gray-200">
+                    <div className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5">Other</div>
+                    <LineItem label="Toll"          value={product.toll} />
+                    <LineItem label="Margin"        value={product.margin} />
+                    <LineItem label="Task / other"  value={product.other} />
+                    <LineItem label="Freight"       value={product.freight} />
+                    <div className="flex justify-between pt-1.5 mt-1 border-t border-gray-200">
+                      <span className="text-gray-700 font-medium">Other subtotal</span>
+                      <span className="font-semibold tabular-nums">{formatCurrency(otherSubtotal)}</span>
+                    </div>
+                  </div>
+
+                  {/* Base cost + AU conversion */}
+                  <div className="flex justify-between pt-2 mt-2 border-t border-gray-300 text-base">
+                    <span className="font-semibold">Base cost (NZ total)</span>
+                    <span className="font-semibold tabular-nums">{formatCurrency(summary.nz_grand_total)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>÷ FX {Number(settings.fx_rates.AUD).toFixed(4)} → AU total</span>
+                    <span className="tabular-nums">{formatCurrency(summary.au_grand_total)}</span>
+                  </div>
+                </div>
+              )
+            })()}
           </>
         )}
       </div>
