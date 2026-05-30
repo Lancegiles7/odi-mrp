@@ -374,7 +374,7 @@ export async function setProductPackagingBom(input: {
   return { ok: true }
 }
 
-async function recomputeProductPackagingCost(
+export async function recomputeProductPackagingCost(
   supabase: ReturnType<typeof createClient>,
   productId: string,
 ): Promise<void> {

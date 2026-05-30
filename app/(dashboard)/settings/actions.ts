@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ROLES } from '@/lib/constants'
+import { computeLoadedNzd, type FxRates } from '@/lib/packaging-cost'
+import { recomputeProductPackagingCost } from '@/app/(dashboard)/packaging/actions'
 
 function parseRate(raw: unknown): number | null {
   if (raw === null || raw === undefined || raw === '') return null
@@ -70,12 +72,103 @@ export async function updateSettings(formData: FormData) {
     redirect('/settings?error=server')
   }
 
+  // Re-stamp every stored loaded cost using the new FX rates. Packaging
+  // and ingredients each store a NZD-loaded cost on the row; changing
+  // FX in Settings would otherwise leave those values stale (we saw
+  // this with AUD pouches keeping their old 1.0833-based total). This
+  // is idempotent — items that already match are skipped — so saving
+  // Settings with no actual change does no DB writes.
+  await refreshAllLoadedCosts(supabase, fxRates)
+
   // Recalculations cascade from the settings change — revalidate the
   // product list and any product detail pages that display COS/FX.
   revalidatePath('/settings')
   revalidatePath('/products')
   revalidatePath('/products', 'layout')
   redirect('/settings?saved=1')
+}
+
+/**
+ * Re-derive packaging.total_loaded_cost_nzd and ingredients.total_loaded_cost
+ * for every item, using the supplied FX rate table. For packaging, also
+ * recomputes the cached product.packaging total on each product whose
+ * BOM links to a packaging item that actually changed.
+ */
+async function refreshAllLoadedCosts(
+  supabase: ReturnType<typeof createClient>,
+  fxRates: FxRates,
+): Promise<void> {
+  // ── Packaging ───────────────────────────────────────────────
+  const { data: pkgRows } = await supabase
+    .from('packaging')
+    .select('id, price, currency, fx_rate_override, freight_per_unit_nzd, total_loaded_cost_nzd') as unknown as {
+      data: Array<{
+        id: string
+        price: number | null
+        currency: string | null
+        fx_rate_override: number | null
+        freight_per_unit_nzd: number | null
+        total_loaded_cost_nzd: number | null
+      }> | null
+    }
+
+  const changedPackagingIds: string[] = []
+  for (const p of pkgRows ?? []) {
+    const fresh = computeLoadedNzd({
+      price:                p.price,
+      currency:             p.currency,
+      fx_rate_override:     p.fx_rate_override,
+      freight_per_unit_nzd: p.freight_per_unit_nzd,
+    }, fxRates)
+    const rounded = Math.round(fresh * 10000) / 10000
+    const stored  = Number(p.total_loaded_cost_nzd ?? 0)
+    if (Math.abs(rounded - stored) >= 0.00005) {
+      await supabase.from('packaging').update({ total_loaded_cost_nzd: rounded }).eq('id', p.id)
+      changedPackagingIds.push(p.id)
+    }
+  }
+
+  // Recompute product.packaging on every product linked to a changed packaging item.
+  if (changedPackagingIds.length > 0) {
+    const { data: affectedLinks } = await supabase
+      .from('product_packaging')
+      .select('product_id')
+      .in('packaging_id', changedPackagingIds) as { data: Array<{ product_id: string }> | null }
+    const productIds = Array.from(new Set((affectedLinks ?? []).map((r) => r.product_id)))
+    for (const pid of productIds) {
+      await recomputeProductPackagingCost(supabase, pid)
+    }
+  }
+
+  // ── Ingredients ─────────────────────────────────────────────
+  const { data: ingRows } = await supabase
+    .from('ingredients')
+    .select('id, price, currency, fx_rate_override, freight, total_loaded_cost') as unknown as {
+      data: Array<{
+        id: string
+        price: number | null
+        currency: string | null
+        fx_rate_override: number | null
+        freight: number | null
+        total_loaded_cost: number | null
+      }> | null
+    }
+
+  for (const i of ingRows ?? []) {
+    // Reuse the same formula — `freight_per_unit_nzd` here just maps
+    // to the ingredient's `freight` column (which is already NZD).
+    const fresh = computeLoadedNzd({
+      price:                i.price,
+      currency:             i.currency,
+      fx_rate_override:     i.fx_rate_override,
+      freight_per_unit_nzd: i.freight,
+    }, fxRates)
+    const rounded = Math.round(fresh * 10000) / 10000
+    const stored  = Number(i.total_loaded_cost ?? 0)
+    if (Math.abs(rounded - stored) >= 0.00005) {
+      await supabase.from('ingredients').update({ total_loaded_cost: rounded }).eq('id', i.id)
+    }
+  }
 }
 
 /**
