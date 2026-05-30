@@ -68,7 +68,6 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
 
   const summary   = calcProductCostSummary(product, bomItems, settings)
   const typeLabel = product.product_type ? PRODUCT_GROUP_LABELS[product.product_type] ?? product.product_type : null
-  const fxNote    = product.apply_fx ? `×${Number(settings.fx_rate).toFixed(4)} FX` : 'FX not applied'
 
   return (
     <div className="space-y-6">
@@ -145,10 +144,8 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Cost summary</h3>
           <div className="text-xs text-gray-500">
-            FX rate <span className="font-mono font-semibold">{Number(settings.fx_rate).toFixed(4)}</span> ·{' '}
-            <span className={`px-1.5 py-0.5 rounded ${product.apply_fx ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-              {fxNote}
-            </span>
+            FX rate (AUD → NZD) <span className="font-mono font-semibold">{Number(settings.fx_rate).toFixed(4)}</span>
+            <span className="ml-1 text-gray-400">· base is NZD; AU = base ÷ FX</span>
             {product.rrp != null && product.rrp > 0 && (
               <>
                 <span className="mx-2 text-gray-300">·</span>
@@ -174,8 +171,8 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             }
           />
           <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="Ing + pkg + toll + margin + task + freight" />
-          <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub={product.apply_fx ? `×${Number(settings.fx_rate).toFixed(4)} FX` : 'No FX'} dark />
-          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub="Never has FX" />
+          <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub="Base — always NZD" dark />
+          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`÷ ${Number(settings.fx_rate).toFixed(4)} FX → AUD`} />
         </div>
 
         {/* Row 2 — COS + GP split across NZ / AU */}
@@ -316,15 +313,13 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                 <span className="font-medium">{product.freight != null ? formatCurrency(product.freight) : '—'}</span>
               </div>
               <div className="flex justify-between col-span-2 pt-2 mt-1 border-t border-gray-200 text-base">
-                <span className="font-semibold">Base cost (AU total)</span>
-                <span className="font-semibold">{formatCurrency(summary.au_grand_total)}</span>
+                <span className="font-semibold">Base cost (NZ total)</span>
+                <span className="font-semibold">{formatCurrency(summary.nz_grand_total)}</span>
               </div>
-              {product.apply_fx && (
-                <div className="flex justify-between col-span-2 text-base">
-                  <span className="font-semibold">+ FX × {Number(settings.fx_rate).toFixed(4)} → NZ total</span>
-                  <span className="font-semibold">{formatCurrency(summary.nz_grand_total)}</span>
-                </div>
-              )}
+              <div className="flex justify-between col-span-2 text-sm text-gray-600">
+                <span>÷ FX {Number(settings.fx_rate).toFixed(4)} → AU total</span>
+                <span>{formatCurrency(summary.au_grand_total)}</span>
+              </div>
             </div>
           </>
         )}

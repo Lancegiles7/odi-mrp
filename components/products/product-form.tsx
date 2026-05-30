@@ -54,7 +54,10 @@ function NumberInput({
 
 export function ProductForm({ product, action, errorMessage, fxRate }: ProductFormProps) {
   const isEdit = !!product
-  const [applyFx, setApplyFx] = useState<boolean>(product?.apply_fx ?? false)
+  // apply_fx is retained on the row but no longer affects costing — the
+  // form no longer renders a toggle (NZD is always the base, AU always
+  // derived). We submit `true` so the column stays populated for the
+  // few legacy reports that still join on it.
 
   // Wastage is stored as a fraction (0.03) but edited as a percent (3)
   const wastageDisplay =
@@ -213,39 +216,20 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
               />
             </Field>
 
-            {/* FX toggle */}
+            {/* Currency model — informational. Base cost is NZD; AU is always derived. */}
             <div className="col-span-2 mt-2 p-3 rounded-md border border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium">Apply currency exchange (AUD → NZD)</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    When ON, NZ grand total = base × FX rate. AU grand total is always base.
-                  </div>
-                </div>
-                {/* Toggle group — submits 'true' or 'false' */}
-                <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-sm">
-                  <button
-                    type="button"
-                    onClick={() => setApplyFx(true)}
-                    className={`px-3 py-1 font-medium ${applyFx ? 'bg-gray-900 text-white' : 'bg-white text-gray-600'}`}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setApplyFx(false)}
-                    className={`px-3 py-1 font-medium border-l border-gray-300 ${!applyFx ? 'bg-gray-900 text-white' : 'bg-white text-gray-600'}`}
-                  >
-                    No
-                  </button>
-                </div>
-                <input type="hidden" name="apply_fx" value={applyFx ? 'true' : 'false'} />
+              <div className="text-sm font-medium">Costing base · NZD</div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Base cost is always NZD. AU total is derived as <span className="font-mono">base ÷ FX</span>, shown alongside everywhere.
+                AUD-priced inputs (ingredients, packaging) are auto-converted to NZD via the per-item currency / FX rate.
               </div>
               <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                <span>Current rate:</span>
+                <span>Current FX (AUD → NZD):</span>
                 <span className="font-mono font-semibold text-gray-900">{fxRate.toFixed(4)}</span>
                 <Link href="/settings" className="underline">Edit in Settings →</Link>
               </div>
+              {/* Keep apply_fx submitted as true for back-compat; costing no longer reads it. */}
+              <input type="hidden" name="apply_fx" value="true" />
             </div>
           </div>
         </div>

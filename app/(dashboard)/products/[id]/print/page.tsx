@@ -160,7 +160,7 @@ export default async function ProductPrintPage({ params }: PageProps) {
           <Meta label="RRP (inc GST)"  value={product.rrp != null ? formatCurrency(product.rrp) : null} />
           {product.hero_call_out && <div className="col-span-2"><Meta label="Hero call-out" value={product.hero_call_out} /></div>}
           <div className="col-span-2">
-            <Meta label="FX" value={product.apply_fx ? `×${Number(settings.fx_rate).toFixed(4)} · applied to NZ` : 'FX not applied'} />
+            <Meta label="FX" value={`AUD → NZD ×${Number(settings.fx_rate).toFixed(4)} · base is NZD, AU derived`} />
           </div>
         </div>
 
@@ -180,8 +180,8 @@ export default async function ProductPrintPage({ params }: PageProps) {
               : product.wastage_pct > 0 ? `+${(product.wastage_pct * 100).toFixed(1)}% wastage` : 'From BOM lines'}
           />
           <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="Ing + pkg + toll + margin + task + freight" />
-          <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub={product.apply_fx ? `×${Number(settings.fx_rate).toFixed(4)} FX` : 'No FX'} dark />
-          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub="Never has FX" />
+          <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub="Base — always NZD" dark />
+          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`÷ ${Number(settings.fx_rate).toFixed(4)} FX → AUD`} />
         </div>
         <div className="grid grid-cols-4 gap-2 mb-5">
           <Tile label="COS NZ" value={summary.cos_nz !== null ? `${(summary.cos_nz * 100).toFixed(1)}%` : '—'} sub={`${formatCurrency(summary.nz_grand_total)} of ${formatCurrency(summary.rrp_ex_gst_nz)} ex-GST`} accent />
@@ -297,15 +297,13 @@ export default async function ProductPrintPage({ params }: PageProps) {
           </div>
 
           <div className="flex justify-between pt-2 mt-2 border-t border-gray-300 text-[15px] font-bold">
-            <span>Base cost (AU total)</span>
+            <span>Base cost (NZ total)</span>
+            <span className="tabular-nums">{formatCurrency(summary.nz_grand_total)}</span>
+          </div>
+          <div className="flex justify-between pt-1 text-[12px]" style={{ color: '#6b7280' }}>
+            <span>÷ FX {Number(settings.fx_rate).toFixed(4)} → AU total</span>
             <span className="tabular-nums">{formatCurrency(summary.au_grand_total)}</span>
           </div>
-          {product.apply_fx && (
-            <div className="flex justify-between pt-1 text-[13px] font-semibold" style={{ color: ODI_GREEN_DARK }}>
-              <span>+ FX × {Number(settings.fx_rate).toFixed(4)} → NZ total</span>
-              <span className="tabular-nums">{formatCurrency(summary.nz_grand_total)}</span>
-            </div>
-          )}
         </div>
 
         <div className="mt-10 pt-3 border-t border-gray-200 text-[9px] text-gray-500 leading-snug">

@@ -2,14 +2,18 @@
  * Cost calculation utilities for the Product + BOM module.
  * All calculations happen here in TypeScript — nothing is stored.
  *
- * Costing model (per spec, 2026-04):
- *   ingredient_subtotal = Σ (quantity_g / 1000) × price_per_kg
+ * Costing model (per spec, 2026-05 — NZD-base):
+ *   ingredient_subtotal = Σ (quantity_g / 1000) × price_per_kg     (NZD; ingredients are loaded to NZD via FX)
  *   ingredient_total    = ingredient_subtotal × (1 + wastage_pct)
- *   base_cost           = ingredient_total + packaging + toll + margin + other + freight
- *   nz_grand_total      = base_cost × fx_rate  when apply_fx, else base_cost
- *   au_grand_total      = base_cost                                        (FX never applied)
+ *   base_cost           = ingredient_total + packaging + toll + margin + other + freight   (NZD)
+ *   nz_grand_total      = base_cost                                                        (base IS NZD)
+ *   au_grand_total      = base_cost ÷ fx_rate                                              (NZD → AUD)
  *   cos_nz              = nz_grand_total / (rrp / (1 + gst_nz_pct))
  *   cos_au              = au_grand_total / (rrp / (1 + gst_au_pct))
+ *
+ *  fx_rate is "AUD → NZD" (i.e. NZD per 1 AUD, e.g. 1.20). Dividing
+ *  NZD by it gives AUD. The per-product `apply_fx` flag is no longer
+ *  read by costing — AU is now always derived alongside NZ.
  */
 
 import type {
@@ -104,10 +108,14 @@ export function calcProductCostSummary(
     (product.freight   ?? 0),
   )
 
+  // NZD-base: base_cost is already in NZD (ingredients & packaging are
+  // loaded to NZD via FX in lib/packaging-cost.ts and the ingredient
+  // form). NZ grand total == base. AU is derived by dividing by the
+  // AUD→NZD rate. apply_fx is kept on the row for back-compat but no
+  // longer affects the calculation — AU is always shown.
   const fxRate       = Number(settings.fx_rate) || 1
-  const applyFx      = product.apply_fx === true
-  const nzGrandTotal = round2(applyFx ? baseCost * fxRate : baseCost)
-  const auGrandTotal = baseCost
+  const nzGrandTotal = baseCost
+  const auGrandTotal = fxRate > 0 ? round2(baseCost / fxRate) : baseCost
 
   const rrp     = product.rrp ?? 0
   const gstNz   = Number(settings.gst_nz_pct) || 0
