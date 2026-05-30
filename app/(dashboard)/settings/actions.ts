@@ -31,27 +31,29 @@ export async function updateSettings(formData: FormData) {
   const roleName = profile?.roles?.name ?? null
   if (roleName !== ROLES.ADMIN) redirect('/?error=forbidden')
 
-  const fxRateRaw   = parseRate(formData.get('fx_rate'))
   const gstNzRaw    = parseRate(formData.get('gst_nz_pct_input'))    // submitted as percent (e.g. 15)
   const gstAuRaw    = parseRate(formData.get('gst_au_pct_input'))
 
-  const fxRate    = fxRateRaw != null && fxRateRaw > 0 ? fxRateRaw : 1
   // Incoming percents → fractions, clamped to [0, 1]
   const gstNzPct  = gstNzRaw != null ? Math.max(0, Math.min(1, gstNzRaw / 100)) : 0
   const gstAuPct  = gstAuRaw != null ? Math.max(0, Math.min(1, gstAuRaw / 100)) : 0
 
-  // Loaded-cost FX rates JSON (NZD always = 1, others editable)
+  // Single FX source — the multi-currency table.
   const fxAud = parseRate(formData.get('fx_rate_aud'))
   const fxUsd = parseRate(formData.get('fx_rate_usd'))
   const fxEur = parseRate(formData.get('fx_rate_eur'))
   const fxGbp = parseRate(formData.get('fx_rate_gbp'))
   const fxRates = {
     NZD: 1.0,
-    AUD: fxAud != null && fxAud > 0 ? fxAud : 1.0833,
+    AUD: fxAud != null && fxAud > 0 ? fxAud : 1.20,
     USD: fxUsd != null && fxUsd > 0 ? fxUsd : 1.62,
     EUR: fxEur != null && fxEur > 0 ? fxEur : 1.78,
     GBP: fxGbp != null && fxGbp > 0 ? fxGbp : 2.05,
   }
+
+  // Keep the legacy single fx_rate column in sync with AUD so any
+  // older code path / report still resolves the same value.
+  const fxRate = fxRates.AUD
 
   const { error } = await supabase
     .from('app_settings')

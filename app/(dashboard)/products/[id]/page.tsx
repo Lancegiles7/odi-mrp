@@ -144,7 +144,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Cost summary</h3>
           <div className="text-xs text-gray-500">
-            FX rate (AUD → NZD) <span className="font-mono font-semibold">{Number(settings.fx_rate).toFixed(4)}</span>
+            FX rate (AUD → NZD) <span className="font-mono font-semibold">{Number(settings.fx_rates.AUD).toFixed(4)}</span>
             <span className="ml-1 text-gray-400">· base is NZD; AU = base ÷ FX</span>
             {product.rrp != null && product.rrp > 0 && (
               <>
@@ -172,7 +172,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
           />
           <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="Ing + pkg + toll + margin + task + freight" />
           <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub="Base — always NZD" dark />
-          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`÷ ${Number(settings.fx_rate).toFixed(4)} FX → AUD`} />
+          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`÷ ${Number(settings.fx_rates.AUD).toFixed(4)} FX → AUD`} />
         </div>
 
         {/* Row 2 — COS + GP split across NZ / AU */}
@@ -317,7 +317,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                 <span className="font-semibold">{formatCurrency(summary.nz_grand_total)}</span>
               </div>
               <div className="flex justify-between col-span-2 text-sm text-gray-600">
-                <span>÷ FX {Number(settings.fx_rate).toFixed(4)} → AU total</span>
+                <span>÷ FX {Number(settings.fx_rates.AUD).toFixed(4)} → AU total</span>
                 <span>{formatCurrency(summary.au_grand_total)}</span>
               </div>
             </div>

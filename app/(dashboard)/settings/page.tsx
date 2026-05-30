@@ -71,40 +71,11 @@ export default async function SettingsPage({ searchParams }: PageProps) {
           <div className="p-5 border-b border-gray-100">
             <h2 className="text-sm font-semibold">Currency exchange</h2>
             <p className="text-xs text-gray-500 mt-1">
-              Applied when a product has &ldquo;Apply FX&rdquo; set to Yes. NZ grand total = base cost × FX rate.
+              One rate per currency, used everywhere. The <strong>AUD → NZD</strong> rate converts AUD-priced ingredients/packaging into the NZD base cost, and is also reversed (NZD ÷ rate) to derive the AU total on every product. Each value is the multiplier <em>from</em> the listed currency <em>to</em> NZD (e.g. AUD = 1.20 means 1 AUD = 1.20 NZD; AU view = base ÷ 1.20).
             </p>
-          </div>
-          <div className="p-5 grid grid-cols-2 gap-4">
-            <label className="block text-sm">
-              <span className="text-gray-600 text-xs font-medium">FX rate (AUD → NZD)</span>
-              <input
-                name="fx_rate"
-                type="number"
-                step="0.0001"
-                min="0"
-                required
-                defaultValue={Number(settings.fx_rate).toFixed(4)}
-                className="mt-1 w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-900"
-              />
-            </label>
-            <div className="text-xs text-gray-500 self-end pb-2">
+            <div className="text-xs text-gray-500 mt-2">
               Last updated {formatDateTime(settings.updated_at)}
             </div>
-          </div>
-          {fxAffected != null && fxAffected > 0 && (
-            <div className="mx-5 mb-5 text-xs text-amber-700 bg-amber-50 rounded p-3">
-              <span className="font-semibold">Heads up:</span>{' '}
-              {fxAffected} product{fxAffected === 1 ? '' : 's'} currently {fxAffected === 1 ? 'has' : 'have'} &ldquo;Apply FX&rdquo; enabled. Saving will recalculate {fxAffected === 1 ? 'its' : 'their'} NZ grand total and COS NZ.
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="p-5 border-b border-gray-100">
-            <h2 className="text-sm font-semibold">Loaded-cost FX rates</h2>
-            <p className="text-xs text-gray-500 mt-1">
-              Used by ingredients + packaging when computing loaded NZD cost from a non-NZD supplier price. Each value is the multiplier to convert <em>from</em> the listed currency <em>to</em> NZD (e.g. AUD = 1.0833 means 1 AUD = 1.0833 NZD).
-            </p>
           </div>
           <div className="p-5 grid grid-cols-2 gap-4">
             <FxRateInput label="AUD → NZD" name="fx_rate_aud" value={settings.fx_rates.AUD} />
@@ -112,6 +83,12 @@ export default async function SettingsPage({ searchParams }: PageProps) {
             <FxRateInput label="EUR → NZD" name="fx_rate_eur" value={settings.fx_rates.EUR} />
             <FxRateInput label="GBP → NZD" name="fx_rate_gbp" value={settings.fx_rates.GBP} />
           </div>
+          {fxAffected != null && fxAffected > 0 && (
+            <div className="mx-5 mb-5 text-xs text-amber-700 bg-amber-50 rounded p-3">
+              <span className="font-semibold">Heads up:</span>{' '}
+              Changing AUD → NZD will recalculate every product&rsquo;s AU total and any AUD-priced ingredient or packaging loaded cost on the next view.
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200">

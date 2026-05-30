@@ -32,7 +32,7 @@ export default async function NewProductPage({ searchParams }: PageProps) {
         </p>
       </div>
 
-      <ProductForm action={createProduct} errorMessage={errorMessage} fxRate={Number(settings.fx_rate)} />
+      <ProductForm action={createProduct} errorMessage={errorMessage} fxRate={Number(settings.fx_rates.AUD)} />
     </div>
   )
 }

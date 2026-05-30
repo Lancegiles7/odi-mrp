@@ -11,7 +11,10 @@ export const DEFAULT_GST_NZ = 0.15
 export const DEFAULT_GST_AU = 0.10
 
 export type FxRatesJson = { NZD: number; AUD: number; USD: number; EUR: number; GBP: number }
-export const DEFAULT_FX_RATES: FxRatesJson = { NZD: 1.0, AUD: 1.0833, USD: 1.62, EUR: 1.78, GBP: 2.05 }
+// AUD here is the single source of truth for AUD → NZD across the app
+// (costing reads it; loaded-cost converters read it). 1.20 matches the
+// rate Odi has been keying off in the legacy fx_rate field.
+export const DEFAULT_FX_RATES: FxRatesJson = { NZD: 1.0, AUD: 1.20, USD: 1.62, EUR: 1.78, GBP: 2.05 }
 
 export type SettingsSnapshot = Pick<AppSettings, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct' | 'planning_start_month' | 'updated_at' | 'updated_by'> & {
   fx_rates: FxRatesJson

@@ -160,7 +160,7 @@ export default async function ProductPrintPage({ params }: PageProps) {
           <Meta label="RRP (inc GST)"  value={product.rrp != null ? formatCurrency(product.rrp) : null} />
           {product.hero_call_out && <div className="col-span-2"><Meta label="Hero call-out" value={product.hero_call_out} /></div>}
           <div className="col-span-2">
-            <Meta label="FX" value={`AUD → NZD ×${Number(settings.fx_rate).toFixed(4)} · base is NZD, AU derived`} />
+            <Meta label="FX" value={`AUD → NZD ×${Number(settings.fx_rates.AUD).toFixed(4)} · base is NZD, AU derived`} />
           </div>
         </div>
 
@@ -181,7 +181,7 @@ export default async function ProductPrintPage({ params }: PageProps) {
           />
           <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="Ing + pkg + toll + margin + task + freight" />
           <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub="Base — always NZD" dark />
-          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`÷ ${Number(settings.fx_rate).toFixed(4)} FX → AUD`} />
+          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`÷ ${Number(settings.fx_rates.AUD).toFixed(4)} FX → AUD`} />
         </div>
         <div className="grid grid-cols-4 gap-2 mb-5">
           <Tile label="COS NZ" value={summary.cos_nz !== null ? `${(summary.cos_nz * 100).toFixed(1)}%` : '—'} sub={`${formatCurrency(summary.nz_grand_total)} of ${formatCurrency(summary.rrp_ex_gst_nz)} ex-GST`} accent />
@@ -301,7 +301,7 @@ export default async function ProductPrintPage({ params }: PageProps) {
             <span className="tabular-nums">{formatCurrency(summary.nz_grand_total)}</span>
           </div>
           <div className="flex justify-between pt-1 text-[12px]" style={{ color: '#6b7280' }}>
-            <span>÷ FX {Number(settings.fx_rate).toFixed(4)} → AU total</span>
+            <span>÷ FX {Number(settings.fx_rates.AUD).toFixed(4)} → AU total</span>
             <span className="tabular-nums">{formatCurrency(summary.au_grand_total)}</span>
           </div>
         </div>

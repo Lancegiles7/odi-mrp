@@ -90,7 +90,7 @@ export default async function EditProductPage({ params, searchParams }: PageProp
         product={product}
         action={action}
         errorMessage={errorMessage}
-        fxRate={Number(settings.fx_rate)}
+        fxRate={Number(settings.fx_rates.AUD)}
       />
 
       {/* BOM editor — shown below the main form */}

@@ -79,7 +79,7 @@ export function calcProductCostSummary(
     | 'wastage_pct'
   >,
   bomItems: BomItemWithIngredient[],
-  settings: Pick<SettingsSnapshot, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct'>,
+  settings: Pick<SettingsSnapshot, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct' | 'fx_rates'>,
 ): ProductCostSummary {
   const ingredientSubtotal = bomItems.reduce(
     (sum, item) => sum + calcLinePrice(item),
@@ -113,7 +113,11 @@ export function calcProductCostSummary(
   // form). NZ grand total == base. AU is derived by dividing by the
   // AUD→NZD rate. apply_fx is kept on the row for back-compat but no
   // longer affects the calculation — AU is always shown.
-  const fxRate       = Number(settings.fx_rate) || 1
+  //
+  // Single source of truth: settings.fx_rates.AUD (same rate the
+  // loaded-cost converters use, so a round-trip on an AUD input is
+  // exact). The legacy settings.fx_rate column is no longer read.
+  const fxRate       = Number(settings.fx_rates?.AUD) || 1
   const nzGrandTotal = baseCost
   const auGrandTotal = fxRate > 0 ? round2(baseCost / fxRate) : baseCost
 
