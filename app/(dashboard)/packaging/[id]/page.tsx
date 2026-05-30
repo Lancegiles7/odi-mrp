@@ -62,6 +62,7 @@ export default async function EditPackagingPage({ params, searchParams }: PagePr
         <PackagingProductsBom
           packagingId={data.id!}
           packagingName={data.name}
+          loadedCostNzd={data.total_loaded_cost_nzd != null ? Number(data.total_loaded_cost_nzd) : null}
           initialRows={(usedIn ?? []).map((u) => ({
             product_id: u.product_id,
             entry_mode: (u.entry_mode === 'per_group' ? 'per_group' : 'per_pack') as 'per_pack' | 'per_group',

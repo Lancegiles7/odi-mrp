@@ -23,6 +23,7 @@ interface BomRow {
 interface Props {
   packagingId: string
   packagingName: string
+  loadedCostNzd: number | null  // packaging.total_loaded_cost_nzd — used to show the per-product cost beside each link
   initialRows: BomRow[]
   products: ProductOption[]
 }
@@ -32,7 +33,9 @@ function resolveQty(mode: EntryMode, value: number): number {
   return mode === 'per_group' ? 1 / value : value
 }
 
-export function PackagingProductsBom({ packagingId, packagingName, initialRows, products }: Props) {
+export function PackagingProductsBom({ packagingId, packagingName, loadedCostNzd, initialRows, products }: Props) {
+  const unitCost = Number(loadedCostNzd) || 0
+  const fmtCost  = (n: number) => `$${n.toFixed(4)}`
   const router = useRouter()
   const [rows, setRows] = useState<BomRow[]>(initialRows)
   const [pending, start] = useTransition()
@@ -156,8 +159,16 @@ export function PackagingProductsBom({ packagingId, packagingName, initialRows, 
                     <option value="per_pack">per product</option>
                     <option value="per_group">products per packaging</option>
                   </select>
-                  {r.entry_mode === 'per_group' && r.entry_value > 0 && (
-                    <div className="text-[10px] text-gray-400 mt-0.5 tabular-nums">→ {qty.toFixed(4)} per product</div>
+                  {qty > 0 && (
+                    <div className="text-[10px] text-gray-400 mt-0.5 tabular-nums">
+                      {r.entry_mode === 'per_group' && <>→ {qty.toFixed(4)} per product</>}
+                      {unitCost > 0 && (
+                        <>
+                          {r.entry_mode === 'per_group' ? ' · ' : '→ '}
+                          <span className={excluded ? '' : 'text-gray-600'}>{fmtCost(qty * unitCost)} per pack</span>
+                        </>
+                      )}
+                    </div>
                   )}
                 </td>
                 <td className="px-3 py-1.5 text-center">
