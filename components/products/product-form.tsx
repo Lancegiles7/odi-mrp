@@ -29,11 +29,15 @@ function Field({
 }
 
 function NumberInput({
-  id, name, defaultValue, placeholder, prefix, suffix, step = '0.01', allowNegative = false,
+  id, name, defaultValue, placeholder, prefix, suffix, step = 'any', allowNegative = false,
 }: {
   id?: string; name: string; defaultValue?: number | null; placeholder?: string
   prefix?: string; suffix?: string; step?: string; allowNegative?: boolean
 }) {
+  // Default step is 'any' so cost inputs accept the same 4-decimal
+  // precision used everywhere else (loaded packaging cost, ingredient
+  // loaded cost, FX, etc.). Fields that genuinely want whole numbers
+  // (size_g override etc.) pass step explicitly.
   return (
     <div className="relative">
       {prefix && <span className="absolute left-3 top-2 text-sm text-gray-400 pointer-events-none">{prefix}</span>}
