@@ -38,10 +38,10 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
         notes: string | null; supplier_id: string; currency: string | null; issuer_id: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
-      .select('id, ingredient_id, product_id, description, quantity_ordered, unit_cost, unit_of_measure, notes')
+      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes')
       .eq('purchase_order_id', params.id)
       .order('created_at') as unknown as Promise<{ data: Array<{
-        id: string; ingredient_id: string | null; product_id: string | null;
+        id: string; ingredient_id: string | null; product_id: string | null; packaging_id: string | null;
         description: string | null; quantity_ordered: number; unit_cost: number | null;
         unit_of_measure: string; notes: string | null;
       }> | null }>,
@@ -51,7 +51,7 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
   if (!po) notFound()
 
   // Resolve supplier + line names + delivery address
-  const [{ data: supplier }, { data: ingredients }, { data: products }, { data: deliveryAddress }] = await Promise.all([
+  const [{ data: supplier }, { data: ingredients }, { data: products }, { data: packaging }, { data: deliveryAddress }] = await Promise.all([
     supabase.from('suppliers')
       .select('name, contact_name, email, phone, address, payment_terms')
       .eq('id', po.supplier_id)
@@ -65,6 +65,9 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
     supabase.from('products')
       .select('id, sku_code, name')
       .in('id', (lines ?? []).filter((l) => l.product_id).map((l) => l.product_id!)) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string }> | null }>,
+    supabase.from('packaging')
+      .select('id, sku_code, name, supplier_sku_code')
+      .in('id', (lines ?? []).filter((l) => l.packaging_id).map((l) => l.packaging_id!)) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; supplier_sku_code: string | null }> | null }>,
     po.delivery_address_id
       ? supabase.from('delivery_addresses')
           .select('label, street, contact_name, phone, country')
@@ -87,6 +90,7 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
 
   const ingMap  = new Map((ingredients ?? []).map((i) => [i.id, i]))
   const prodMap = new Map((products ?? []).map((p) => [p.id, p]))
+  const pkgMap  = new Map((packaging  ?? []).map((p) => [p.id, p]))
 
   const subtotal = (lines ?? []).reduce(
     (s, l) => s + (Number(l.unit_cost) || 0) * Number(l.quantity_ordered), 0,
@@ -223,9 +227,10 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
             {(lines ?? []).map((l) => {
               const ing  = l.ingredient_id ? ingMap.get(l.ingredient_id) : null
               const prod = l.product_id    ? prodMap.get(l.product_id)   : null
-              const name = ing?.name ?? prod?.name ?? l.description ?? '—'
-              const sku  = ing?.sku_code ?? prod?.sku_code ?? null
-              const supplierSku = ing?.supplier_sku_code ?? null
+              const pkg  = l.packaging_id  ? pkgMap.get(l.packaging_id)  : null
+              const name = ing?.name ?? prod?.name ?? pkg?.name ?? l.description ?? '—'
+              const sku  = ing?.sku_code ?? prod?.sku_code ?? pkg?.sku_code ?? null
+              const supplierSku = ing?.supplier_sku_code ?? pkg?.supplier_sku_code ?? null
               const total = (Number(l.unit_cost) || 0) * Number(l.quantity_ordered)
               return (
                 <tr key={l.id} className="border-b border-gray-100">
