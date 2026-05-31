@@ -39,6 +39,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       .from('products')
       .select('id, sku_code, name, manufacturer, opening_stock_override, is_active')
       .is('deleted_at', null)
+      .eq('is_active', true)
       .order('manufacturer', { ascending: true, nullsFirst: false })
       .order('name', { ascending: true }) as unknown as Promise<{ data: ProductRow[] | null }>,
     fetchAllRows<DemandForecast>((from, to) =>

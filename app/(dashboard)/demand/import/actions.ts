@@ -180,6 +180,58 @@ export async function commitDemandImport(payload: DemandImportPayload): Promise<
     })
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // True-overwrite cleanup
+  // For every product the import resolved, delete any existing
+  // non-edited, non-pipefill demand row in the sheet's month window
+  // that isn't being written by this import. Without this, an empty
+  // cell in the new sheet leaves the old non-zero value untouched —
+  // exactly the "stale August demand" the user spotted on inactive
+  // SKUs. Manually-edited cells (is_edited=true, amber) and pipefill
+  // (separate channel) are excluded from the cleanup and stay intact.
+  // ─────────────────────────────────────────────────────────────
+  if (productIdByKey.size > 0 && payload.rows.length > 0) {
+    const distinctMonths   = Array.from(new Set(payload.rows.map((r) => r.year_month)))
+    const importChannels   = Array.from(new Set(payload.rows.map((r) => r.channel))) as DemandChannel[]
+    const windowStart      = distinctMonths.reduce((a, b) => (a < b ? a : b))
+    const windowEnd        = distinctMonths.reduce((a, b) => (a > b ? a : b))
+    const matchedProductIds = Array.from(new Set(productIdByKey.values()))
+    const writtenKeys      = new Set(byKey.keys())
+
+    // Chunk product IDs into .in() calls so we don't blow past
+    // PostgREST's filter-length limit on big imports.
+    const PROD_CHUNK = 200
+    const idsToDelete: string[] = []
+    for (let i = 0; i < matchedProductIds.length; i += PROD_CHUNK) {
+      const pidSlice = matchedProductIds.slice(i, i + PROD_CHUNK)
+      const stale = await fetchAllRows<{ id: string; product_id: string; year_month: string; channel: string }>((from, to) =>
+        supabase.from('demand_forecasts')
+          .select('id, product_id, year_month, channel')
+          .in('product_id', pidSlice)
+          .gte('year_month', windowStart).lte('year_month', windowEnd)
+          .in('channel', importChannels)
+          .eq('is_edited', false)
+          .order('product_id').order('year_month').order('channel')
+          .range(from, to) as unknown as PromiseLike<{ data: Array<{ id: string; product_id: string; year_month: string; channel: string }> | null; error: { message: string } | null }>,
+      )
+      for (const r of stale) {
+        const k = `${r.product_id}|${r.year_month.slice(0, 10)}|${r.channel}`
+        if (!writtenKeys.has(k)) idsToDelete.push(r.id)
+      }
+    }
+
+    if (idsToDelete.length > 0) {
+      const DEL_CHUNK = 500
+      for (let i = 0; i < idsToDelete.length; i += DEL_CHUNK) {
+        const slice = idsToDelete.slice(i, i + DEL_CHUNK)
+        const { error } = await supabase.from('demand_forecasts').delete().in('id', slice)
+        if (error) {
+          result.errors.push({ product: '(cleanup chunk)', error: error.message })
+        }
+      }
+    }
+  }
+
   if (upserts.length > 0) {
     // Chunk to avoid huge single inserts
     const CHUNK = 500
