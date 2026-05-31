@@ -1,10 +1,14 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { updateIngredientOpeningStock } from '@/app/(dashboard)/ingredients/demand/actions'
-import { demandUnitLabel, monthShortfalls } from '@/lib/ingredient-demand'
+import {
+  updateIngredientOpeningStock,
+  getIngredientOpeningStockHistory,
+} from '@/app/(dashboard)/ingredients/demand/actions'
+import { demandUnitLabel, monthShortfalls, monthRunningBalances } from '@/lib/ingredient-demand'
 import type { IngredientRow as IngredientRowData } from '@/lib/ingredient-demand'
+import { OpeningStockHistoryPopover } from '@/components/inventory/opening-stock-popover'
 
 interface Props {
   row: IngredientRowData
@@ -22,26 +26,19 @@ function fmt(n: number): string {
 export function IngredientDemandRow({ row, months }: Props) {
   const [open, setOpen] = useState(false)
   const [override, setOverride] = useState<number | null>(row.ingredient.opening_stock_override)
-  const [saving, setSaving] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
   const opening = override ?? 0
-  const shortByMonth = useMemo(
-    () => monthShortfalls(row, opening, months),
-    [row, opening, months],
-  )
+  const shortByMonth   = useMemo(() => monthShortfalls(row, opening, months),   [row, opening, months])
+  const balanceByMonth = useMemo(() => monthRunningBalances(row, opening, months), [row, opening, months])
 
-  function commitOpening(raw: string) {
-    const trimmed = raw.trim()
-    const next: number | null = trimmed === '' ? null : Math.max(0, Number(trimmed))
-    if (next !== null && !Number.isFinite(next)) return
-    if (next === override) return
+  const ingredientId = row.ingredient.id
+  const ingredientName = row.ingredient.name
+  const onSave        = useCallback((v: number | null, note: string) => updateIngredientOpeningStock(ingredientId, v, note), [ingredientId])
+  const onLoadHistory = useCallback(() => getIngredientOpeningStockHistory(ingredientId), [ingredientId])
+  function handleSaved(next: number | null) {
     setOverride(next)
     setError(null)
-    setSaving(async () => {
-      const res = await updateIngredientOpeningStock(row.ingredient.id, next)
-      if (!res.ok) setError(res.error ?? 'Save failed')
-    })
   }
 
   const unit = demandUnitLabel(row.ingredient.unit_of_measure)
@@ -67,7 +64,6 @@ export function IngredientDemandRow({ row, months }: Props) {
                   {row.ingredient.name}
                 </Link>
                 <span className="ml-2 text-[10px] text-gray-400">({unit})</span>
-                {saving && <span className="ml-2 text-[10px] text-gray-400">saving…</span>}
               </div>
               {error && <div className="text-[11px] text-red-600 mt-0.5">{error}</div>}
             </div>
@@ -75,27 +71,27 @@ export function IngredientDemandRow({ row, months }: Props) {
         </td>
 
         <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-          <input
-            key={`${row.ingredient.id}-opening-${override ?? 'null'}`}
-            type="number"
-            min={0}
-            step="any"
-            defaultValue={override ?? ''}
-            onBlur={(e) => commitOpening(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-            placeholder="0"
-            title={`Opening stock in ${unit} — leave blank to fall back to on-hand inventory`}
-            className={`w-20 text-right text-[11px] rounded px-1.5 py-0.5 tabular-nums ${
-              override === null
-                ? 'border border-dashed border-gray-300 bg-white text-gray-400 placeholder-gray-300 focus:border-gray-400 focus:text-gray-900'
-                : 'border border-gray-300 bg-white text-gray-900 font-medium'
-            } focus:bg-amber-50 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none`}
+          <OpeningStockHistoryPopover
+            entityLabel={`Opening stock · ${ingredientName}`}
+            description={`Manual override in ${unit} — leave blank to fall back to on-hand inventory.`}
+            currentValue={override}
+            unitLabel={unit}
+            onSave={onSave}
+            onLoadHistory={onLoadHistory}
+            onSaved={handleSaved}
           />
         </td>
 
         {months.map((m) => {
           const v = row.demandByMonth.get(m) ?? 0
           const short = shortByMonth.get(m)
+          const bal   = balanceByMonth.get(m) ?? 0
+          const pct   = v > 0 ? Math.round((bal / v) * 100) : null
+          const pctCls = pct == null
+            ? ''
+            : pct < 0     ? 'text-red-600'
+            : pct >= 100  ? 'text-emerald-600'
+                          : 'text-amber-600'
           return (
             <td
               key={m}
@@ -103,7 +99,8 @@ export function IngredientDemandRow({ row, months }: Props) {
                 short ? 'bg-red-50 text-red-700 font-semibold' : 'text-gray-700'
               }`}
             >
-              {v === 0 ? <span className="text-gray-300">0</span> : fmt(v)}
+              <div>{v === 0 ? <span className="text-gray-300">0</span> : fmt(v)}</div>
+              {pct != null && <div className={`text-[9px] font-normal ${pctCls}`}>{pct}%</div>}
             </td>
           )
         })}

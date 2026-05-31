@@ -1,30 +1,42 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import {
-  updateOpeningStockOverride,
-  getOpeningStockHistory,
-  type OpeningStockHistoryRow,
-} from '@/app/(dashboard)/production/actions'
+import type {
+  OpeningStockHistoryRow,
+  UpdateResult,
+  HistoryFetchResult,
+} from '@/lib/opening-stock-history'
 
 interface Props {
-  productId:    string
-  productName:  string
+  /** Heading shown at the top of the popover, e.g. "Opening stock · Odi Organic Banana". */
+  entityLabel:  string
+  /** Current opening-stock override value (null = no override set; falls back to inventory). */
   currentValue: number | null
-  /** Parent updates its row display when the override saves successfully. */
+  /** Hint text shown under the heading — entity-specific copy. */
+  description?: string
+  /** Server action that writes the new value + appends a history row. */
+  onSave:       (value: number | null, note: string) => Promise<UpdateResult>
+  /** Server action that fetches the history rows for this entity. */
+  onLoadHistory: () => Promise<HistoryFetchResult>
+  /** Parent updates its row display when the save succeeds. */
   onSaved:      (next: number | null) => void
+  /** Unit suffix shown next to the value (e.g. "g", "kg") — optional. */
+  unitLabel?:   string
 }
 
 /**
- * Trigger button + modal popover for editing a product's opening-stock
- * override with an optional comment, plus a scrollable view of every
- * past change. Replaces the bare numeric input that used to live in
- * the Production row.
+ * Shared popover for editing an opening-stock override with an
+ * optional comment and viewing the audit trail. Used on the
+ * Production page (products), Ingredient demand and Packaging
+ * demand. The popover itself is entity-agnostic — the caller
+ * supplies the right server actions and label strings.
  *
- * History is fetched lazily when the popover opens (avoids loading
- * dozens of rows of audit data for every product on first paint).
+ * History is fetched lazily on first open. Reopening reloads.
  */
-export function OpeningStockPopover({ productId, productName, currentValue, onSaved }: Props) {
+export function OpeningStockHistoryPopover({
+  entityLabel, currentValue, description,
+  onSave, onLoadHistory, onSaved, unitLabel,
+}: Props) {
   const [open,    setOpen]    = useState(false)
   const [value,   setValue]   = useState<string>(currentValue == null ? '' : String(currentValue))
   const [note,    setNote]    = useState<string>('')
@@ -33,8 +45,6 @@ export function OpeningStockPopover({ productId, productName, currentValue, onSa
   const [error,   setError]   = useState<string | null>(null)
   const [saving,  startSave]  = useTransition()
 
-  // Reset local state every time the popover opens so it always shows
-  // the latest server-side value, not a stale value from a prior render.
   useEffect(() => {
     if (!open) return
     setValue(currentValue == null ? '' : String(currentValue))
@@ -42,22 +52,22 @@ export function OpeningStockPopover({ productId, productName, currentValue, onSa
     setError(null)
     setRows(null)
     setLoading(true)
-    getOpeningStockHistory(productId).then((res) => {
+    onLoadHistory().then((res) => {
       setRows(res.ok ? res.rows : [])
       if (!res.ok && res.error) setError(`Couldn't load history: ${res.error}`)
       setLoading(false)
     })
-  }, [open, productId, currentValue])
+  }, [open, currentValue, onLoadHistory])
 
   function save() {
     const trimmed   = value.trim()
-    const nextValue: number | null = trimmed === '' ? null : Math.max(0, Math.round(Number(trimmed)))
+    const nextValue: number | null = trimmed === '' ? null : Math.max(0, Number(trimmed))
     if (nextValue !== null && !Number.isFinite(nextValue)) {
       setError('Enter a number')
       return
     }
     startSave(async () => {
-      const res = await updateOpeningStockOverride(productId, nextValue, note)
+      const res = await onSave(nextValue, note)
       if (!res.ok) {
         setError(res.error ?? 'Save failed')
         return
@@ -71,7 +81,7 @@ export function OpeningStockPopover({ productId, productName, currentValue, onSa
 
   return (
     <>
-      {/* Trigger row — keeps the existing inline numeric look so the page reads the same at a glance */}
+      {/* Trigger — value chip + clock icon button */}
       <div className="inline-flex items-center gap-1">
         <span
           className={`inline-block w-20 text-right text-[11px] rounded px-1.5 py-0.5 tabular-nums border ${
@@ -105,21 +115,27 @@ export function OpeningStockPopover({ productId, productName, currentValue, onSa
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-5 py-3 border-b border-gray-100">
-              <h3 className="text-sm font-semibold">Opening stock · {productName}</h3>
-              <p className="text-[11px] text-gray-500 mt-0.5">Manual override · leave blank to fall back to inventory on hand.</p>
+              <h3 className="text-sm font-semibold">{entityLabel}</h3>
+              {description && <p className="text-[11px] text-gray-500 mt-0.5">{description}</p>}
             </div>
 
             <div className="px-5 py-4 text-sm space-y-3">
               <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                 <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Current</span>
-                <span className="text-lg font-semibold tabular-nums">{currentValue == null ? '—' : currentValue.toLocaleString()}</span>
+                <span className="text-lg font-semibold tabular-nums">
+                  {currentValue == null ? '—' : currentValue.toLocaleString()}
+                  {unitLabel && currentValue != null && <span className="text-xs text-gray-500 ml-1">{unitLabel}</span>}
+                </span>
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">New value</label>
+                <label className="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                  New value{unitLabel && <span className="text-gray-400 ml-1 normal-case tracking-normal">({unitLabel})</span>}
+                </label>
                 <input
                   type="number"
                   min={0}
+                  step="any"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   placeholder="(blank = clear override)"

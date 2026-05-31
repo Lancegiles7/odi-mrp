@@ -1,11 +1,15 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useCallback, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { updateProductionCell } from '@/app/(dashboard)/production/actions'
+import {
+  updateProductionCell,
+  updateOpeningStockOverride,
+  getOpeningStockHistory,
+} from '@/app/(dashboard)/production/actions'
 import { calcRollingBalance, monthLabel } from '@/lib/demand'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
-import { OpeningStockPopover } from '@/components/production/opening-stock-popover'
+import { OpeningStockHistoryPopover } from '@/components/inventory/opening-stock-popover'
 
 interface Props {
   productId: string
@@ -91,10 +95,12 @@ export function ProductionRow({
       )}
 
       <td className="px-3 py-2 text-right">
-        <OpeningStockPopover
-          productId={productId}
-          productName={productName}
+        <OpeningStockHistoryPopover
+          entityLabel={`Opening stock · ${productName}`}
+          description="Manual override · leave blank to fall back to inventory on hand."
           currentValue={override}
+          onSave={useCallback((v, note) => updateOpeningStockOverride(productId, v, note), [productId])}
+          onLoadHistory={useCallback(() => getOpeningStockHistory(productId), [productId])}
           onSaved={handleOpeningSaved}
         />
       </td>

@@ -1,9 +1,13 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { updatePackagingOpeningStock } from '@/app/(dashboard)/packaging/demand/actions'
-import { monthShortfalls, type PackagingRow } from '@/lib/packaging-demand'
+import {
+  updatePackagingOpeningStock,
+  getPackagingOpeningStockHistory,
+} from '@/app/(dashboard)/packaging/demand/actions'
+import { monthShortfalls, monthRunningBalances, type PackagingRow } from '@/lib/packaging-demand'
+import { OpeningStockHistoryPopover } from '@/components/inventory/opening-stock-popover'
 
 interface Props {
   row: PackagingRow
@@ -21,24 +25,21 @@ function fmt(n: number): string {
 export function PackagingDemandRow({ row, months }: Props) {
   const [open, setOpen] = useState(false)
   const [override, setOverride] = useState<number | null>(row.packaging.opening_stock_override)
-  const [, setSaving] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
   const opening = override ?? 0
-  const shortByMonth = useMemo(() => monthShortfalls(row, opening, months), [row, opening, months])
+  const shortByMonth   = useMemo(() => monthShortfalls(row, opening, months),   [row, opening, months])
+  const balanceByMonth = useMemo(() => monthRunningBalances(row, opening, months), [row, opening, months])
   const hasArrivals = Array.from(row.arrivingByMonth.values()).some((v) => v > 0)
 
-  function commitOpening(raw: string) {
-    const trimmed = raw.trim()
-    const next: number | null = trimmed === '' ? null : Math.max(0, Number(trimmed))
-    if (next !== null && !Number.isFinite(next)) return
-    if (next === override) return
+  const packagingId   = row.packaging.id
+  const packagingName = row.packaging.name
+  const unit          = row.packaging.unit_of_measure
+  const onSave        = useCallback((v: number | null, note: string) => updatePackagingOpeningStock(packagingId, v, note), [packagingId])
+  const onLoadHistory = useCallback(() => getPackagingOpeningStockHistory(packagingId), [packagingId])
+  function handleSaved(next: number | null) {
     setOverride(next)
     setError(null)
-    setSaving(async () => {
-      const res = await updatePackagingOpeningStock(row.packaging.id, next)
-      if (!res.ok) setError(res.error ?? 'Save failed')
-    })
   }
 
   return (
@@ -60,29 +61,30 @@ export function PackagingDemandRow({ row, months }: Props) {
           </div>
         </td>
         <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-          <input
-            key={`${row.packaging.id}-opening-${override ?? 'null'}`}
-            type="number"
-            min={0}
-            step="any"
-            defaultValue={override ?? ''}
-            onBlur={(e) => commitOpening(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-            placeholder="0"
-            title="Opening stock — leave blank to fall back to on-hand inventory"
-            className={`w-20 text-right text-[11px] rounded px-1.5 py-0.5 tabular-nums ${
-              override === null
-                ? 'border border-dashed border-gray-300 bg-white text-gray-400 placeholder-gray-300 focus:border-gray-400 focus:text-gray-900'
-                : 'border border-gray-300 bg-white text-gray-900 font-medium'
-            } focus:bg-amber-50 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none`}
+          <OpeningStockHistoryPopover
+            entityLabel={`Opening stock · ${packagingName}`}
+            description={`Manual override in ${unit} — leave blank to fall back to on-hand inventory.`}
+            currentValue={override}
+            unitLabel={unit}
+            onSave={onSave}
+            onLoadHistory={onLoadHistory}
+            onSaved={handleSaved}
           />
         </td>
         {months.map((m) => {
           const v = row.demandByMonth.get(m) ?? 0
           const short = shortByMonth.get(m)
+          const bal   = balanceByMonth.get(m) ?? 0
+          const pct   = v > 0 ? Math.round((bal / v) * 100) : null
+          const pctCls = pct == null
+            ? ''
+            : pct < 0     ? 'text-red-600'
+            : pct >= 100  ? 'text-emerald-600'
+                          : 'text-amber-600'
           return (
             <td key={m} className={`px-2 py-2 text-right tabular-nums border-l border-gray-100 ${short ? 'bg-red-50 text-red-700 font-semibold' : 'text-gray-700'}`}>
-              {v === 0 ? <span className="text-gray-300">0</span> : fmt(v)}
+              <div>{v === 0 ? <span className="text-gray-300">0</span> : fmt(v)}</div>
+              {pct != null && <div className={`text-[9px] font-normal ${pctCls}`}>{pct}%</div>}
             </td>
           )
         })}

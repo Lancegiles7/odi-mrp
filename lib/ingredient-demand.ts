@@ -268,6 +268,27 @@ export function monthShortfalls(
   return out
 }
 
+/**
+ * Running stock balance after each month (opening + Σ arrivals − Σ demand
+ * through that month). Powers the per-cell "% of demand still covered"
+ * sub-label on the Ingredient demand row.
+ */
+export function monthRunningBalances(
+  row: IngredientRow,
+  opening: number,
+  months: string[],
+): Map<string, number> {
+  const out = new Map<string, number>()
+  let balance = opening
+  for (const m of months) {
+    const demand   = row.demandByMonth.get(m)   ?? 0
+    const arriving = row.arrivingByMonth.get(m) ?? 0
+    balance = balance + arriving - demand
+    out.set(m, balance)
+  }
+  return out
+}
+
 export function hasAnyShortfall(
   row: IngredientRow,
   opening: number,

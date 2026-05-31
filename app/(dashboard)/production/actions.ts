@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import type { OpeningStockHistoryRow } from '@/lib/opening-stock-history'
 
 export async function updateProductionCell(
   productId: string,
@@ -105,17 +106,9 @@ export async function updateOpeningStockOverride(
 /**
  * Read recent opening-stock audit entries for a product. Newest first,
  * capped at 50 (the popover lazy-loads when opened, so this is enough
- * for browsing without paginating).
+ * for browsing without paginating). Returns the shared
+ * OpeningStockHistoryRow shape from lib/opening-stock-history.
  */
-export interface OpeningStockHistoryRow {
-  id:               string
-  previous_value:   number | null
-  new_value:        number | null
-  note:             string | null
-  changed_at:       string
-  changed_by_name:  string | null
-}
-
 export async function getOpeningStockHistory(
   productId: string,
 ): Promise<{ ok: boolean; rows: OpeningStockHistoryRow[]; error?: string }> {
