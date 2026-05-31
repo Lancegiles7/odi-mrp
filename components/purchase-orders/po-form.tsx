@@ -28,6 +28,7 @@ interface IngredientOption {
   supplier_pack_size: number | null
   supplier_pack_unit: string | null
   price:              number | null
+  currency:           string | null     // price is denominated in this currency
 }
 
 interface ProductOption {
@@ -44,6 +45,8 @@ interface PackagingOption {
   supplier_sku_code: string | null
   supplier_pack_size: number | null
   supplier_pack_unit: string | null
+  price: number | null            // supplier-currency price (what we PO at)
+  currency: string | null         // the packaging item's currency
   total_loaded_cost_nzd: number | null
 }
 
@@ -150,18 +153,37 @@ export function POForm(props: POFormProps) {
         if (patch.line_type === 'product')    next.unit_of_measure = 'each'
         if (patch.line_type === 'packaging')  next.unit_of_measure = 'each'
       }
-      // Pre-fill from the selected ingredient's saved supplier reference data
+      // Pre-fill from the selected ingredient's saved supplier reference
+      // data. Only fill price when the ingredient's currency matches the
+      // current PO currency — otherwise we'd silently mis-price the line.
       if (patch.ingredient_id && patch.ingredient_id !== l.ingredient_id) {
         const ing = props.ingredients.find((x) => x.id === patch.ingredient_id)
         if (ing) {
-          if (next.unit_cost == null && ing.price != null) next.unit_cost = Number(ing.price)
+          if (
+            next.unit_cost == null &&
+            ing.price != null &&
+            (ing.currency ?? 'NZD').toUpperCase() === currency.toUpperCase()
+          ) {
+            next.unit_cost = Number(ing.price)
+          }
         }
       }
-      // Pre-fill from packaging item: loaded NZD price + UoM
+      // Pre-fill from packaging item. The PO is denominated in the
+      // supplier's currency, so we pre-fill the supplier-currency
+      // price (pk.price) — NOT the NZD-loaded cost, which already has
+      // FX baked in. Only auto-fill when the packaging item's currency
+      // matches the current PO currency; otherwise the user has to
+      // enter it explicitly so we don't silently mis-price the line.
       if (patch.packaging_id && patch.packaging_id !== l.packaging_id) {
         const pk = props.packaging.find((x) => x.id === patch.packaging_id)
         if (pk) {
-          if (next.unit_cost == null && pk.total_loaded_cost_nzd != null) next.unit_cost = Number(pk.total_loaded_cost_nzd)
+          if (
+            next.unit_cost == null &&
+            pk.price != null &&
+            (pk.currency ?? 'NZD').toUpperCase() === currency.toUpperCase()
+          ) {
+            next.unit_cost = Number(pk.price)
+          }
           if (pk.unit_of_measure) next.unit_of_measure = pk.unit_of_measure
         }
       }
