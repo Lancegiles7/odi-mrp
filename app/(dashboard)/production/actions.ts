@@ -37,12 +37,19 @@ export async function updateProductionCell(
 }
 
 /**
- * Update the manual opening-stock override on a product.
- * Pass null to clear the override (falls back to inventory_balances).
+ * Update the manual opening-stock override on a product, and append an
+ * audit row to product_opening_stock_history capturing who changed it,
+ * when, the previous + new values, and an optional comment. Pass null
+ * to clear the override (falls back to inventory_balances).
+ *
+ * No-op when the new value matches the existing one AND no note is
+ * provided — keeps the history table free of empty rows from accidental
+ * blur-without-change events on the input.
  */
 export async function updateOpeningStockOverride(
   productId: string,
   value: number | null,
+  note?: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
   if (value !== null && (!Number.isFinite(value) || value < 0)) {
     return { ok: false, error: 'invalid_value' }
@@ -52,14 +59,93 @@ export async function updateOpeningStockOverride(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
 
-  const { error } = await supabase
+  // Read the existing value first so the history row captures the full change.
+  const { data: existing } = await supabase
     .from('products')
-    .update({ opening_stock_override: value })
+    .select('opening_stock_override')
     .eq('id', productId)
+    .maybeSingle() as { data: { opening_stock_override: number | null } | null }
+  const previousValue = existing?.opening_stock_override ?? null
 
-  if (error) return { ok: false, error: error.message }
+  const trimmedNote   = note?.trim() || null
+  const valueChanged  = (previousValue ?? null) !== (value ?? null)
+
+  // Nothing to record — skip everything.
+  if (!valueChanged && !trimmedNote) return { ok: true }
+
+  if (valueChanged) {
+    const { error: updateErr } = await supabase
+      .from('products')
+      .update({ opening_stock_override: value })
+      .eq('id', productId)
+    if (updateErr) return { ok: false, error: updateErr.message }
+  }
+
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+
+  // Append audit row. We deliberately don't fail the whole call if the
+  // history insert errors — the override was already saved and that's
+  // what the user sees on screen.
+  await supabase
+    .from('product_opening_stock_history')
+    .insert({
+      product_id:     productId,
+      previous_value: previousValue,
+      new_value:      value,
+      note:           trimmedNote,
+      changed_by:     profile?.id ?? null,
+    })
 
   revalidatePath('/production')
   revalidatePath(`/products/${productId}`)
   return { ok: true }
+}
+
+/**
+ * Read recent opening-stock audit entries for a product. Newest first,
+ * capped at 50 (the popover lazy-loads when opened, so this is enough
+ * for browsing without paginating).
+ */
+export interface OpeningStockHistoryRow {
+  id:               string
+  previous_value:   number | null
+  new_value:        number | null
+  note:             string | null
+  changed_at:       string
+  changed_by_name:  string | null
+}
+
+export async function getOpeningStockHistory(
+  productId: string,
+): Promise<{ ok: boolean; rows: OpeningStockHistoryRow[]; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, rows: [], error: 'not_authenticated' }
+
+  const { data, error } = await supabase
+    .from('product_opening_stock_history')
+    .select('id, previous_value, new_value, note, changed_at, user_profiles:changed_by ( full_name )')
+    .eq('product_id', productId)
+    .order('changed_at', { ascending: false })
+    .limit(50) as unknown as { data: Array<{
+      id: string
+      previous_value: number | null
+      new_value: number | null
+      note: string | null
+      changed_at: string
+      user_profiles: { full_name: string } | null
+    }> | null; error: { message: string } | null }
+
+  if (error) return { ok: false, rows: [], error: error.message }
+
+  const rows: OpeningStockHistoryRow[] = (data ?? []).map((r) => ({
+    id:               r.id,
+    previous_value:   r.previous_value,
+    new_value:        r.new_value,
+    note:             r.note,
+    changed_at:       r.changed_at,
+    changed_by_name:  r.user_profiles?.full_name ?? null,
+  }))
+  return { ok: true, rows }
 }

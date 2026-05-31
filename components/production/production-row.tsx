@@ -2,9 +2,10 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { updateProductionCell, updateOpeningStockOverride } from '@/app/(dashboard)/production/actions'
+import { updateProductionCell } from '@/app/(dashboard)/production/actions'
 import { calcRollingBalance, monthLabel } from '@/lib/demand'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
+import { OpeningStockPopover } from '@/components/production/opening-stock-popover'
 
 interface Props {
   productId: string
@@ -59,20 +60,10 @@ export function ProductionRow({
     })
   }
 
-  function commitOpening(raw: string) {
-    const trimmed = raw.trim()
-    const nextOverride: number | null = trimmed === ''
-      ? null
-      : Math.max(0, Math.round(Number(trimmed)))
-    if (nextOverride !== null && !Number.isFinite(nextOverride)) return
-    if (nextOverride === override) return
-    setOverride(nextOverride)
-    setOpening(nextOverride ?? 0)
+  function handleOpeningSaved(next: number | null) {
+    setOverride(next)
+    setOpening(next ?? 0)
     setError(null)
-    setSaving(async () => {
-      const res = await updateOpeningStockOverride(productId, nextOverride)
-      if (!res.ok) setError(res.error ?? 'Save failed')
-    })
   }
 
   const manufacturerChip = manufacturer
@@ -100,20 +91,11 @@ export function ProductionRow({
       )}
 
       <td className="px-3 py-2 text-right">
-        <input
-          key={`${productId}-opening-${override ?? 'null'}`}
-          type="number"
-          min={0}
-          defaultValue={override ?? ''}
-          onBlur={(e) => commitOpening(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-          placeholder="0"
-          title="Opening stock override — leave blank to use inventory on hand"
-          className={`w-20 text-right text-[11px] rounded px-1.5 py-0.5 tabular-nums ${
-            override === null
-              ? 'border border-dashed border-gray-300 bg-white text-gray-400 placeholder-gray-300 focus:border-gray-400 focus:text-gray-900'
-              : 'border border-gray-300 bg-white text-gray-900 font-medium'
-          } focus:bg-amber-50 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none`}
+        <OpeningStockPopover
+          productId={productId}
+          productName={productName}
+          currentValue={override}
+          onSaved={handleOpeningSaved}
         />
       </td>
 
@@ -182,7 +164,15 @@ function FragmentCells({
         />
       </td>
       <td className={`px-2 py-2 text-right tabular-nums ${negCls} ${balTxt}`}>
-        {balance.toLocaleString()}
+        <div>{balance.toLocaleString()}</div>
+        {forecast > 0 && (() => {
+          const pct = Math.round((balance / forecast) * 100)
+          const cls =
+            pct < 0     ? 'text-red-600'   :
+            pct >= 100  ? 'text-emerald-600' :
+                          'text-amber-600'
+          return <div className={`text-[9px] font-normal ${cls}`}>{pct}%</div>
+        })()}
       </td>
     </>
   )

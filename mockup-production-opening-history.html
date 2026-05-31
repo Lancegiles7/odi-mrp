@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mockup · Production · Opening audit + balance %</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#f4f5f6; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:#1f2937; }
+  .wrap { max-width:1200px; margin:24px auto; padding:0 16px; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:18px; }
+  .card-h { padding:14px 18px; border-bottom:1px solid #f1f1f1; }
+  .card-h h2 { margin:0; font-size:14px; font-weight:600; }
+  .card-h .hint { font-size:11px; color:#6b7280; margin-top:2px; }
+  .card-b { padding:14px 18px; font-size:12px; }
+
+  /* ── Production table styling */
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th { text-align:right; color:#6b7280; font-size:9px; text-transform:uppercase; letter-spacing:.05em; padding:6px 8px; font-weight:600; border-bottom:1px solid #f1f1f1; }
+  th.l { text-align:left; }
+  td { padding:7px 8px; border-bottom:1px solid #f4f5f6; text-align:right; vertical-align:top; }
+  td.l { text-align:left; }
+
+  .sku { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; color:#9ca3af; }
+  .pname { font-size:12px; color:#111827; font-weight:500; }
+
+  .num-input { width:50px; padding:3px 6px; border:1px solid #d1d5db; border-radius:4px; font-size:11px; text-align:right; }
+  .open-cell { display:inline-flex; align-items:center; gap:4px; }
+  .icon-btn { width:18px; height:18px; border:1px solid #d1d5db; border-radius:4px; background:#fff; color:#6b7280; font-size:10px; cursor:pointer; padding:0; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+  .icon-btn:hover { background:#f9fafb; color:#111827; }
+  .icon-btn.has-history { background:#eef2ff; border-color:#c7d2fe; color:#4f46e5; }
+
+  .bal { font-weight:600; color:#111827; tabular-nums:1; }
+  .bal.neg { color:#dc2626; }
+  .bal-pct { display:block; font-size:9px; color:#6b7280; font-weight:400; margin-top:1px; }
+  .bal-pct.neg { color:#dc2626; }
+  .bal-pct.warn { color:#d97706; }
+  .bal-pct.good { color:#059669; }
+
+  /* ── Popover */
+  .pop-wrap { position:relative; padding:18px; background:#eef0f1; border-radius:8px; }
+  .popover { background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.10); max-width:380px; }
+  .pop-h { padding:10px 14px; border-bottom:1px solid #f1f1f1; }
+  .pop-h .title { font-size:12px; font-weight:600; color:#111827; }
+  .pop-h .sub { font-size:10px; color:#6b7280; margin-top:1px; }
+  .pop-current { padding:10px 14px; background:#f9fafb; border-bottom:1px solid #f1f1f1; display:flex; justify-content:space-between; align-items:center; }
+  .pop-current .label { font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:.05em; }
+  .pop-current .value { font-size:18px; font-weight:600; color:#111827; tabular-nums:1; }
+
+  .pop-edit { padding:10px 14px; border-bottom:1px solid #f1f1f1; }
+  .pop-edit label { display:block; font-size:9px; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; margin-bottom:2px; }
+  .pop-edit input { width:100%; padding:5px 8px; border:1px solid #d1d5db; border-radius:4px; font-size:12px; }
+  .pop-edit textarea { width:100%; padding:5px 8px; border:1px solid #d1d5db; border-radius:4px; font-size:11px; min-height:42px; margin-top:6px; font-family:inherit; resize:vertical; }
+  .pop-edit-row { display:flex; gap:8px; }
+  .pop-edit-row > div { flex:1; }
+
+  .pop-history { padding:8px 14px 12px; max-height:200px; overflow:auto; }
+  .pop-history .h-title { font-size:9px; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; margin:0 0 6px; font-weight:600; }
+  .h-row { display:flex; gap:10px; padding:6px 0; border-top:1px solid #f4f5f6; font-size:11px; }
+  .h-row:first-of-type { border-top:none; padding-top:0; }
+  .h-row .delta { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; color:#374151; min-width:90px; }
+  .h-row .delta .arrow { color:#9ca3af; margin:0 3px; }
+  .h-row .meta { flex:1; color:#6b7280; font-size:10px; }
+  .h-row .meta .who { color:#111827; font-weight:500; }
+  .h-row .note { font-size:10px; color:#374151; background:#fffbeb; border-left:3px solid #fde68a; padding:3px 6px; margin-top:3px; border-radius:0 3px 3px 0; }
+
+  .pop-f { padding:10px 14px; border-top:1px solid #f1f1f1; display:flex; justify-content:flex-end; gap:8px; background:#fafafa; }
+  .btn { font-size:11px; padding:5px 10px; border-radius:4px; border:1px solid #d1d5db; background:#fff; color:#111827; cursor:pointer; }
+  .btn.primary { background:#111827; color:#fff; border-color:#111827; }
+
+  /* "What changes" legend */
+  .legend { font-size:10px; color:#6b7280; padding:8px 12px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; }
+  .legend strong { color:#92400e; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ── 1 · Production row with history button + balance % -->
+  <div class="card">
+    <div class="card-h">
+      <h2>1 · Production row — new clock icon next to Opening + % under each Bal</h2>
+      <div class="hint">Mockup focuses on Odi Organic Banana. Other rows shown for context.</div>
+    </div>
+    <div class="card-b" style="padding:0;">
+      <table>
+        <thead>
+          <tr>
+            <th class="l" colspan="2">Product</th>
+            <th>Opening</th>
+            <th colspan="3">Jun 26</th>
+            <th colspan="3">Jul 26</th>
+            <th colspan="3">Aug 26</th>
+          </tr>
+          <tr>
+            <th class="l" colspan="2"></th>
+            <th>(editable)</th>
+            <th>Fcst</th><th>Prod</th><th>Bal</th>
+            <th>Fcst</th><th>Prod</th><th>Bal</th>
+            <th>Fcst</th><th>Prod</th><th>Bal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="l" style="width:230px;">
+              <div class="sku">ODI-ODI-ORGA-BANA-SNACK4-30G</div>
+              <div class="pname">Odi Organic Banana</div>
+            </td>
+            <td></td>
+            <td>
+              <div class="open-cell">
+                <input class="num-input" value="991" />
+                <button class="icon-btn has-history" title="3 edits · click for history">●</button>
+              </div>
+            </td>
+            <td>722</td>
+            <td><input class="num-input" value="1350" /></td>
+            <td>
+              <span class="bal">1,619</span>
+              <span class="bal-pct good">+224% of fcst</span>
+            </td>
+            <td>1,095</td>
+            <td><input class="num-input" value="0" /></td>
+            <td>
+              <span class="bal">524</span>
+              <span class="bal-pct warn">48% of fcst</span>
+            </td>
+            <td>1,332</td>
+            <td><input class="num-input" value="0" /></td>
+            <td>
+              <span class="bal neg">-808</span>
+              <span class="bal-pct neg">-61% of fcst</span>
+            </td>
+          </tr>
+          <tr>
+            <td class="l">
+              <div class="sku">ODI-ODI-ORGA-BROW-SNACK4-30G</div>
+              <div class="pname">Odi Organic Brownie</div>
+            </td>
+            <td></td>
+            <td>
+              <div class="open-cell">
+                <input class="num-input" value="1549" />
+                <button class="icon-btn" title="No edits yet — click to set with a note">○</button>
+              </div>
+            </td>
+            <td>1,829</td>
+            <td><input class="num-input" value="2750" /></td>
+            <td><span class="bal">2,470</span><span class="bal-pct good">+135%</span></td>
+            <td>1,885</td>
+            <td><input class="num-input" value="0" /></td>
+            <td><span class="bal">585</span><span class="bal-pct warn">31% of fcst</span></td>
+            <td>1,909</td>
+            <td><input class="num-input" value="0" /></td>
+            <td><span class="bal neg">-1,324</span><span class="bal-pct neg">-69%</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="legend" style="margin:10px 14px;">
+        <strong>Legend:</strong>
+        Solid blue dot = has edit history (click to view).
+        Open circle = no edits yet (click to open the same panel and make the first edit + note).
+        <strong>Balance %</strong> = Bal ÷ that month's Fcst.
+        Green ≥100% (covered), amber 0–99% (partial), red &lt; 0 (shortfall).
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2 · The Opening history popover -->
+  <div class="card">
+    <div class="card-h">
+      <h2>2 · Opening edit + history popover (opens when you click the icon)</h2>
+      <div class="hint">Pre-fills with the current value · Notes live alongside each edit · scroll for full history</div>
+    </div>
+    <div class="card-b" style="padding:0;">
+      <div class="pop-wrap">
+        <div class="popover">
+          <div class="pop-h">
+            <div class="title">Opening stock · Odi Organic Banana</div>
+            <div class="sub">Manual override · falls back to inventory_balances if cleared</div>
+          </div>
+
+          <div class="pop-current">
+            <div>
+              <div class="label">Current</div>
+            </div>
+            <div class="value">991</div>
+          </div>
+
+          <div class="pop-edit">
+            <label for="new-val">New value</label>
+            <input id="new-val" type="number" value="991" />
+            <label style="margin-top:8px;" for="note">Comment (optional but recommended)</label>
+            <textarea id="note" placeholder="e.g. 'Physical count after stocktake — 12 missing'"></textarea>
+          </div>
+
+          <div class="pop-history">
+            <p class="h-title">Edit history · 3 changes</p>
+
+            <div class="h-row">
+              <div class="delta">850 <span class="arrow">→</span> 991</div>
+              <div class="meta">
+                <div><span class="who">Lance Giles</span> · 12 Jun 2026, 10:14 am</div>
+                <div class="note">Physical count after Friday stocktake — added 141 units to opening.</div>
+              </div>
+            </div>
+
+            <div class="h-row">
+              <div class="delta">920 <span class="arrow">→</span> 850</div>
+              <div class="meta">
+                <div><span class="who">Lance Giles</span> · 4 Jun 2026, 9:02 am</div>
+                <div class="note">Wrote off 70 damaged in transit (Logo's container).</div>
+              </div>
+            </div>
+
+            <div class="h-row">
+              <div class="delta">— <span class="arrow">→</span> 920</div>
+              <div class="meta">
+                <div><span class="who">Lance Giles</span> · 1 Jun 2026, 8:30 am</div>
+                <div class="note">Initial override set from supplier confirmation.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pop-f">
+            <button class="btn">Cancel</button>
+            <button class="btn primary">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3 · Notes about scope -->
+  <div class="card">
+    <div class="card-h"><h2>3 · What this would change behind the scenes</h2></div>
+    <div class="card-b">
+      <ul style="margin:0; padding-left:18px; line-height:1.6;">
+        <li>New table <strong>product_opening_stock_history</strong> (append-only — mirrors the existing <code>ingredient_price_history</code> shape). Columns: <code>id, product_id, previous_value, new_value, note, changed_by, changed_at</code>.</li>
+        <li><code>updateOpeningStockOverride</code> server action now: (a) reads the existing value, (b) writes the new value to <code>products.opening_stock_override</code>, (c) inserts a history row capturing previous + new + note + user — all in one transaction.</li>
+        <li>Production row UI: replaces the raw input with the input + a small clock-style icon that opens the popover above.</li>
+        <li>Each monthly Bal cell gains a small sub-label "<code>X% of fcst</code>" (green / amber / red).</li>
+        <li>Read-only roles still see the icon (showing history is fine) but can't save — same as the rest of the page.</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
