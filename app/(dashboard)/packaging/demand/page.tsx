@@ -169,19 +169,17 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
   const totalItems      = uniqueRows.length
   const totalShortfalls = uniqueRows.filter((r) => hasAnyShortfall(r, r.packaging.opening_stock_override ?? 0, months)).length
 
-  // Per-group monthly shortfall counts feed the thead row inside each accordion.
-  function shortfallCountsForGroup(rows: PackagingRow[]) {
-    const totals = new Map<string, number>(months.map((m) => [m, 0]))
-    const shorts = new Map<string, number>(months.map((m) => [m, 0]))
-    for (const r of rows) {
-      const opening = r.packaging.opening_stock_override ?? 0
-      const states  = monthShortfallStates(r, opening, months)
-      for (const m of months) {
-        if ((r.demandByMonth.get(m) ?? 0) > 0) totals.set(m, (totals.get(m) ?? 0) + 1)
-        if (states.get(m) === 'red')           shorts.set(m, (shorts.get(m) ?? 0) + 1)
-      }
+  // Page-level monthly shortfall counts (every packaging item across every
+  // supplier / group). The same numbers feed every accordion's thead-row strip.
+  const pageTotals = new Map<string, number>(months.map((m) => [m, 0]))
+  const pageShorts = new Map<string, number>(months.map((m) => [m, 0]))
+  for (const r of uniqueRows) {
+    const opening = r.packaging.opening_stock_override ?? 0
+    const states  = monthShortfallStates(r, opening, months)
+    for (const m of months) {
+      if ((r.demandByMonth.get(m) ?? 0) > 0) pageTotals.set(m, (pageTotals.get(m) ?? 0) + 1)
+      if (states.get(m) === 'red')           pageShorts.set(m, (pageShorts.get(m) ?? 0) + 1)
     }
-    return { totals, shorts }
   }
 
   const commentedCells = await getCellsWithComments(
@@ -254,7 +252,6 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
 
       {renderGroups.map((g) => {
         const shortCount = g.rows.reduce((n, r) => n + (hasAnyShortfall(r, r.packaging.opening_stock_override ?? 0, months) ? 1 : 0), 0)
-        const { totals: groupTotals, shorts: groupShorts } = shortfallCountsForGroup(g.rows)
         return (
           <details key={g.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden" open={shortCount > 0}>
             <summary className="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
@@ -273,8 +270,8 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
                 <thead>
                   <MonthlyShortfallTheadRow
                     months={months}
-                    totalsByMonth={groupTotals}
-                    shortByMonth={groupShorts}
+                    totalsByMonth={pageTotals}
+                    shortByMonth={pageShorts}
                     leadingColSpan={2}
                     trailingColSpan={2}
                   />

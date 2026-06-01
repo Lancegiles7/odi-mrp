@@ -90,8 +90,11 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     return out
   }
 
-  // Per-group monthly shortfall counts for the strip thead row inside each accordion.
-  function shortfallCountsForGroup(items: ProductRow[]) {
+  // Total-across-visible-products monthly shortfall counts. Used for the
+  // thead strip on every accordion in the grouped view (always = all
+  // active products) and for the single strip in view-all (= the
+  // filtered set, which may be a manufacturer slice).
+  function shortfallCountsFor(items: ProductRow[]) {
     const totals = new Map<string, number>(months.map((m) => [m, 0]))
     const shorts = new Map<string, number>(months.map((m) => [m, 0]))
     for (const p of items) {
@@ -99,12 +102,13 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       const pr = productionFor(p.id)
       const rolling = calcRollingBalance(months, openingFor(p), (m) => f[m] ?? 0, (m) => pr[m] ?? 0)
       for (const r of rolling) {
-        if (r.forecast > 0)     totals.set(r.month, (totals.get(r.month) ?? 0) + 1)
-        if (r.state === 'red')  shorts.set(r.month, (shorts.get(r.month) ?? 0) + 1)
+        if (r.forecast > 0)    totals.set(r.month, (totals.get(r.month) ?? 0) + 1)
+        if (r.state === 'red') shorts.set(r.month, (shorts.get(r.month) ?? 0) + 1)
       }
     }
     return { totals, shorts }
   }
+  const pageCounts = shortfallCountsFor(allProducts)
 
   // Bulk-fetch which (product, month) cells already have a comment.
   const commentedCells = await getCellsWithComments(
@@ -203,7 +207,6 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           const label = key === UNASSIGNED ? 'Manufacturer not set' : key
           const chip  = key === UNASSIGNED ? null : (MANUFACTURER_CHIP_COLOURS[key] ?? null)
           const short = shortfallCount(items)
-          const { totals: groupTotals, shorts: groupShorts } = shortfallCountsForGroup(items)
           return (
             <details key={key} className="bg-white rounded-lg border border-gray-200 overflow-hidden" open={short > 0}>
               <summary className="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
@@ -223,8 +226,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                   <thead>
                     <MonthlyShortfallTheadRow
                       months={months}
-                      totalsByMonth={groupTotals}
-                      shortByMonth={groupShorts}
+                      totalsByMonth={pageCounts.totals}
+                      shortByMonth={pageCounts.shorts}
                       leadingColSpan={2}
                       monthColSpan={3}
                       trailingColSpan={1}
@@ -317,14 +320,12 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           <table className="w-full text-xs" style={{ minWidth: 3000 }}>
             <thead>
               {(() => {
-                // View-all has no per-manufacturer accordion, so the strip
-                // shows counts across the whole filtered set.
-                const { totals: viewAllTotals, shorts: viewAllShorts } = shortfallCountsForGroup(filtered)
+                const c = shortfallCountsFor(filtered)
                 return (
                   <MonthlyShortfallTheadRow
                     months={months}
-                    totalsByMonth={viewAllTotals}
-                    shortByMonth={viewAllShorts}
+                    totalsByMonth={c.totals}
+                    shortByMonth={c.shorts}
                     leadingColSpan={3}
                     monthColSpan={3}
                     trailingColSpan={1}

@@ -176,19 +176,20 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     }
   }
 
-  // Per-group monthly shortfall counts feed the thead row inside each accordion.
-  function shortfallCountsForGroup(rows: typeof groups[number]['ingredients']) {
-    const totals = new Map<string, number>(months.map((m) => [m, 0]))
-    const shorts = new Map<string, number>(months.map((m) => [m, 0]))
-    for (const row of rows) {
+  // Page-level monthly shortfall counts (every ingredient across every supplier).
+  // The same numbers are passed into every accordion's thead-row strip so the
+  // user sees a consistent "total" view no matter which group is open.
+  const pageTotals = new Map<string, number>(months.map((m) => [m, 0]))
+  const pageShorts = new Map<string, number>(months.map((m) => [m, 0]))
+  for (const g of groups) {
+    for (const row of g.ingredients) {
       const opening = row.ingredient.opening_stock_override ?? 0
       const states  = monthShortfallStates(row, opening, months)
       for (const m of months) {
-        if ((row.demandByMonth.get(m) ?? 0) > 0) totals.set(m, (totals.get(m) ?? 0) + 1)
-        if (states.get(m) === 'red')             shorts.set(m, (shorts.get(m) ?? 0) + 1)
+        if ((row.demandByMonth.get(m) ?? 0) > 0) pageTotals.set(m, (pageTotals.get(m) ?? 0) + 1)
+        if (states.get(m) === 'red')             pageShorts.set(m, (pageShorts.get(m) ?? 0) + 1)
       }
     }
-    return { totals, shorts }
   }
 
   const commentedCells = await getCellsWithComments('ingredient', allIngredientIds, firstMonth, lastMonth)
@@ -253,7 +254,6 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       {groups.map((g) => {
         const shortCount = g.ingredients.reduce((n, r) =>
           n + (hasAnyShortfall(r, r.ingredient.opening_stock_override ?? 0, months) ? 1 : 0), 0)
-        const { totals: groupTotals, shorts: groupShorts } = shortfallCountsForGroup(g.ingredients)
         return (
           <details key={g.supplier.id ?? 'none'} className="bg-white rounded-lg border border-gray-200 overflow-hidden" open={shortCount > 0}>
             <summary className="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
@@ -274,8 +274,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
                 <thead>
                   <MonthlyShortfallTheadRow
                     months={months}
-                    totalsByMonth={groupTotals}
-                    shortByMonth={groupShorts}
+                    totalsByMonth={pageTotals}
+                    shortByMonth={pageShorts}
                     leadingColSpan={2}
                     trailingColSpan={2}
                   />
