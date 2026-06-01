@@ -135,7 +135,20 @@ export function ProductionRow({
         )
       })}
 
-      {/* Total shortfall — sum of monthly shortAmounts across the rolling year */}
+      {/* Total needed — sum of forecast across the rolling year. Lets the
+          user see annual demand at a glance: needed − shortfall = covered. */}
+      {(() => {
+        const totalNeeded = months.reduce((s, m) => s + (forecastByMonth[m] ?? 0), 0)
+        return (
+          <td className="px-2 text-right text-xs tabular-nums text-gray-600 bg-gray-50 border-l border-gray-200">
+            {totalNeeded > 0 ? totalNeeded.toLocaleString() : <span className="text-gray-300">—</span>}
+          </td>
+        )
+      })()}
+
+      {/* Total shortfall — units of forecast we can't ship across the year
+          (= sum of marginal monthly shortAmounts, which is the same as the
+           end-of-year ending deficit when production is non-decreasing). */}
       {(() => {
         const total = rows.reduce((s, r) => s + r.shortAmount, 0)
         return (

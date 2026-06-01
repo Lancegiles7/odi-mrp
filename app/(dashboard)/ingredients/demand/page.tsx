@@ -272,13 +272,13 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
             </summary>
 
             <div className="border-t border-gray-100 overflow-x-auto">
-              <table className="w-full text-xs table-fixed" style={{ minWidth: 1700 }}>
+              <table className="w-full text-xs table-fixed" style={{ minWidth: 1740 }}>
                 <colgroup>
                   <col style={{ width: 280 }} />
                   <col style={{ width: 110 }} />
                   {months.map((m) => <col key={m} style={{ width: 80 }} />)}
-                  <col style={{ width: 78 }} />
-                  <col style={{ width: 90 }} />
+                  <col style={{ width: 96 }} />
+                  <col style={{ width: 110 }} />
                 </colgroup>
                 <thead>
                   <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
@@ -290,8 +290,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
                     {months.map((m) => (
                       <th key={m} className="text-right font-medium px-2 py-2 border-l border-gray-200">{monthLabel(m)}</th>
                     ))}
-                    <th className="text-right font-medium px-2 py-2 bg-gray-50 border-l border-gray-200">12-mo</th>
-                    <th className="text-right font-medium px-2 py-2 border-l border-gray-200">Short</th>
+                    <th className="text-right font-medium px-2 py-2 bg-gray-50 border-l border-gray-200">Total needed</th>
+                    <th className="text-right font-medium px-2 py-2 border-l border-gray-200">Total shortfall</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -226,7 +226,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
               </summary>
 
               <div className="border-t border-gray-100 overflow-x-auto">
-                <table className="w-full text-xs table-fixed" style={{ minWidth: 2800 }}>
+                <table className="w-full text-xs table-fixed" style={{ minWidth: 3000 }}>
                   <colgroup>
                     <col style={{ width: 280 }} />
                     <col style={{ width: 100 }} />
@@ -237,7 +237,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                         <col style={{ width: 64 }} />
                       </Fragment>
                     ))}
-                    <col style={{ width: 90 }} />
+                    <col style={{ width: 96 }} />
+                    <col style={{ width: 110 }} />
                   </colgroup>
                   <thead>
                     <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
@@ -247,12 +248,14 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                       <span className="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
                     </th>
                       {monthHeaders}
-                      <th className="text-right font-medium px-2 py-2 border-l border-gray-200">Short</th>
+                      <th className="text-right font-medium px-2 py-2 bg-gray-50 border-l border-gray-200">Total needed</th>
+                      <th className="text-right font-medium px-2 py-2 border-l border-gray-200">Total shortfall</th>
                     </tr>
                     <tr className="bg-gray-50 text-[10px] text-gray-500">
                       <th className="sticky left-0 bg-gray-50 z-10"></th>
                       <th></th>
                       {monthSubHeaders}
+                      <th></th>
                       <th></th>
                     </tr>
                   </thead>
@@ -329,7 +332,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs table-fixed" style={{ minWidth: 3000 }}>
+          <table className="w-full text-xs table-fixed" style={{ minWidth: 3100 }}>
             <colgroup>
               <col style={{ width: 280 }} />
               <col style={{ width: 110 }} />
@@ -341,7 +344,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                   <col style={{ width: 64 }} />
                 </Fragment>
               ))}
-              <col style={{ width: 90 }} />
+              <col style={{ width: 96 }} />
+              <col style={{ width: 110 }} />
             </colgroup>
             <thead>
               <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
@@ -352,13 +356,15 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                       <span className="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
                     </th>
                 {monthHeaders}
-                <th className="text-right font-medium px-2 py-2 border-l border-gray-200">Short</th>
+                <th className="text-right font-medium px-2 py-2 bg-gray-50 border-l border-gray-200">Total needed</th>
+                <th className="text-right font-medium px-2 py-2 border-l border-gray-200">Total shortfall</th>
               </tr>
               <tr className="bg-gray-50 text-[10px] text-gray-500">
                 <th className="sticky left-0 bg-gray-50 z-10"></th>
                 <th></th>
                 <th></th>
                 {monthSubHeaders}
+                <th></th>
                 <th></th>
               </tr>
             </thead>
