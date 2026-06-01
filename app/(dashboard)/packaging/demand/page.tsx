@@ -6,7 +6,7 @@ import { rollingMonths, indexProduction, getProductionCell, indexDemand, getGran
 import { getPlanningAnchor } from '@/lib/settings'
 import { aggregatePackagingDemand, hasAnyShortfall, monthShortfallStates, type PackagingRow } from '@/lib/packaging-demand'
 import { PackagingDemandRow } from '@/components/packaging/packaging-demand-row'
-import { MonthlyShortfallTheadRow } from '@/components/inventory/monthly-shortfall-thead-row'
+import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 import { PRODUCT_GROUP_LABELS } from '@/lib/constants'
 
@@ -170,7 +170,8 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
   const totalShortfalls = uniqueRows.filter((r) => hasAnyShortfall(r, r.packaging.opening_stock_override ?? 0, months)).length
 
   // Page-level monthly shortfall counts (every packaging item across every
-  // supplier / group). The same numbers feed every accordion's thead-row strip.
+  // supplier / group). Drives the single top-of-page summary strip — totals
+  // across the board, regardless of which accordion is open.
   const pageTotals = new Map<string, number>(months.map((m) => [m, 0]))
   const pageShorts = new Map<string, number>(months.map((m) => [m, 0]))
   for (const r of uniqueRows) {
@@ -244,6 +245,8 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
         <Tile label="Source" value={sourceLabel} sub={`× per-product BOM (${pp?.length ?? 0} links)`} />
       </div>
 
+      <MonthlyShortfallStrip months={months} totalsByMonth={pageTotals} shortByMonth={pageShorts} />
+
       {renderGroups.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
           No packaging demand to show. Add a packaging item, link it to a product&rsquo;s BOM, or set an opening-stock override.
@@ -268,13 +271,6 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
             <div className="border-t border-gray-100 overflow-x-auto">
               <table className="w-full text-xs" style={{ minWidth: 1700 }}>
                 <thead>
-                  <MonthlyShortfallTheadRow
-                    months={months}
-                    totalsByMonth={pageTotals}
-                    shortByMonth={pageShorts}
-                    leadingColSpan={2}
-                    trailingColSpan={2}
-                  />
                   <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                     <th className="text-left px-4 py-2 font-medium w-[320px] min-w-[320px]">Packaging</th>
                     <th className="text-right px-3 py-2 font-medium w-[110px] min-w-[110px]">

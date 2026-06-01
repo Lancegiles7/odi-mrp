@@ -12,7 +12,7 @@ import {
   convertGramsToIngredientUom, monthShortfallStates,
 } from '@/lib/ingredient-demand'
 import { IngredientDemandRow } from '@/components/ingredients/ingredient-demand-row'
-import { MonthlyShortfallTheadRow } from '@/components/inventory/monthly-shortfall-thead-row'
+import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 
 export const metadata: Metadata = { title: 'Ingredient demand' }
@@ -177,8 +177,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
   }
 
   // Page-level monthly shortfall counts (every ingredient across every supplier).
-  // The same numbers are passed into every accordion's thead-row strip so the
-  // user sees a consistent "total" view no matter which group is open.
+  // Drives the single top-of-page summary strip — totals across the board, so
+  // the user sees the same numbers regardless of which supplier accordion is open.
   const pageTotals = new Map<string, number>(months.map((m) => [m, 0]))
   const pageShorts = new Map<string, number>(months.map((m) => [m, 0]))
   for (const g of groups) {
@@ -245,6 +245,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
         <Tile label="Opening stock" value={`${Math.round(openingSumKg).toLocaleString()} kg`} sub="kg-tracked ingredients" />
       </div>
 
+      <MonthlyShortfallStrip months={months} totalsByMonth={pageTotals} shortByMonth={pageShorts} />
+
       {groups.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
           No ingredient demand to show. Add BOMs to products, or set an opening stock override.
@@ -272,13 +274,6 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
             <div className="border-t border-gray-100 overflow-x-auto">
               <table className="w-full text-xs" style={{ minWidth: 1700 }}>
                 <thead>
-                  <MonthlyShortfallTheadRow
-                    months={months}
-                    totalsByMonth={pageTotals}
-                    shortByMonth={pageShorts}
-                    leadingColSpan={2}
-                    trailingColSpan={2}
-                  />
                   <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                     <th className="text-left font-medium px-4 py-2 w-[320px] min-w-[320px]">Ingredient</th>
                     <th className="text-right font-medium px-3 py-2 w-[110px] min-w-[110px]">

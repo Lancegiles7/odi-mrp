@@ -10,7 +10,7 @@ import { getPlanningAnchor } from '@/lib/settings'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
-import { MonthlyShortfallTheadRow } from '@/components/inventory/monthly-shortfall-thead-row'
+import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 import type { DemandForecast, ProductionPlan } from '@/lib/types/database.types'
 
@@ -90,10 +90,11 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     return out
   }
 
-  // Total-across-visible-products monthly shortfall counts. Used for the
-  // thead strip on every accordion in the grouped view (always = all
-  // active products) and for the single strip in view-all (= the
-  // filtered set, which may be a manufacturer slice).
+  // Total-across-visible-products monthly shortfall counts. Drives the
+  // single top-of-page summary strip — grouped view uses the all-active set
+  // (consistent regardless of which manufacturer accordion is open);
+  // view-all uses the filtered set so the strip respects the manufacturer
+  // filter.
   function shortfallCountsFor(items: ProductRow[]) {
     const totals = new Map<string, number>(months.map((m) => [m, 0]))
     const shorts = new Map<string, number>(months.map((m) => [m, 0]))
@@ -203,6 +204,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           <span>Opening stock = manual override where set, else inventory on hand.</span>
         </div>
 
+        <MonthlyShortfallStrip months={months} totalsByMonth={pageCounts.totals} shortByMonth={pageCounts.shorts} />
+
         {Array.from(manufacturers.entries()).map(([key, items]) => {
           const label = key === UNASSIGNED ? 'Manufacturer not set' : key
           const chip  = key === UNASSIGNED ? null : (MANUFACTURER_CHIP_COLOURS[key] ?? null)
@@ -224,15 +227,6 @@ export default async function ProductionPage({ searchParams }: PageProps) {
               <div className="border-t border-gray-100 overflow-x-auto">
                 <table className="w-full text-xs" style={{ minWidth: 2800 }}>
                   <thead>
-                    <MonthlyShortfallTheadRow
-                      months={months}
-                      totalsByMonth={pageCounts.totals}
-                      shortByMonth={pageCounts.shorts}
-                      leadingColSpan={2}
-                      monthColSpan={3}
-                      trailingColSpan={1}
-                      stickyLeading
-                    />
                     <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                       <th className="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 z-10 w-[320px] min-w-[320px]">Product</th>
                       <th className="text-right font-medium px-3 py-2 w-[90px] min-w-[90px]">
@@ -298,6 +292,9 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     opening:    filtered.reduce((s, p) => s + openingFor(p), 0),
   }
 
+  // Filter-aware monthly counts for the top-of-page summary strip.
+  const filteredCounts = shortfallCountsFor(filtered)
+
   return (
     <div className="space-y-5">
       {header}
@@ -315,24 +312,12 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         <Tile label="Opening stock" value={totals.opening.toLocaleString()} sub="units on hand" />
       </div>
 
+      <MonthlyShortfallStrip months={months} totalsByMonth={filteredCounts.totals} shortByMonth={filteredCounts.shorts} />
+
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs" style={{ minWidth: 3000 }}>
             <thead>
-              {(() => {
-                const c = shortfallCountsFor(filtered)
-                return (
-                  <MonthlyShortfallTheadRow
-                    months={months}
-                    totalsByMonth={c.totals}
-                    shortByMonth={c.shorts}
-                    leadingColSpan={3}
-                    monthColSpan={3}
-                    trailingColSpan={1}
-                    stickyLeading
-                  />
-                )
-              })()}
               <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                 <th className="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 z-10 w-[320px] min-w-[320px]">Product</th>
                 <th className="text-left font-medium px-3 py-2 w-[120px] min-w-[120px]">Manufacturer</th>
