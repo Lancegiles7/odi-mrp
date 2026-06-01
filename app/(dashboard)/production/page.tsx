@@ -202,9 +202,6 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           months={months}
           totalsByMonth={monthlyTotals}
           shortByMonth={monthlyShorts}
-          leadingColWidths={[320, 90]}   /* Product + Opening */
-          monthMinPx={220}               /* each month group spans Fcst + Prod + Bal; matches the actual rendered group width with the w-20 inputs */
-          trailingWidthPx={0}
         />
 
         {Array.from(manufacturers.entries()).map(([key, items]) => {
@@ -312,9 +309,6 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         months={months}
         totalsByMonth={monthlyTotals}
         shortByMonth={monthlyShorts}
-        leadingColWidths={[320, 120, 90]}   /* Product + Manufacturer + Opening */
-        monthMinPx={200}
-        trailingWidthPx={0}
       />
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
