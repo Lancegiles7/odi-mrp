@@ -46,7 +46,7 @@ export async function updatePackagingOpeningStock(
   const { data: profile } = await supabase
     .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
 
-  await supabase
+  const { error: histErr } = await supabase
     .from('packaging_opening_stock_history')
     .insert({
       packaging_id:   packagingId,
@@ -55,6 +55,7 @@ export async function updatePackagingOpeningStock(
       note:           trimmedNote,
       changed_by:     profile?.id ?? null,
     })
+  if (histErr) return { ok: false, error: `Couldn't save audit: ${histErr.message}` }
 
   revalidatePath('/packaging/demand')
   revalidatePath(`/packaging/${packagingId}`)

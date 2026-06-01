@@ -66,6 +66,14 @@ export function OpeningStockHistoryPopover({
       setError('Enter a number')
       return
     }
+    // If neither the value nor the comment changed, the server returns
+    // ok-but-no-op. Tell the user so they don't think they saved.
+    const valueIsSame =
+      (currentValue ?? null) === (nextValue ?? null)
+    if (valueIsSame && note.trim() === '') {
+      setError('No changes to save — change the value or add a comment.')
+      return
+    }
     startSave(async () => {
       const res = await onSave(nextValue, note)
       if (!res.ok) {
@@ -73,7 +81,12 @@ export function OpeningStockHistoryPopover({
         return
       }
       onSaved(nextValue)
-      setOpen(false)
+      // Keep the popover open and refresh history so the user can see
+      // their just-saved row right away (mirrors the cell-comment popover).
+      setNote('')
+      setError(null)
+      const refreshed = await onLoadHistory()
+      if (refreshed.ok) setRows(refreshed.rows)
     })
   }
 

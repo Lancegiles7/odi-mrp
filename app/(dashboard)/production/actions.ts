@@ -85,10 +85,10 @@ export async function updateOpeningStockOverride(
   const { data: profile } = await supabase
     .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
 
-  // Append audit row. We deliberately don't fail the whole call if the
-  // history insert errors — the override was already saved and that's
-  // what the user sees on screen.
-  await supabase
+  // Append audit row. Surface the error so silent insert failures
+  // (e.g. RLS denial, schema mismatch) don't leave the user thinking
+  // their comment was saved when it wasn't.
+  const { error: histErr } = await supabase
     .from('product_opening_stock_history')
     .insert({
       product_id:     productId,
@@ -97,6 +97,7 @@ export async function updateOpeningStockOverride(
       note:           trimmedNote,
       changed_by:     profile?.id ?? null,
     })
+  if (histErr) return { ok: false, error: `Couldn't save audit: ${histErr.message}` }
 
   revalidatePath('/production')
   revalidatePath(`/products/${productId}`)
