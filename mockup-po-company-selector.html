@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PO — issuing company selector</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+</style>
+</head>
+<body class="bg-gray-50 p-6">
+
+<div class="max-w-[1100px] mx-auto space-y-6">
+
+  <!-- ═════════ HEADER ═════════ -->
+  <div>
+    <h1 class="text-2xl font-semibold">PO — choose issuing company</h1>
+    <p class="text-sm text-gray-500 mt-1">Add VISION MADE CO PTY LTD as an alternative legal entity that can issue a PO.</p>
+  </div>
+
+  <!-- ═════════ PROPOSAL ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-md p-4">
+    <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">Two-minute summary</div>
+    <ul class="text-sm text-gray-700 space-y-1.5 leading-relaxed">
+      <li>• Today the PO letterhead is <span class="font-semibold">hardcoded</span> to one company (Odi Nutrition Ltd, from Settings).</li>
+      <li>• We add a new <span class="font-semibold">"PO companies"</span> list (Settings → PO companies) — separate from issuers (people).</li>
+      <li>• Each PO gets a new <span class="font-semibold">"From company"</span> dropdown to pick the issuing legal entity.</li>
+      <li>• Two companies seeded on first load:
+        <span class="ml-2 inline-block px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[11px] border border-emerald-200">Odi Nutrition Ltd (default)</span>
+        <span class="ml-1 inline-block px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[11px] border border-indigo-200">Vision Made Co Pty Ltd</span>
+      </li>
+      <li>• Existing POs keep showing Odi Nutrition Ltd — nothing breaks.</li>
+      <li>• Issuer (Atma Okan etc.) stays as-is — independent of company. So Atma can issue from either company.</li>
+    </ul>
+  </div>
+
+  <!-- ═════════ WHY SEPARATE FROM ISSUERS? ═════════ -->
+  <div class="grid grid-cols-2 gap-4">
+    <div class="bg-amber-50 border border-amber-200 rounded-md p-4">
+      <div class="text-xs uppercase tracking-wider font-semibold text-amber-900 mb-1.5">"Issued by" (existing)</div>
+      <p class="text-sm text-amber-900">The <span class="font-semibold">person</span> issuing the PO — Atma Okan, Operations Manager. Shows in the "Issued by" block on the PDF (right column).</p>
+    </div>
+    <div class="bg-indigo-50 border border-indigo-200 rounded-md p-4">
+      <div class="text-xs uppercase tracking-wider font-semibold text-indigo-900 mb-1.5">"From company" (new)</div>
+      <p class="text-sm text-indigo-900">The <span class="font-semibold">legal entity</span> issuing the PO — Odi Nutrition Ltd <em>or</em> Vision Made Co Pty Ltd. Drives the letterhead at the top.</p>
+    </div>
+  </div>
+
+  <!-- ═════════ SCREEN 1 — PO CREATE/EDIT FORM ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-lg p-5">
+    <div class="text-[11px] uppercase tracking-wider font-semibold text-gray-500 mb-3">Screen 1 · Create / edit PO — new dropdown</div>
+
+    <div class="space-y-3 max-w-2xl">
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Supplier</label>
+        <select class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm bg-white">
+          <option>BJ Ball T/A Caspak Products</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Order date</label>
+          <input class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" value="2 Jun 2026" readonly />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Expected delivery</label>
+          <input class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" value="20 Jul 2026" readonly />
+        </div>
+      </div>
+
+      <!-- NEW FIELD -->
+      <div class="bg-indigo-50/60 border-2 border-dashed border-indigo-300 rounded-md p-3">
+        <label class="block text-xs font-semibold text-indigo-900 mb-1">
+          From company <span class="text-[10px] font-normal text-indigo-700 ml-1">(new — drives PDF letterhead)</span>
+        </label>
+        <select class="w-full border border-indigo-300 rounded px-3 py-1.5 text-sm bg-white">
+          <option>Odi Nutrition Ltd  ·  NZBN 9429046884123  ·  default</option>
+          <option selected>Vision Made Co Pty Ltd  ·  ABN 12 345 678 901</option>
+        </select>
+        <p class="text-[10px] text-indigo-700 mt-1">Defaults to Odi Nutrition Ltd. Picking Vision Made swaps the PDF header to that entity's name, address, ABN &amp; GST.</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Issued by</label>
+        <select class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm bg-white">
+          <option>Atma Okan · Operations Manager · default</option>
+        </select>
+        <p class="text-[10px] text-gray-500 mt-1">Unchanged — the person on the PO, independent of the company.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════ SCREEN 2 — PDF LETTERHEAD COMPARISON ═════════ -->
+  <div>
+    <div class="text-[11px] uppercase tracking-wider font-semibold text-gray-500 mb-2">Screen 2 · PDF letterhead — same PO, two companies</div>
+    <div class="grid grid-cols-2 gap-4">
+
+      <!-- Odi -->
+      <div class="bg-white border border-gray-200 rounded-md overflow-hidden">
+        <div class="bg-emerald-50 px-3 py-1.5 text-[10px] uppercase font-semibold tracking-wider text-emerald-700">If From company = Odi Nutrition Ltd</div>
+        <div class="p-5">
+          <div class="flex items-start justify-between pb-3 border-b-2" style="border-color:#5a8a3a">
+            <div class="flex items-end h-14 text-[24px] font-light tracking-wider" style="color:#2f4d1f">odi</div>
+            <div class="text-right text-[9px] text-gray-600 leading-tight">
+              <div class="font-semibold text-gray-900 text-[10px]">Odi Nutrition Ltd</div>
+              <div>NZBN: 9429046884123</div>
+              <div>GST: 123-456-789</div>
+              <div class="mt-1.5">12 Example St,<br/>Auckland 1010, NZ</div>
+              <div class="mt-1">www.odinutrition.com</div>
+            </div>
+          </div>
+          <h2 class="text-[18px] font-light mt-4" style="color:#2f4d1f">PURCHASE ORDER</h2>
+          <div class="text-[9px] text-gray-400 mt-2 italic">(rest of PO unchanged — supplier, lines, totals, issued by Atma Okan)</div>
+        </div>
+      </div>
+
+      <!-- Vision Made -->
+      <div class="bg-white border border-gray-200 rounded-md overflow-hidden">
+        <div class="bg-indigo-50 px-3 py-1.5 text-[10px] uppercase font-semibold tracking-wider text-indigo-700">If From company = Vision Made Co Pty Ltd</div>
+        <div class="p-5">
+          <div class="flex items-start justify-between pb-3 border-b-2" style="border-color:#3949ab">
+            <div class="flex items-end h-14 text-[20px] font-light tracking-wider text-indigo-900">VISION MADE CO</div>
+            <div class="text-right text-[9px] text-gray-600 leading-tight">
+              <div class="font-semibold text-gray-900 text-[10px]">VISION MADE CO PTY LTD</div>
+              <div>ABN: 12 345 678 901</div>
+              <div>GST registered</div>
+              <div class="mt-1.5">(your AU address here)</div>
+              <div class="mt-1">(your AU website / email)</div>
+            </div>
+          </div>
+          <h2 class="text-[18px] font-light mt-4 text-indigo-900">PURCHASE ORDER</h2>
+          <div class="text-[9px] text-gray-400 mt-2 italic">(rest of PO unchanged — same PO number, lines, totals)</div>
+        </div>
+      </div>
+
+    </div>
+    <p class="text-[11px] text-gray-500 mt-2">↑ <span class="font-semibold">Only the letterhead changes</span>. PO number, lines, supplier, delivery and "Issued by" all stay the same.</p>
+  </div>
+
+  <!-- ═════════ SCREEN 3 — SETTINGS LIST ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div>
+        <div class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Screen 3 · Settings → PO companies</div>
+        <div class="text-sm font-semibold mt-0.5">PO companies</div>
+      </div>
+      <button class="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800">+ New company</button>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <tr>
+          <th class="text-left px-5 py-2 font-medium">Name</th>
+          <th class="text-left px-3 py-2 font-medium">Country</th>
+          <th class="text-left px-3 py-2 font-medium">Business no.</th>
+          <th class="text-left px-3 py-2 font-medium">Tax no.</th>
+          <th class="text-center px-3 py-2 font-medium">Default</th>
+          <th class="text-center px-3 py-2 font-medium">Active</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody class="text-[13px]">
+        <tr class="border-t border-gray-100">
+          <td class="px-5 py-2.5 font-medium">Odi Nutrition Ltd</td>
+          <td class="px-3 py-2.5"><span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[11px]">NZ</span></td>
+          <td class="px-3 py-2.5 tabular-nums">NZBN 9429046884123</td>
+          <td class="px-3 py-2.5 tabular-nums">GST 123-456-789</td>
+          <td class="px-3 py-2.5 text-center"><span class="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">★ default</span></td>
+          <td class="px-3 py-2.5 text-center text-emerald-600">●</td>
+          <td class="px-3 py-2.5 text-right text-xs"><a class="text-gray-600 hover:underline">Edit</a></td>
+        </tr>
+        <tr class="border-t border-gray-100 bg-indigo-50/40">
+          <td class="px-5 py-2.5 font-medium">VISION MADE CO PTY LTD</td>
+          <td class="px-3 py-2.5"><span class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[11px]">AU</span></td>
+          <td class="px-3 py-2.5 tabular-nums">ABN 12 345 678 901</td>
+          <td class="px-3 py-2.5 tabular-nums">GST registered</td>
+          <td class="px-3 py-2.5 text-center text-gray-300">—</td>
+          <td class="px-3 py-2.5 text-center text-emerald-600">●</td>
+          <td class="px-3 py-2.5 text-right text-xs"><a class="text-gray-600 hover:underline">Edit</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ═════════ SCREEN 4 — ADD / EDIT COMPANY ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-lg p-5">
+    <div class="text-[11px] uppercase tracking-wider font-semibold text-gray-500 mb-3">Screen 4 · Add / edit company form</div>
+    <div class="grid grid-cols-2 gap-3 max-w-3xl">
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Legal name <span class="text-red-500">*</span></label>
+        <input class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" value="VISION MADE CO PTY LTD" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Country</label>
+        <select class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm bg-white">
+          <option>New Zealand</option>
+          <option selected>Australia</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Business number label</label>
+        <input class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" value="ABN" />
+        <p class="text-[10px] text-gray-500 mt-0.5">e.g. NZBN (NZ) or ABN (AU)</p>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Business number</label>
+        <input class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" value="12 345 678 901" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Tax number label</label>
+        <input class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" value="GST" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Tax number</label>
+        <input class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" placeholder="(optional)" />
+      </div>
+      <div class="col-span-2">
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Address</label>
+        <textarea rows="2" class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" placeholder="Street, City, State, Postcode, Country"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Website</label>
+        <input class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" placeholder="www.visionmade.com.au" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Contact email</label>
+        <input class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm" placeholder="orders@visionmade.com.au" />
+      </div>
+      <div class="col-span-2 flex items-center gap-4 pt-1">
+        <label class="inline-flex items-center gap-2 text-xs"><input type="checkbox" /> Set as default for new POs</label>
+        <label class="inline-flex items-center gap-2 text-xs"><input type="checkbox" checked /> Active</label>
+      </div>
+    </div>
+    <div class="mt-4 flex justify-end gap-2">
+      <button class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md">Cancel</button>
+      <button class="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-md">Save company</button>
+    </div>
+  </div>
+
+  <!-- ═════════ BUILD PLAN ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-md p-4">
+    <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">What we'd build</div>
+    <ol class="text-sm text-gray-700 space-y-1.5 leading-relaxed list-decimal pl-5">
+      <li><span class="font-semibold">Migration 031</span> · Create <code class="bg-gray-100 px-1 rounded text-[12px]">po_companies</code> table (id, legal_name, country, business_number_label/value, tax_number_label/value, address, website, email, phone, is_default, is_active). Add <code class="bg-gray-100 px-1 rounded text-[12px]">company_id</code> column to <code class="bg-gray-100 px-1 rounded text-[12px]">purchase_orders</code>. Seed Odi Nutrition Ltd from current app_settings as the default. Pre-seed VISION MADE CO PTY LTD with name only (you fill in ABN, address etc. via the UI).</li>
+      <li><span class="font-semibold">Settings page</span> · New <code class="bg-gray-100 px-1 rounded text-[12px]">/settings/companies</code> route — list, new, edit (mirrors the existing issuers pattern).</li>
+      <li><span class="font-semibold">PO form</span> · Add the "From company" dropdown above "Issued by". Defaults to the company marked as default.</li>
+      <li><span class="font-semibold">PO PDF</span> · Read company from <code class="bg-gray-100 px-1 rounded text-[12px]">po.company_id</code>; render letterhead from that record instead of <code class="bg-gray-100 px-1 rounded text-[12px]">app_settings</code>. Existing POs (no <code class="bg-gray-100 px-1 rounded text-[12px]">company_id</code>) fall back to default → Odi.</li>
+      <li><span class="font-semibold">Nav</span> · Add "PO companies" link under Settings, next to PO issuers.</li>
+    </ol>
+    <p class="text-[11px] text-gray-500 mt-3 italic">No logo upload in v1 — letterhead uses text-only header for Vision Made (the Odi logo image stays for Odi). Logo upload is an easy follow-up if you want it.</p>
+  </div>
+
+  <div class="bg-emerald-50 border border-emerald-200 rounded-md p-4 text-sm text-emerald-900">
+    <strong>Happy to proceed?</strong> If you give me Vision Made Co Pty Ltd's address, ABN, GST status, website &amp; contact email I can pre-fill the seed row so it's ready to use the moment we deploy. Otherwise I'll seed just the name and you fill the rest in via the UI.
+  </div>
+
+</div>
+</body>
+</html>

@@ -167,6 +167,11 @@ export default async function SettingsPage({ searchParams }: PageProps) {
             title="PO issuers"
             description="People who appear in the &ldquo;Issued by&rdquo; block on PO PDFs."
           />
+          <ReferenceLink
+            href="/settings/companies"
+            title="PO companies"
+            description="Legal entities (Odi Nutrition Ltd, Vision Made Co Pty Ltd) that drive the PO PDF letterhead."
+          />
         </ul>
       </div>
     </div>

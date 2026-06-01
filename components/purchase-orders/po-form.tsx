@@ -61,6 +61,7 @@ interface DeliveryAddressOption {
 }
 
 export interface IssuerOption { id: string; name: string; title: string | null; is_default: boolean }
+export interface CompanyOption { id: string; legal_name: string; country: string | null; is_default: boolean }
 
 export interface POFormProps {
   mode: 'new' | 'edit'
@@ -69,6 +70,7 @@ export interface POFormProps {
   initialSupplierId: string
   initialCurrency: string          // 'NZD' default
   initialIssuerId: string | null
+  initialCompanyId: string | null
   initialOrderDate: string         // 'YYYY-MM-DD'
   initialExpected: string | null   // 'YYYY-MM-DD' or null
   initialDeliveryAddressId: string | null
@@ -82,6 +84,7 @@ export interface POFormProps {
   packaging: PackagingOption[]
   deliveryAddresses: DeliveryAddressOption[]
   issuers: IssuerOption[]
+  companies: CompanyOption[]
 }
 
 const NEW_LINE: POLineInput = {
@@ -107,6 +110,9 @@ export function POForm(props: POFormProps) {
   const [currencyManuallySet, setCurrencyManuallySet] = useState(props.mode === 'edit')
   const [issuerId, setIssuerId] = useState<string>(
     props.initialIssuerId ?? props.issuers.find((i) => i.is_default)?.id ?? props.issuers[0]?.id ?? '',
+  )
+  const [companyId, setCompanyId] = useState<string>(
+    props.initialCompanyId ?? props.companies.find((c) => c.is_default)?.id ?? props.companies[0]?.id ?? '',
   )
   const [orderDate, setOrderDate]   = useState(props.initialOrderDate)
   const [expected, setExpected]     = useState(props.initialExpected ?? '')
@@ -207,6 +213,7 @@ export function POForm(props: POFormProps) {
         supplier_id: supplierId,
         currency,
         issuer_id: issuerId || null,
+        company_id: companyId || null,
         order_date: orderDate,
         expected_delivery_date: expected || null,
         delivery_address_id: deliveryAddressId || null,
@@ -338,6 +345,23 @@ export function POForm(props: POFormProps) {
                   ⚠ supplier&apos;s currency is {supplier.currency.toUpperCase()} — overriding to {currency}
                 </p>
               )}
+            </Field>
+
+            <Field label="From company">
+              <select
+                disabled={!isEditable}
+                value={companyId}
+                onChange={(e) => setCompanyId(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
+              >
+                {props.companies.length === 0 && <option value="">— no companies set up —</option>}
+                {props.companies.map((c) => (
+                  <option key={c.id} value={c.id}>{c.legal_name}{c.country ? ` (${c.country})` : ''}{c.is_default ? ' ★' : ''}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Drives the PO PDF letterhead. Manage in <a href="/settings/companies" className="underline">Settings → PO companies</a>.
+              </p>
             </Field>
 
             <Field label="Issued by">

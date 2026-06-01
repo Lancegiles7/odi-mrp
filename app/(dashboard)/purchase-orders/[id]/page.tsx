@@ -13,12 +13,13 @@ interface PageProps {
 export default async function PurchaseOrderDetailPage({ params }: PageProps) {
   const supabase = createClient()
 
-  const [{ data: po }, { data: lines }, { data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }, { data: issuers }] = await Promise.all([
+  const [{ data: po }, { data: lines }, { data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }, { data: issuers }, { data: companies }] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('id, po_number, supplier_id, currency, issuer_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes')
+      .select('id, po_number, supplier_id, currency, issuer_id, company_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
         id: string; po_number: string; supplier_id: string; currency: string | null; issuer_id: string | null;
+        company_id: string | null;
         status: 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled';
         order_date: string; expected_delivery_date: string | null;
         delivery_address_id: string | null; delivery_notes: string | null;
@@ -55,6 +56,10 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       .select('id, name, title, is_default')
       .eq('is_active', true)
       .order('is_default', { ascending: false }).order('name') as unknown as Promise<{ data: Array<{ id: string; name: string; title: string | null; is_default: boolean }> | null }>,
+    supabase.from('po_companies')
+      .select('id, legal_name, country, is_default')
+      .eq('is_active', true)
+      .order('is_default', { ascending: false }).order('legal_name') as unknown as Promise<{ data: Array<{ id: string; legal_name: string; country: string | null; is_default: boolean }> | null }>,
   ])
 
   if (!po) notFound()
@@ -83,6 +88,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       initialSupplierId={po.supplier_id}
       initialCurrency={po.currency ?? 'NZD'}
       initialIssuerId={po.issuer_id}
+      initialCompanyId={po.company_id}
       initialOrderDate={po.order_date.slice(0, 10)}
       initialExpected={po.expected_delivery_date?.slice(0, 10) ?? null}
       initialDeliveryAddressId={po.delivery_address_id}
@@ -96,6 +102,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       packaging={packaging ?? []}
       deliveryAddresses={addresses ?? []}
       issuers={issuers ?? []}
+      companies={companies ?? []}
     />
   )
 }

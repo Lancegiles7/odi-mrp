@@ -61,6 +61,7 @@ export async function createPurchaseOrder(input: {
   supplier_id: string
   currency?: string
   issuer_id?: string | null
+  company_id?: string | null
   order_date: string
   expected_delivery_date: string | null
   delivery_address_id: string | null
@@ -87,6 +88,7 @@ export async function createPurchaseOrder(input: {
       supplier_id:            input.supplier_id,
       currency:               (input.currency ?? 'NZD').toUpperCase(),
       issuer_id:              input.issuer_id ?? null,
+      company_id:             input.company_id ?? null,
       status:                 'draft',
       order_date:             input.order_date,
       expected_delivery_date: input.expected_delivery_date,
@@ -131,6 +133,7 @@ export async function updatePurchaseOrder(input: {
   supplier_id: string
   currency?: string
   issuer_id?: string | null
+  company_id?: string | null
   order_date: string
   expected_delivery_date: string | null
   delivery_address_id: string | null
@@ -158,6 +161,7 @@ export async function updatePurchaseOrder(input: {
       supplier_id:            input.supplier_id,
       currency:               (input.currency ?? 'NZD').toUpperCase(),
       issuer_id:              input.issuer_id ?? null,
+      company_id:             input.company_id ?? null,
       order_date:             input.order_date,
       expected_delivery_date: input.expected_delivery_date,
       delivery_address_id:    input.delivery_address_id,
