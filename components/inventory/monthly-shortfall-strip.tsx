@@ -2,67 +2,81 @@ import { monthLabel } from '@/lib/demand'
 
 interface Props {
   months: string[]
-  /** For each month: how many entities have demand > 0 that month. */
   totalsByMonth:    Map<string, number>
-  /** For each month: how many of those entities are in a 'red' shortfall state. */
   shortByMonth:     Map<string, number>
   /**
-   * Column widths to mirror the data table below so the month cells
-   * land in the same horizontal positions as the table's month columns.
-   * Defaults match the Ingredient demand / Packaging demand tables
-   * (Ingredient/Packaging w-[320px] + Opening w-[110px] + 12 × min-w-[72px]
-   * + 12-mo total min-w-[90px]).
+   * Widths (px) of the leading column(s) before the month columns,
+   * matching the data table below 1-for-1. The strip renders a single
+   * cell that spans all of these (with the title inside), so the
+   * column boundaries match the data table exactly.
+   *
+   * Defaults match Ingredient demand / Packaging demand (Packaging 320 + Opening 110).
    */
-  leadingWidthPx?:  number
-  monthMinPx?:      number
-  trailingWidthPx?: number
+  leadingColWidths?:  number[]
+  /** Min width applied to each month col — should match the table. */
+  monthMinPx?:        number
+  /** Width of the trailing column (e.g. 12-mo total). 0 = no trailing column. */
+  trailingWidthPx?:   number
 }
 
 /**
- * Monthly-shortfall strip that sits below the top tiles on the
- * Ingredient demand, Packaging demand and Production pages. The grid
- * template mirrors the underlying data table's columns so the month
- * cells line up vertically with the table's month columns underneath.
+ * Monthly-shortfall strip rendered as a real <table> with a <colgroup>
+ * that mirrors the data table directly below. Because both tables
+ * share the same column-sizing semantics and identical column widths,
+ * the strip's month cells line up vertically with the table's month
+ * columns underneath.
  *
  * Server component — purely presentational.
  */
 export function MonthlyShortfallStrip({
   months, totalsByMonth, shortByMonth,
-  leadingWidthPx  = 430,   // 320 (name) + 110 (opening) on demand pages
-  monthMinPx      = 72,
-  trailingWidthPx = 90,
+  leadingColWidths = [320, 110],
+  monthMinPx       = 72,
+  trailingWidthPx  = 90,
 }: Props) {
-  const gridStyle = {
-    gridTemplateColumns: `${leadingWidthPx}px repeat(${months.length}, minmax(${monthMinPx}px, 1fr)) ${trailingWidthPx}px`,
-  }
+  const leadingSum = leadingColWidths.reduce((a, b) => a + b, 0)
+  const minWidth   = leadingSum + months.length * monthMinPx + trailingWidthPx
+  const hasTrailing = trailingWidthPx > 0
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-4">
-      <div className="px-4 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-gray-500 border-b border-gray-100">
-        Shortfalls by month — short / total with demand
-      </div>
       <div className="overflow-x-auto">
-        <div className="grid" style={gridStyle}>
-          {/* leading spacer */}
-          <div />
-          {months.map((m) => {
-            const total = totalsByMonth.get(m) ?? 0
-            const short = shortByMonth.get(m) ?? 0
-            const isShort = short > 0
-            return (
-              <div
-                key={m}
-                className={`px-2 py-1.5 text-center border-l border-gray-100 ${isShort ? 'bg-red-50 text-red-700' : 'bg-white text-gray-600'}`}
-              >
-                <div className="text-[9px] uppercase tracking-wider font-semibold opacity-70">{monthLabel(m)}</div>
-                <div className={`text-sm font-semibold tabular-nums mt-0.5 ${isShort ? '' : 'opacity-80'}`}>
-                  {short}<span className="text-xs opacity-60 font-normal"> / </span>{total}
-                </div>
-              </div>
-            )
-          })}
-          {/* trailing spacer (12-mo total column) */}
-          <div className="border-l border-gray-200 bg-gray-50" />
-        </div>
+        <table className="w-full text-xs" style={{ minWidth }}>
+          <colgroup>
+            {leadingColWidths.map((w, i) => (
+              <col key={`lead-${i}`} style={{ width: `${w}px`, minWidth: `${w}px` }} />
+            ))}
+            {months.map((m) => (
+              <col key={m} style={{ minWidth: `${monthMinPx}px` }} />
+            ))}
+            {hasTrailing && <col style={{ width: `${trailingWidthPx}px`, minWidth: `${trailingWidthPx}px` }} />}
+          </colgroup>
+          <tbody>
+            <tr>
+              <td colSpan={leadingColWidths.length} className="px-4 py-2 text-[10px] uppercase tracking-wider font-semibold text-gray-500 align-middle">
+                Shortfalls by month
+                <div className="text-[9px] normal-case tracking-normal text-gray-400 font-normal mt-0.5">short / total with demand</div>
+              </td>
+              {months.map((m) => {
+                const total = totalsByMonth.get(m) ?? 0
+                const short = shortByMonth.get(m) ?? 0
+                const isShort = short > 0
+                return (
+                  <td
+                    key={m}
+                    className={`px-2 py-1.5 text-center border-l border-gray-100 ${isShort ? 'bg-red-50 text-red-700' : 'bg-white text-gray-600'}`}
+                  >
+                    <div className="text-[9px] uppercase tracking-wider font-semibold opacity-70">{monthLabel(m)}</div>
+                    <div className={`text-sm font-semibold tabular-nums mt-0.5 ${isShort ? '' : 'opacity-80'}`}>
+                      {short}<span className="text-xs opacity-60 font-normal"> / </span>{total}
+                    </div>
+                  </td>
+                )
+              })}
+              {hasTrailing && <td className="border-l border-gray-200 bg-gray-50" />}
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   )

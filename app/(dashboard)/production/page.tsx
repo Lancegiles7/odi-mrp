@@ -202,8 +202,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           months={months}
           totalsByMonth={monthlyTotals}
           shortByMonth={monthlyShorts}
-          leadingWidthPx={410}    /* Product 320 + Opening 90 */
-          monthMinPx={200}        /* month group = Fcst + Prod + Bal */
+          leadingColWidths={[320, 90]}   /* Product + Opening */
+          monthMinPx={200}               /* each month group spans Fcst + Prod + Bal */
           trailingWidthPx={0}
         />
 
@@ -312,7 +312,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         months={months}
         totalsByMonth={monthlyTotals}
         shortByMonth={monthlyShorts}
-        leadingWidthPx={530}    /* Product 320 + Manufacturer 120 + Opening 90 */
+        leadingColWidths={[320, 120, 90]}   /* Product + Manufacturer + Opening */
         monthMinPx={200}
         trailingWidthPx={0}
       />
