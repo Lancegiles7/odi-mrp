@@ -7,9 +7,10 @@ import {
   updateOpeningStockOverride,
   getOpeningStockHistory,
 } from '@/app/(dashboard)/production/actions'
-import { calcRollingBalance, monthLabel } from '@/lib/demand'
+import { calcRollingBalance, monthLabel, type ShortfallState } from '@/lib/demand'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { OpeningStockHistoryPopover } from '@/components/inventory/opening-stock-popover'
+import { CellCommentPopover } from '@/components/inventory/cell-comment-popover'
 
 interface Props {
   productId: string
@@ -22,6 +23,7 @@ interface Props {
   months: string[]
   forecastByMonth: Record<string, number>
   productionByMonth: Record<string, number>
+  commentedCells: Set<string>      // "productId|yyyy-mm-01" keys
   showManufacturerChip?: boolean   // true on the flat "view all" table
 }
 
@@ -35,7 +37,7 @@ interface Props {
 export function ProductionRow({
   productId, skuCode, productName, manufacturer, isActive,
   openingStock, openingStockOverride, months, forecastByMonth, productionByMonth,
-  showManufacturerChip,
+  commentedCells, showManufacturerChip,
 }: Props) {
   const [prod, setProd] = useState<Record<string, number>>(productionByMonth)
   const [opening, setOpening] = useState<number>(openingStock)
@@ -106,17 +108,27 @@ export function ProductionRow({
       </td>
 
       {rows.map((r) => {
-        const negCls = r.balance < 0 ? 'bg-red-50' : ''
-        const balTxt = r.balance < 0 ? 'text-red-700 font-semibold' : 'text-gray-700'
+        const negCls =
+          r.state === 'red'   ? 'bg-red-50'
+          : r.state === 'amber' ? 'bg-amber-50'
+                                : ''
+        const balTxt =
+          r.state === 'red'   ? 'text-red-700 font-semibold'
+          : r.state === 'amber' ? 'text-amber-900 font-medium'
+                                : 'text-gray-700'
         return (
           <FragmentCells
             key={r.month}
+            productId={productId}
+            productName={productName}
             month={r.month}
             forecast={r.forecast}
             production={prod[r.month] ?? 0}
             balance={r.balance}
+            state={r.state}
             negCls={negCls}
             balTxt={balTxt}
+            hasComment={commentedCells.has(`${productId}|${r.month.slice(0, 10)}`)}
             onCommit={(raw) => commit(r.month, raw)}
           />
         )
@@ -126,14 +138,18 @@ export function ProductionRow({
 }
 
 function FragmentCells({
-  month, forecast, production, balance, negCls, balTxt, onCommit,
+  productId, productName, month, forecast, production, balance, state, negCls, balTxt, hasComment, onCommit,
 }: {
+  productId: string
+  productName: string
   month: string
   forecast: number
   production: number
   balance: number
+  state: ShortfallState
   negCls: string
   balTxt: string
+  hasComment: boolean
   onCommit: (raw: string) => void
 }) {
   return (
@@ -169,16 +185,40 @@ function FragmentCells({
           className="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none"
         />
       </td>
-      <td className={`px-2 py-2 text-right tabular-nums ${negCls} ${balTxt}`}>
+      <td className={`relative px-2 py-2 text-right tabular-nums ${negCls} ${balTxt}`}>
         <div>{balance.toLocaleString()}</div>
         {forecast > 0 && (() => {
           const pct = Math.round((balance / forecast) * 100)
           const cls =
-            pct < 0     ? 'text-red-600'   :
-            pct >= 100  ? 'text-emerald-600' :
-                          'text-amber-600'
+            state === 'red'   ? 'text-red-600'
+            : state === 'amber' ? 'text-amber-600'
+            : pct >= 100      ? 'text-emerald-600'
+                              : 'text-amber-600'
           return <div className={`text-[9px] font-normal ${cls}`}>{pct}%</div>
         })()}
+        {production > 0 && (state === 'red' || state === 'amber') && (
+          <div
+            title={`Planned production ${production.toLocaleString()} this month`}
+            className={`inline-block mt-0.5 text-[8px] px-1 py-px rounded font-medium ${
+              state === 'amber' ? 'bg-amber-200 text-amber-900' : 'bg-red-100 text-red-800'
+            }`}
+          >
+            +{production.toLocaleString()} prod
+          </div>
+        )}
+        {(state === 'red' || state === 'amber') && (
+          <CellCommentPopover
+            entityType="product"
+            entityId={productId}
+            yearMonth={month}
+            entityName={productName}
+            state={state}
+            hasComment={hasComment}
+            status={state === 'red'
+              ? `Balance ${balance.toLocaleString()} — short even with ${production.toLocaleString()} planned production.`
+              : `Balance ${balance.toLocaleString()} — covered by ${production.toLocaleString()} planned production this month.`}
+          />
+        )}
       </td>
     </>
   )

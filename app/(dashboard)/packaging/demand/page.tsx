@@ -4,8 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { rollingMonths, indexProduction, getProductionCell, indexDemand, getGrandTotal, monthLabel } from '@/lib/demand'
 import { getPlanningAnchor } from '@/lib/settings'
-import { aggregatePackagingDemand, hasAnyShortfall, type PackagingRow } from '@/lib/packaging-demand'
+import { aggregatePackagingDemand, hasAnyShortfall, monthShortfallStates, type PackagingRow } from '@/lib/packaging-demand'
 import { PackagingDemandRow } from '@/components/packaging/packaging-demand-row'
+import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
+import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 import { PRODUCT_GROUP_LABELS } from '@/lib/constants'
 
 export const metadata: Metadata = { title: 'Packaging demand' }
@@ -149,6 +151,29 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
   const totalItems      = uniqueRows.length
   const totalShortfalls = uniqueRows.filter((r) => hasAnyShortfall(r, r.packaging.opening_stock_override ?? 0, months)).length
 
+  // Monthly shortfall strip data
+  const monthlyTotals = new Map<string, number>(months.map((m) => [m, 0]))
+  const monthlyShorts = new Map<string, number>(months.map((m) => [m, 0]))
+  for (const r of uniqueRows) {
+    const opening = r.packaging.opening_stock_override ?? 0
+    const states  = monthShortfallStates(r, opening, months)
+    for (const m of months) {
+      if ((r.demandByMonth.get(m) ?? 0) > 0) {
+        monthlyTotals.set(m, (monthlyTotals.get(m) ?? 0) + 1)
+      }
+      if (states.get(m) === 'red') {
+        monthlyShorts.set(m, (monthlyShorts.get(m) ?? 0) + 1)
+      }
+    }
+  }
+
+  const commentedCells = await getCellsWithComments(
+    'packaging',
+    uniqueRows.map((r) => r.packaging.id),
+    firstMonth,
+    lastMonth,
+  )
+
   const sourceLabel = source === 'production' ? 'production plan' : 'demand forecast'
   const groupLabel  = groupBy === 'supplier' ? 'supplier' : 'product group'
 
@@ -204,6 +229,8 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
         <Tile label="Source" value={sourceLabel} sub={`× per-product BOM (${pp?.length ?? 0} links)`} />
       </div>
 
+      <MonthlyShortfallStrip months={months} totalsByMonth={monthlyTotals} shortByMonth={monthlyShorts} />
+
       {renderGroups.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
           No packaging demand to show. Add a packaging item, link it to a product&rsquo;s BOM, or set an opening-stock override.
@@ -242,7 +269,7 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
                 </thead>
                 <tbody>
                   {g.rows.map((row) => (
-                    <PackagingDemandRow key={row.packaging.id} row={row} months={months} />
+                    <PackagingDemandRow key={row.packaging.id} row={row} months={months} commentedCells={commentedCells} />
                   ))}
                 </tbody>
               </table>

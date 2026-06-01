@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mockup · Shortfall amber / red · monthly counts · cell comments</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#f4f5f6; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:#1f2937; }
+  .wrap { max-width:1300px; margin:24px auto; padding:0 16px; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:18px; }
+  .card-h { padding:14px 18px; border-bottom:1px solid #f1f1f1; }
+  .card-h h2 { margin:0; font-size:14px; font-weight:600; }
+  .card-h .hint { font-size:11px; color:#6b7280; margin-top:2px; }
+  .card-b { padding:14px 18px; font-size:12px; }
+
+  /* Existing top tiles row (just for context — unchanged) */
+  .tiles-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
+  .tile { padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; }
+  .tile.urgent { background:#fef2f2; border-color:#fecaca; }
+  .tile .lbl { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; font-weight:600; }
+  .tile.urgent .lbl { color:#b91c1c; }
+  .tile .val { font-size:18px; font-weight:600; color:#111827; margin-top:2px; }
+  .tile.urgent .val { color:#b91c1c; }
+  .tile .sub { font-size:10px; color:#6b7280; margin-top:2px; }
+
+  /* ── NEW: monthly shortfall strip */
+  .month-strip { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px; margin-bottom:18px; }
+  .month-strip .title { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; font-weight:600; margin-bottom:6px; display:flex; justify-content:space-between; }
+  .month-grid { display:grid; grid-template-columns:repeat(12,1fr); gap:4px; }
+  .m-cell { padding:6px 4px; border-radius:4px; text-align:center; font-size:10px; }
+  .m-cell.clean { background:#f9fafb; color:#6b7280; }
+  .m-cell.short { background:#fef2f2; color:#b91c1c; }
+  .m-cell .mlabel { font-weight:600; font-size:9px; text-transform:uppercase; letter-spacing:.04em; opacity:.7; }
+  .m-cell .ratio { font-size:13px; font-weight:600; margin-top:2px; }
+  .m-cell .ratio .sep { opacity:.5; font-weight:400; }
+
+  /* ── Demand table */
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th { text-align:right; color:#6b7280; font-size:9px; text-transform:uppercase; letter-spacing:.05em; padding:8px 6px; font-weight:600; border-bottom:1px solid #f1f1f1; }
+  th.l { text-align:left; }
+  td { padding:6px; border-bottom:1px solid #f4f5f6; text-align:right; vertical-align:top; }
+  td.l { text-align:left; }
+
+  .sku { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; color:#9ca3af; }
+  .pname { font-size:12px; color:#111827; font-weight:500; }
+  .opening { display:inline-block; width:60px; text-align:right; font-size:11px; padding:2px 6px; border:1px solid #d1d5db; border-radius:4px; background:#fff; }
+
+  /* The all-important demand cell */
+  .demand-cell { position:relative; padding:6px 8px; min-width:64px; }
+  .demand-cell .v { font-weight:500; }
+  .demand-cell .pct { font-size:9px; margin-top:1px; }
+  .pct.good { color:#059669; }
+  .pct.warn { color:#d97706; }
+  .pct.bad  { color:#dc2626; }
+  /* NEW: amber state — demand needed an arrival THIS month but the PO is arriving in time */
+  .demand-cell.amber { background:#fffbeb; }
+  .demand-cell.amber .v   { color:#92400e; font-weight:600; }
+  .demand-cell.amber .pct { color:#b45309; }
+  /* RED state — short even with this month's arrival */
+  .demand-cell.red { background:#fef2f2; }
+  .demand-cell.red .v   { color:#b91c1c; font-weight:600; }
+  .demand-cell.red .pct { color:#dc2626; }
+
+  .po-pill {
+    display:inline-block; margin-top:2px;
+    font-size:8px; padding:1px 4px; border-radius:3px;
+    background:#dbeafe; color:#1d4ed8; font-weight:500;
+  }
+  .demand-cell.amber .po-pill { background:#fde68a; color:#92400e; }
+  .demand-cell.red   .po-pill { background:#fecaca; color:#991b1b; }
+
+  /* Comment + button — top-right corner of each cell, appears on hover */
+  .comment-btn {
+    position:absolute; top:2px; right:2px;
+    width:13px; height:13px; border-radius:3px;
+    border:1px solid #d1d5db; background:#fff;
+    color:#9ca3af; font-size:10px; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; opacity:0; transition:opacity .15s;
+  }
+  .demand-cell:hover .comment-btn { opacity:1; }
+  .comment-btn.has-comment { opacity:1; background:#dbeafe; color:#1d4ed8; border-color:#93c5fd; }
+
+  /* Popover for the comment input */
+  .pop-wrap { position:relative; padding:18px; background:#eef0f1; border-radius:8px; }
+  .popover { background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.10); max-width:380px; }
+  .pop-h { padding:10px 14px; border-bottom:1px solid #f1f1f1; }
+  .pop-h .title { font-size:12px; font-weight:600; color:#111827; }
+  .pop-h .sub { font-size:10px; color:#6b7280; margin-top:1px; }
+  .pop-b { padding:12px 14px; font-size:12px; }
+  .pop-b textarea { width:100%; min-height:60px; padding:6px 8px; border:1px solid #d1d5db; border-radius:4px; font-size:12px; font-family:inherit; resize:vertical; }
+  .past { margin-top:10px; max-height:130px; overflow:auto; border:1px solid #f1f1f1; border-radius:4px; }
+  .past-row { padding:6px 8px; border-bottom:1px solid #f4f5f6; font-size:10px; }
+  .past-row .meta { color:#6b7280; }
+  .past-row .text { color:#374151; margin-top:1px; }
+  .pop-f { padding:10px 14px; border-top:1px solid #f1f1f1; display:flex; justify-content:flex-end; gap:6px; background:#fafafa; }
+  .btn { font-size:11px; padding:5px 10px; border-radius:4px; border:1px solid #d1d5db; background:#fff; color:#111827; cursor:pointer; }
+  .btn.primary { background:#111827; color:#fff; border-color:#111827; }
+
+  /* Legend / explainer */
+  .legend { display:flex; gap:12px; font-size:10px; margin-top:10px; flex-wrap:wrap; }
+  .swatch { display:inline-flex; align-items:center; gap:4px; }
+  .sw { width:12px; height:12px; border-radius:3px; }
+  .sw.red { background:#fef2f2; border:1px solid #fecaca; }
+  .sw.amb { background:#fffbeb; border:1px solid #fde68a; }
+  .sw.def { background:#fff;    border:1px solid #e5e7eb; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ── 1 · TOP-LEVEL CONTEXT (unchanged tiles + NEW monthly strip) -->
+  <div class="card">
+    <div class="card-h">
+      <h2>1 · New monthly shortfall strip (under the existing tiles)</h2>
+      <div class="hint">Reads at a glance how many SKUs / ingredients are short each month, against the total with demand that month.</div>
+    </div>
+    <div class="card-b">
+
+      <!-- existing tiles (kept for context) -->
+      <div class="tiles-row">
+        <div class="tile"><div class="lbl">Ingredients</div><div class="val">69</div><div class="sub">across 17 suppliers</div></div>
+        <div class="tile"><div class="lbl">Demand 12mo</div><div class="val">47,541 kg</div></div>
+        <div class="tile urgent"><div class="lbl">Shortfalls</div><div class="val">51</div><div class="sub">ingredients short</div></div>
+        <div class="tile"><div class="lbl">Opening stock</div><div class="val">3,219 kg</div></div>
+      </div>
+
+      <!-- NEW strip -->
+      <div class="month-strip">
+        <div class="title">
+          <span>Shortfalls by month — short / total with demand</span>
+          <span style="font-weight:normal; text-transform:none; letter-spacing:0;">Click a month to filter rows below (future)</span>
+        </div>
+        <div class="month-grid">
+          <div class="m-cell clean"><div class="mlabel">Jun 26</div><div class="ratio">0<span class="sep"> of </span>50</div></div>
+          <div class="m-cell short"><div class="mlabel">Jul 26</div><div class="ratio">3<span class="sep"> of </span>50</div></div>
+          <div class="m-cell short"><div class="mlabel">Aug 26</div><div class="ratio">7<span class="sep"> of </span>52</div></div>
+          <div class="m-cell short"><div class="mlabel">Sep 26</div><div class="ratio">11<span class="sep"> of </span>61</div></div>
+          <div class="m-cell short"><div class="mlabel">Oct 26</div><div class="ratio">9<span class="sep"> of </span>65</div></div>
+          <div class="m-cell short"><div class="mlabel">Nov 26</div><div class="ratio">8<span class="sep"> of </span>65</div></div>
+          <div class="m-cell short"><div class="mlabel">Dec 26</div><div class="ratio">6<span class="sep"> of </span>65</div></div>
+          <div class="m-cell short"><div class="mlabel">Jan 27</div><div class="ratio">5<span class="sep"> of </span>65</div></div>
+          <div class="m-cell short"><div class="mlabel">Feb 27</div><div class="ratio">2<span class="sep"> of </span>65</div></div>
+          <div class="m-cell clean"><div class="mlabel">Mar 27</div><div class="ratio">0<span class="sep"> of </span>65</div></div>
+          <div class="m-cell clean"><div class="mlabel">Apr 27</div><div class="ratio">0<span class="sep"> of </span>50</div></div>
+          <div class="m-cell clean"><div class="mlabel">May 27</div><div class="ratio">0<span class="sep"> of </span>50</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2 · DEMAND ROW WITH NEW AMBER/RED STATES + ARRIVAL PILLS + COMMENT BUTTONS -->
+  <div class="card">
+    <div class="card-h">
+      <h2>2 · Demand row · new red / amber colouring · arrival pill · "+" comment button</h2>
+      <div class="hint">Same row pattern works for Ingredient demand, Packaging demand and Production.</div>
+    </div>
+    <div class="card-b" style="padding:0;">
+      <table>
+        <thead>
+          <tr>
+            <th class="l" style="width:240px;">Packaging</th>
+            <th>Opening</th>
+            <th>Jun 26</th><th>Jul 26</th><th>Aug 26</th><th>Sep 26</th><th>Oct 26</th><th>Nov 26</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="l">
+              <div class="sku">PAK-PUR-VAN-PCH</div>
+              <div class="pname">Vanilla Puree Pouch</div>
+            </td>
+            <td><span class="opening">5,904</span></td>
+
+            <!-- comfortable -->
+            <td class="demand-cell">
+              <div class="v">0</div>
+              <button class="comment-btn" title="Add comment">+</button>
+            </td>
+            <td class="demand-cell">
+              <div class="v">0</div>
+              <button class="comment-btn" title="Add comment">+</button>
+            </td>
+
+            <!-- AMBER: 30,000 needed in Aug, PO of 35,000 arriving Aug. Short without it; covered with it. -->
+            <td class="demand-cell amber">
+              <div class="v">30,000</div>
+              <div class="pct">17%</div>
+              <div class="po-pill" title="PO-2026-107 · +35,000 in Aug">+35k PO</div>
+              <button class="comment-btn" title="Add comment">+</button>
+            </td>
+
+            <!-- AMBER: covered by same PO carry-over -->
+            <td class="demand-cell">
+              <div class="v">0</div>
+              <button class="comment-btn" title="Add comment">+</button>
+            </td>
+
+            <!-- RED: short, no PO in time -->
+            <td class="demand-cell red">
+              <div class="v">30,000</div>
+              <div class="pct">-83%</div>
+              <button class="comment-btn has-comment" title="Has comment: 'Quoted with supplier'">●</button>
+            </td>
+
+            <!-- RED -->
+            <td class="demand-cell red">
+              <div class="v">30,000</div>
+              <div class="pct">-100%</div>
+              <button class="comment-btn" title="Add comment">+</button>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="l">
+              <div class="sku">PAK-PUR-BER-PCH</div>
+              <div class="pname">Berry Puree Pouch</div>
+            </td>
+            <td><span class="opening">13,920</span></td>
+            <td class="demand-cell"><div class="v">0</div><button class="comment-btn">+</button></td>
+            <!-- demand 8,370, opening covers -->
+            <td class="demand-cell">
+              <div class="v">8,370</div>
+              <div class="pct good">+66%</div>
+              <button class="comment-btn">+</button>
+            </td>
+            <td class="demand-cell amber">
+              <div class="v">30,000</div>
+              <div class="pct">8%</div>
+              <div class="po-pill">+30k PO</div>
+              <button class="comment-btn">+</button>
+            </td>
+            <td class="demand-cell"><div class="v">0</div><button class="comment-btn">+</button></td>
+            <td class="demand-cell red">
+              <div class="v">30,000</div>
+              <div class="pct">-92%</div>
+              <button class="comment-btn">+</button>
+            </td>
+            <td class="demand-cell red">
+              <div class="v">30,000</div>
+              <div class="pct">-100%</div>
+              <button class="comment-btn">+</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="padding:10px 14px;">
+        <div class="legend">
+          <span class="swatch"><span class="sw def"></span>Comfortable (opening + carry-over covers it)</span>
+          <span class="swatch"><span class="sw amb"></span><strong>Amber — short without this month's PO, covered with it</strong></span>
+          <span class="swatch"><span class="sw red"></span>Red — still short even with PO(s) landing in time</span>
+        </div>
+        <div style="font-size:10px; color:#6b7280; margin-top:6px;">
+          The blue/amber pill in a cell shows the matching PO arrival (e.g. <code>+35k PO</code>) — hover for the PO number(s). Late POs (arriving after the month they were needed) don't downgrade red to amber.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3 · COMMENT POPOVER (clicking the + on a cell) -->
+  <div class="card">
+    <div class="card-h">
+      <h2>3 · Click "+" on a cell → comment popover</h2>
+      <div class="hint">Same shape as the opening-stock history popover — comment + audit trail.</div>
+    </div>
+    <div class="card-b" style="padding:0;">
+      <div class="pop-wrap">
+        <div class="popover">
+          <div class="pop-h">
+            <div class="title">Comment · Vanilla Puree Pouch · Oct 26</div>
+            <div class="sub">Demand 30,000 · short by 25,000 · no PO arriving</div>
+          </div>
+          <div class="pop-b">
+            <textarea placeholder="e.g. 'Quoted with Logo's — expecting PO confirmation Friday'"></textarea>
+
+            <div class="past">
+              <div class="past-row">
+                <div class="meta">Lance Giles · 12 Jun 2026, 10:14</div>
+                <div class="text">Quoted with Logo's — expecting PO confirmation Friday.</div>
+              </div>
+              <div class="past-row">
+                <div class="meta">Lance Giles · 5 Jun 2026, 09:02</div>
+                <div class="text">Tooled order at supplier; lead time 10 weeks confirmed.</div>
+              </div>
+            </div>
+          </div>
+          <div class="pop-f">
+            <button class="btn">Cancel</button>
+            <button class="btn primary">Add comment</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4 · WHAT THIS BUILDS BEHIND THE SCENES -->
+  <div class="card">
+    <div class="card-h"><h2>4 · What this build entails</h2></div>
+    <div class="card-b">
+      <ul style="margin:0; padding-left:18px; line-height:1.65;">
+        <li><strong>Amber state</strong> — change the shortfall logic so cells distinguish "would have been short without this month's PO arrival" (amber) from "still short even with the PO" (red). Late-arriving POs never downgrade red to amber. No DB change, just a smarter computation.</li>
+        <li><strong>Arrival pill</strong> — render the matching PO quantity in any amber/red cell where a PO lands that month (or where one is on the books but too late). Hover shows PO number(s). Replaces the separate "Arriving (POs)" row that currently lives below each ingredient/packaging row (or keeps both, your call).</li>
+        <li><strong>Monthly shortfall strip</strong> — new 12-column block under the top tiles. For each month, count of (entities short) / (entities with demand that month). Colour: red when any shortfall, neutral when clean.</li>
+        <li><strong>Cell comments</strong> — new DB table <code>demand_cell_comments</code> with <code>entity_type</code> ('ingredient' | 'packaging' | 'product'), <code>entity_id</code>, <code>year_month</code>, <code>comment</code>, <code>changed_by</code>, <code>changed_at</code>. Each cell gets a "+" on hover; clicking opens a popover with the comment field + the full history for that cell. Filled comments show a small blue dot in the corner so you can see at a glance which cells have notes.</li>
+        <li><strong>Scope</strong> — all four changes apply identically to Ingredient demand, Packaging demand and Production. For Production, "arrival pill" = planned production for that month (we already factor it into the balance), so amber = "production planned this month is what saves it".</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

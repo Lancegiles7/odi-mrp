@@ -4,12 +4,14 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import {
   rollingMonths, indexDemand, indexProduction,
-  getGrandTotal, getProductionCell, resolveOpeningStock, monthLabel,
+  getGrandTotal, getProductionCell, resolveOpeningStock, monthLabel, calcRollingBalance,
 } from '@/lib/demand'
 import { getPlanningAnchor } from '@/lib/settings'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
+import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
+import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 import type { DemandForecast, ProductionPlan } from '@/lib/types/database.types'
 
 export const metadata: Metadata = { title: 'Production schedule' }
@@ -88,6 +90,29 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     return out
   }
 
+  // Per-month shortfall counts for the strip + per-cell state for comments.
+  // We compute the rolling balance once per product so the strip and
+  // the rows agree (and so we know which cells are red/amber).
+  const monthlyTotals  = new Map<string, number>(months.map((m) => [m, 0]))
+  const monthlyShorts  = new Map<string, number>(months.map((m) => [m, 0]))
+  for (const p of allProducts) {
+    const f = forecastFor(p.id)
+    const pr = productionFor(p.id)
+    const rolling = calcRollingBalance(months, openingFor(p), (m) => f[m] ?? 0, (m) => pr[m] ?? 0)
+    for (const r of rolling) {
+      if (r.forecast > 0) monthlyTotals.set(r.month, (monthlyTotals.get(r.month) ?? 0) + 1)
+      if (r.state === 'red') monthlyShorts.set(r.month, (monthlyShorts.get(r.month) ?? 0) + 1)
+    }
+  }
+
+  // Bulk-fetch which (product, month) cells already have a comment.
+  const commentedCells = await getCellsWithComments(
+    'product',
+    allProducts.map((p) => p.id),
+    firstMonth,
+    lastMonth,
+  )
+
   // Build manufacturer groups + derived stats
   const manufacturers = new Map<string, ProductRow[]>()
   const UNASSIGNED = '__unassigned__'
@@ -165,12 +190,15 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       <div className="space-y-5">
         {header}
 
-        <div className="flex items-center gap-4 text-xs text-gray-500">
+        <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-100 border border-gray-300"></span> Production (editable)</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-50 border border-red-200"></span> Shortfall (negative balance)</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-50 border border-amber-200"></span> Amber — saved by this month&rsquo;s production</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-50 border border-red-200"></span> Red — short even with production</span>
           <span className="text-gray-300">·</span>
           <span>Opening stock = manual override where set, else inventory on hand.</span>
         </div>
+
+        <MonthlyShortfallStrip months={months} totalsByMonth={monthlyTotals} shortByMonth={monthlyShorts} />
 
         {Array.from(manufacturers.entries()).map(([key, items]) => {
           const label = key === UNASSIGNED ? 'Manufacturer not set' : key
@@ -221,6 +249,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                         months={months}
                         forecastByMonth={forecastFor(p.id)}
                         productionByMonth={productionFor(p.id)}
+                        commentedCells={commentedCells}
                       />
                     ))}
                   </tbody>
@@ -271,6 +300,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         <Tile label="Shortfalls" value={totals.shortfalls.toString()} sub="months × SKU" accent={totals.shortfalls > 0 ? 'red' : undefined} />
         <Tile label="Opening stock" value={totals.opening.toLocaleString()} sub="units on hand" />
       </div>
+
+      <MonthlyShortfallStrip months={months} totalsByMonth={monthlyTotals} shortByMonth={monthlyShorts} />
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">

@@ -9,9 +9,11 @@ import {
 import { getPlanningAnchor } from '@/lib/settings'
 import {
   aggregateIngredientDemand, hasAnyShortfall, demandUnitLabel,
-  convertGramsToIngredientUom,
+  convertGramsToIngredientUom, monthShortfallStates,
 } from '@/lib/ingredient-demand'
 import { IngredientDemandRow } from '@/components/ingredients/ingredient-demand-row'
+import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
+import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 
 export const metadata: Metadata = { title: 'Ingredient demand' }
 
@@ -155,11 +157,14 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     arrivalsByIngredient,
   })
 
-  // ── Derived totals for tiles ───────────────────────────────
+  // ── Derived totals for tiles + monthly shortfall strip ─────
   let totalIngredients = 0
   let totalShortfalls = 0
   const demandByUnit = new Map<string, number>()
   let openingSumKg = 0
+  const monthlyTotals = new Map<string, number>(months.map((m) => [m, 0]))
+  const monthlyShorts = new Map<string, number>(months.map((m) => [m, 0]))
+  const allIngredientIds: string[] = []
 
   for (const g of groups) {
     for (const row of g.ingredients) {
@@ -169,8 +174,21 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       const opening = row.ingredient.opening_stock_override ?? 0
       if (hasAnyShortfall(row, opening, months)) totalShortfalls++
       if (unit === 'kg') openingSumKg += opening
+
+      allIngredientIds.push(row.ingredient.id)
+      const states = monthShortfallStates(row, opening, months)
+      for (const m of months) {
+        if ((row.demandByMonth.get(m) ?? 0) > 0) {
+          monthlyTotals.set(m, (monthlyTotals.get(m) ?? 0) + 1)
+        }
+        if (states.get(m) === 'red') {
+          monthlyShorts.set(m, (monthlyShorts.get(m) ?? 0) + 1)
+        }
+      }
     }
   }
+
+  const commentedCells = await getCellsWithComments('ingredient', allIngredientIds, firstMonth, lastMonth)
 
   const demandSummaryParts: string[] = []
   for (const [u, v] of demandByUnit.entries()) {
@@ -223,6 +241,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
         <Tile label="Opening stock" value={`${Math.round(openingSumKg).toLocaleString()} kg`} sub="kg-tracked ingredients" />
       </div>
 
+      <MonthlyShortfallStrip months={months} totalsByMonth={monthlyTotals} shortByMonth={monthlyShorts} />
+
       {groups.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
           No ingredient demand to show. Add BOMs to products, or set an opening stock override.
@@ -264,7 +284,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
                 </thead>
                 <tbody>
                   {g.ingredients.map((row) => (
-                    <IngredientDemandRow key={row.ingredient.id} row={row} months={months} />
+                    <IngredientDemandRow key={row.ingredient.id} row={row} months={months} commentedCells={commentedCells} />
                   ))}
                 </tbody>
               </table>

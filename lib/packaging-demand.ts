@@ -173,6 +173,32 @@ export function monthShortfalls(row: PackagingRow, opening: number, months: stri
   return out
 }
 
+/** Three-state classification — see lib/ingredient-demand.ts. */
+export type ShortfallState = 'ok' | 'amber' | 'red'
+
+export function monthShortfallStates(
+  row: PackagingRow,
+  opening: number,
+  months: string[],
+): Map<string, ShortfallState> {
+  const out = new Map<string, ShortfallState>()
+  let balance = opening
+  for (const m of months) {
+    const demand   = row.demandByMonth.get(m)   ?? 0
+    const arriving = row.arrivingByMonth.get(m) ?? 0
+    const carriedAvailable = Math.max(0, balance)
+    const fullAvailable    = carriedAvailable + arriving
+    let state: ShortfallState = 'ok'
+    if (demand > 0) {
+      if (demand > fullAvailable) state = 'red'
+      else if (demand > carriedAvailable) state = 'amber'
+    }
+    out.set(m, state)
+    balance = balance + arriving - demand
+  }
+  return out
+}
+
 /**
  * Running stock balance after each month (opening + Σ arrivals − Σ demand
  * through that month). Powers the per-cell "% of demand still covered"

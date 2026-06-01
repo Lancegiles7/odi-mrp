@@ -119,12 +119,15 @@ export function getProductionCell(
 //   balance[m] = (m == first ? opening : balance[m-1]) + production[m] - forecast[m]
 // ============================================================
 
+export type ShortfallState = 'ok' | 'amber' | 'red'
+
 export interface MonthRow {
   month: string
   forecast: number
   production: number
   balance: number
-  shortfall: boolean
+  shortfall: boolean       // back-compat: true iff state === 'red'
+  state: ShortfallState    // 'red' = bal < 0; 'amber' = production this month saved a would-be shortfall; 'ok' otherwise
 }
 
 export function calcRollingBalance(
@@ -138,13 +141,20 @@ export function calcRollingBalance(
   for (const m of months) {
     const f = forecastByMonth(m)
     const p = productionByMonth(m)
+    const carried   = bal                  // balance before this month's production / forecast applied
     bal = bal + p - f
+    // 'amber' = balance is still ≥ 0 but only because of this month's production
+    // (i.e. without that production it would have gone negative).
+    let state: ShortfallState = 'ok'
+    if (bal < 0) state = 'red'
+    else if (carried - f < 0 && f > 0) state = 'amber'
     out.push({
-      month: m,
-      forecast: f,
+      month:      m,
+      forecast:   f,
       production: p,
-      balance: bal,
-      shortfall: bal < 0,
+      balance:    bal,
+      shortfall:  state === 'red',
+      state,
     })
   }
   return out

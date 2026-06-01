@@ -269,6 +269,39 @@ export function monthShortfalls(
 }
 
 /**
+ * Three-state shortfall classification per month.
+ *   - 'red'   = demand > opening-carried balance + this month's arrival (still short).
+ *   - 'amber' = demand fits with this month's arrival, but WOULD have been short
+ *               without it (the PO landing this month is what saved it).
+ *   - 'ok'    = demand fits within the opening-carried balance alone.
+ *               No demand → also 'ok'.
+ */
+export type ShortfallState = 'ok' | 'amber' | 'red'
+
+export function monthShortfallStates(
+  row: IngredientRow,
+  opening: number,
+  months: string[],
+): Map<string, ShortfallState> {
+  const out = new Map<string, ShortfallState>()
+  let balance = opening
+  for (const m of months) {
+    const demand   = row.demandByMonth.get(m)   ?? 0
+    const arriving = row.arrivingByMonth.get(m) ?? 0
+    const carriedAvailable = Math.max(0, balance)
+    const fullAvailable    = carriedAvailable + arriving
+    let state: ShortfallState = 'ok'
+    if (demand > 0) {
+      if (demand > fullAvailable) state = 'red'
+      else if (demand > carriedAvailable) state = 'amber'
+    }
+    out.set(m, state)
+    balance = balance + arriving - demand
+  }
+  return out
+}
+
+/**
  * Running stock balance after each month (opening + Σ arrivals − Σ demand
  * through that month). Powers the per-cell "% of demand still covered"
  * sub-label on the Ingredient demand row.
