@@ -196,16 +196,9 @@ function FragmentCells({
                               : 'text-amber-600'
           return <div className={`text-[9px] font-normal ${cls}`}>{pct}%</div>
         })()}
-        {production > 0 && (state === 'red' || state === 'amber') && (
-          <div
-            title={`Planned production ${production.toLocaleString()} this month`}
-            className={`inline-block mt-0.5 text-[8px] px-1 py-px rounded font-medium ${
-              state === 'amber' ? 'bg-amber-200 text-amber-900' : 'bg-red-100 text-red-800'
-            }`}
-          >
-            +{production.toLocaleString()} prod
-          </div>
-        )}
+        {/* No "+X prod" pill on Production — the Prod sub-column to the left already
+            shows the value, so the pill would just duplicate it. Comment + button still
+            renders below on red / amber cells. */}
         {(state === 'red' || state === 'amber') && (
           <CellCommentPopover
             entityType="product"
