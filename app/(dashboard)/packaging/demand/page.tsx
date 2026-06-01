@@ -52,8 +52,8 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
       .in('status', ['submitted', 'partially_received'])
       .not('expected_delivery_date', 'is', null) as { data: Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null }> | null },
     supabase.from('purchase_order_lines')
-      .select('purchase_order_id, ingredient_id, product_id, description, quantity_ordered, quantity_received, unit_of_measure, notes')
-      .ilike('notes', '%packaging%') as { data: Array<{ purchase_order_id: string; ingredient_id: string | null; product_id: string | null; description: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string; notes: string | null }> | null },
+      .select('purchase_order_id, packaging_id, quantity_ordered, quantity_received')
+      .not('packaging_id', 'is', null) as { data: Array<{ purchase_order_id: string; packaging_id: string | null; quantity_ordered: number; quantity_received: number }> | null },
   ])
 
   // Build units map per product / month from the chosen source
@@ -78,12 +78,30 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     }
   }
 
-  // Build arrivals from open packaging-line POs.
-  // We don't have a packaging_id on PO lines yet, so for v1 we leave arrivals
-  // empty — POs flow inventory through stock_movements at receipt time, which
-  // is already wired. (TODO: add packaging_id to PO lines for arrival tracking.)
-  void openPos; void openPoLines
+  // Build arrivals from open packaging-line POs. For each line with a
+  // packaging_id and a parent PO whose expected_delivery_date lands in
+  // the planning window, count (ordered − received) units into the
+  // arrival bucket for that packaging item × month. Mirrors the
+  // ingredient-demand arrivals build (without the UoM conversion since
+  // packaging is always tracked as 'each').
+  const poById = new Map<string, { po_number: string; expected_delivery_date: string | null }>()
+  for (const p of openPos ?? []) {
+    poById.set(p.id, { po_number: p.po_number, expected_delivery_date: p.expected_delivery_date })
+  }
   const arrivalsByPackaging = new Map<string, Array<{ po_id: string; po_number: string; month: string; qty: number }>>()
+  for (const ln of openPoLines ?? []) {
+    if (!ln.packaging_id) continue
+    const po = poById.get(ln.purchase_order_id)
+    if (!po?.expected_delivery_date) continue
+    const monthKey = po.expected_delivery_date.slice(0, 7) + '-01'
+    if (!months.includes(monthKey)) continue
+    const remaining = Math.max(0, Number(ln.quantity_ordered) - Number(ln.quantity_received))
+    if (remaining <= 0) continue
+    if (!arrivalsByPackaging.has(ln.packaging_id)) arrivalsByPackaging.set(ln.packaging_id, [])
+    arrivalsByPackaging.get(ln.packaging_id)!.push({
+      po_id: ln.purchase_order_id, po_number: po.po_number, month: monthKey, qty: remaining,
+    })
+  }
 
   const supplierGroups = aggregatePackagingDemand({
     packaging:        packaging ?? [],
