@@ -188,13 +188,17 @@ export function monthShortfallStates(
     const arriving = row.arrivingByMonth.get(m) ?? 0
     const carriedAvailable = Math.max(0, balance)
     const fullAvailable    = carriedAvailable + arriving
+    const balanceAfter     = balance + arriving - demand
+    // 'amber' = the PO arriving this month is what avoided a shortfall
+    // AND the resulting buffer is thin (less than one month's demand).
+    // A huge PO that lands with comfortable surplus stays neutral.
     let state: ShortfallState = 'ok'
     if (demand > 0) {
       if (demand > fullAvailable) state = 'red'
-      else if (demand > carriedAvailable) state = 'amber'
+      else if (demand > carriedAvailable && balanceAfter < demand) state = 'amber'
     }
     out.set(m, state)
-    balance = balance + arriving - demand
+    balance = balanceAfter
   }
   return out
 }

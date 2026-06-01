@@ -203,7 +203,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           totalsByMonth={monthlyTotals}
           shortByMonth={monthlyShorts}
           leadingColWidths={[320, 90]}   /* Product + Opening */
-          monthMinPx={200}               /* each month group spans Fcst + Prod + Bal */
+          monthMinPx={220}               /* each month group spans Fcst + Prod + Bal; matches the actual rendered group width with the w-20 inputs */
           trailingWidthPx={0}
         />
 

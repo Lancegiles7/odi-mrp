@@ -143,11 +143,13 @@ export function calcRollingBalance(
     const p = productionByMonth(m)
     const carried   = bal                  // balance before this month's production / forecast applied
     bal = bal + p - f
-    // 'amber' = balance is still ≥ 0 but only because of this month's production
-    // (i.e. without that production it would have gone negative).
+    // 'amber' = production this month saved a would-be shortfall AND the
+    // resulting buffer is thin (less than one month's forecast). A
+    // production run that lands with a comfortable buffer (>= 1 month's
+    // forecast) stays neutral — no need to flag.
     let state: ShortfallState = 'ok'
     if (bal < 0) state = 'red'
-    else if (carried - f < 0 && f > 0) state = 'amber'
+    else if (carried - f < 0 && f > 0 && bal < f) state = 'amber'
     out.push({
       month:      m,
       forecast:   f,
