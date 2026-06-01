@@ -280,6 +280,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
                       <th key={m} className="text-right font-medium px-2 py-2 border-l border-gray-200 min-w-[72px]">{monthLabel(m)}</th>
                     ))}
                     <th className="text-right font-medium px-3 py-2 bg-gray-100 border-l border-gray-200 min-w-[90px]">12-mo total</th>
+                    <th className="text-right font-medium px-3 py-2 bg-gray-100 border-l border-gray-200 min-w-[100px]">Total shortfall</th>
                   </tr>
                 </thead>
                 <tbody>

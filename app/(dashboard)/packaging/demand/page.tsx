@@ -283,6 +283,7 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
                       <th key={m} className="text-right px-2 py-2 font-medium border-l border-gray-200 min-w-[72px]">{monthLabel(m)}</th>
                     ))}
                     <th className="text-right px-3 py-2 font-medium bg-gray-100 border-l border-gray-200 min-w-[90px]">12-mo total</th>
+                    <th className="text-right px-3 py-2 font-medium bg-gray-100 border-l border-gray-200 min-w-[100px]">Total shortfall</th>
                   </tr>
                 </thead>
                 <tbody>

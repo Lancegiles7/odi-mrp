@@ -6,7 +6,7 @@ import {
   updateIngredientOpeningStock,
   getIngredientOpeningStockHistory,
 } from '@/app/(dashboard)/ingredients/demand/actions'
-import { demandUnitLabel, monthShortfallStates, monthRunningBalances } from '@/lib/ingredient-demand'
+import { demandUnitLabel, monthShortfallStates, monthRunningBalances, monthShortAmounts } from '@/lib/ingredient-demand'
 import type { IngredientRow as IngredientRowData } from '@/lib/ingredient-demand'
 import { OpeningStockHistoryPopover } from '@/components/inventory/opening-stock-popover'
 import { CellCommentPopover } from '@/components/inventory/cell-comment-popover'
@@ -34,6 +34,8 @@ export function IngredientDemandRow({ row, months, commentedCells }: Props) {
   const opening = override ?? 0
   const stateByMonth   = useMemo(() => monthShortfallStates(row, opening, months), [row, opening, months])
   const balanceByMonth = useMemo(() => monthRunningBalances(row, opening, months), [row, opening, months])
+  const shortByMonth   = useMemo(() => monthShortAmounts(row, opening, months),    [row, opening, months])
+  const totalShortfall = useMemo(() => months.reduce((s, m) => s + (shortByMonth.get(m) ?? 0), 0), [shortByMonth, months])
 
   const ingredientId = row.ingredient.id
   const ingredientName = row.ingredient.name
@@ -110,7 +112,14 @@ export function IngredientDemandRow({ row, months, commentedCells }: Props) {
               className={`relative px-2 py-2 text-right tabular-nums border-l border-gray-100 ${cellCls}`}
             >
               <div>{v === 0 ? <span className="text-gray-300">0</span> : fmt(v)}</div>
-              {pct != null && <div className={`text-[9px] font-normal ${pctCls}`}>{pct}%</div>}
+              {pct != null && (
+                <div className={`text-[9px] font-normal ${pctCls}`}>
+                  {state === 'red' && (shortByMonth.get(m) ?? 0) > 0 && (
+                    <>{fmt(shortByMonth.get(m) ?? 0)} short · </>
+                  )}
+                  {pct}%
+                </div>
+              )}
               {arriving > 0 && (
                 <div
                   title={poTitle}
@@ -147,12 +156,17 @@ export function IngredientDemandRow({ row, months, commentedCells }: Props) {
         }`}>
           {fmt(row.totalDemand)}
         </td>
+        <td className={`px-3 py-2 text-right tabular-nums font-semibold border-l border-gray-200 ${
+          totalShortfall > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-50 text-gray-400'
+        }`}>
+          {totalShortfall > 0 ? fmt(totalShortfall) : '—'}
+        </td>
       </tr>
 
       {open && row.products.length > 0 && (
         <>
           <tr className="bg-blue-50/30 border-t border-blue-100">
-            <td className="px-4 pl-10 py-1.5 text-[10px] uppercase tracking-wider text-blue-700 font-semibold" colSpan={3 + months.length}>
+            <td className="px-4 pl-10 py-1.5 text-[10px] uppercase tracking-wider text-blue-700 font-semibold" colSpan={4 + months.length}>
               Driven by {row.products.length} product{row.products.length === 1 ? '' : 's'}
             </td>
           </tr>
@@ -179,6 +193,7 @@ export function IngredientDemandRow({ row, months, commentedCells }: Props) {
               <td className="px-3 py-1.5 text-right tabular-nums text-gray-600 border-l border-blue-100/60">
                 {fmt(p.totalDemand)}
               </td>
+              <td className="px-3 py-1.5 border-l border-blue-100/60" />
             </tr>
           ))}
         </>

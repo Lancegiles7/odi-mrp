@@ -126,8 +126,9 @@ export interface MonthRow {
   forecast: number
   production: number
   balance: number
-  shortfall: boolean       // back-compat: true iff state === 'red'
-  state: ShortfallState    // 'red' = bal < 0; 'amber' = production this month saved a would-be shortfall; 'ok' otherwise
+  shortfall: boolean        // back-compat: true iff state === 'red'
+  state: ShortfallState     // 'red' = bal < 0; 'amber' = production this month saved a would-be shortfall; 'ok' otherwise
+  shortAmount: number       // units short THIS month: max(0, forecast − (max(0, carried) + production))
 }
 
 export function calcRollingBalance(
@@ -142,6 +143,8 @@ export function calcRollingBalance(
     const f = forecastByMonth(m)
     const p = productionByMonth(m)
     const carried   = bal                  // balance before this month's production / forecast applied
+    const available = Math.max(0, carried) + p
+    const shortAmount = Math.max(0, f - available)
     bal = bal + p - f
     // 'amber' = production this month saved a would-be shortfall AND the
     // resulting buffer is thin (less than one month's forecast). A
@@ -151,12 +154,13 @@ export function calcRollingBalance(
     if (bal < 0) state = 'red'
     else if (carried - f < 0 && f > 0 && bal < f) state = 'amber'
     out.push({
-      month:      m,
-      forecast:   f,
-      production: p,
-      balance:    bal,
-      shortfall:  state === 'red',
+      month:       m,
+      forecast:    f,
+      production:  p,
+      balance:     bal,
+      shortfall:   state === 'red',
       state,
+      shortAmount,
     })
   }
   return out

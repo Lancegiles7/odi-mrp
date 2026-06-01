@@ -126,6 +126,7 @@ export function ProductionRow({
             production={prod[r.month] ?? 0}
             balance={r.balance}
             state={r.state}
+            shortAmount={r.shortAmount}
             negCls={negCls}
             balTxt={balTxt}
             hasComment={commentedCells.has(`${productId}|${r.month.slice(0, 10)}`)}
@@ -133,12 +134,24 @@ export function ProductionRow({
           />
         )
       })}
+
+      {/* Total shortfall — sum of monthly shortAmounts across the rolling year */}
+      {(() => {
+        const total = rows.reduce((s, r) => s + r.shortAmount, 0)
+        return (
+          <td className={`px-3 py-2 text-right tabular-nums font-semibold border-l border-gray-200 ${
+            total > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-50 text-gray-400'
+          }`}>
+            {total > 0 ? total.toLocaleString() : '—'}
+          </td>
+        )
+      })()}
     </tr>
   )
 }
 
 function FragmentCells({
-  productId, productName, month, forecast, production, balance, state, negCls, balTxt, hasComment, onCommit,
+  productId, productName, month, forecast, production, balance, state, shortAmount, negCls, balTxt, hasComment, onCommit,
 }: {
   productId: string
   productName: string
@@ -147,6 +160,7 @@ function FragmentCells({
   production: number
   balance: number
   state: ShortfallState
+  shortAmount: number
   negCls: string
   balTxt: string
   hasComment: boolean
@@ -194,7 +208,14 @@ function FragmentCells({
             : state === 'amber' ? 'text-amber-600'
             : pct >= 100      ? 'text-emerald-600'
                               : 'text-amber-600'
-          return <div className={`text-[9px] font-normal ${cls}`}>{pct}%</div>
+          return (
+            <div className={`text-[9px] font-normal ${cls}`}>
+              {state === 'red' && shortAmount > 0 && (
+                <>{shortAmount.toLocaleString()} short · </>
+              )}
+              {pct}%
+            </div>
+          )
         })()}
         {/* No "+X prod" pill on Production — the Prod sub-column to the left already
             shows the value, so the pill would just duplicate it. Comment + button still

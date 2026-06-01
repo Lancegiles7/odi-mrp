@@ -232,11 +232,13 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                       <span className="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
                     </th>
                       {monthHeaders}
+                      <th className="text-right font-medium px-3 py-2 bg-gray-100 border-l border-gray-200 min-w-[100px]">Total shortfall</th>
                     </tr>
                     <tr className="bg-gray-50 text-[10px] text-gray-500">
                       <th className="sticky left-0 bg-gray-50 z-10"></th>
                       <th></th>
                       {monthSubHeaders}
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -323,12 +325,14 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                       <span className="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
                     </th>
                 {monthHeaders}
+                <th className="text-right font-medium px-3 py-2 bg-gray-100 border-l border-gray-200 min-w-[100px]">Total shortfall</th>
               </tr>
               <tr className="bg-gray-50 text-[10px] text-gray-500">
                 <th className="sticky left-0 bg-gray-50 z-10"></th>
                 <th></th>
                 <th></th>
                 {monthSubHeaders}
+                <th></th>
               </tr>
             </thead>
             <tbody>

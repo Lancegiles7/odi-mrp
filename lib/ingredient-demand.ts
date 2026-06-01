@@ -306,6 +306,28 @@ export function monthShortfallStates(
 }
 
 /**
+ * Per-month "units short" (i.e. demand this month minus what's available
+ * from carried stock + this month's PO arrivals). Sum across months
+ * gives the total unmet demand for the rolling year.
+ */
+export function monthShortAmounts(
+  row: IngredientRow,
+  opening: number,
+  months: string[],
+): Map<string, number> {
+  const out = new Map<string, number>()
+  let balance = opening
+  for (const m of months) {
+    const demand   = row.demandByMonth.get(m)   ?? 0
+    const arriving = row.arrivingByMonth.get(m) ?? 0
+    const available = Math.max(0, balance) + arriving
+    out.set(m, Math.max(0, demand - available))
+    balance = balance + arriving - demand
+  }
+  return out
+}
+
+/**
  * Running stock balance after each month (opening + Σ arrivals − Σ demand
  * through that month). Powers the per-cell "% of demand still covered"
  * sub-label on the Ingredient demand row.
