@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Fragment } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
@@ -225,16 +226,28 @@ export default async function ProductionPage({ searchParams }: PageProps) {
               </summary>
 
               <div className="border-t border-gray-100 overflow-x-auto">
-                <table className="w-full text-xs" style={{ minWidth: 2800 }}>
+                <table className="w-full text-xs table-fixed" style={{ minWidth: 2800 }}>
+                  <colgroup>
+                    <col style={{ width: 280 }} />
+                    <col style={{ width: 100 }} />
+                    {months.map((m) => (
+                      <Fragment key={m}>
+                        <col style={{ width: 56 }} />
+                        <col style={{ width: 80 }} />
+                        <col style={{ width: 64 }} />
+                      </Fragment>
+                    ))}
+                    <col style={{ width: 90 }} />
+                  </colgroup>
                   <thead>
                     <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
-                      <th className="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 z-10 w-[320px] min-w-[320px]">Product</th>
-                      <th className="text-right font-medium px-3 py-2 w-[90px] min-w-[90px]">
+                      <th className="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 z-10">Product</th>
+                      <th className="text-right font-medium px-3 py-2">
                       Opening
                       <span className="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
                     </th>
                       {monthHeaders}
-                      <th className="text-right font-medium px-3 py-2 bg-gray-100 border-l border-gray-200 min-w-[100px]">Total shortfall</th>
+                      <th className="text-right font-medium px-2 py-2 border-l border-gray-200">Short</th>
                     </tr>
                     <tr className="bg-gray-50 text-[10px] text-gray-500">
                       <th className="sticky left-0 bg-gray-50 z-10"></th>
@@ -316,17 +329,30 @@ export default async function ProductionPage({ searchParams }: PageProps) {
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs" style={{ minWidth: 3000 }}>
+          <table className="w-full text-xs table-fixed" style={{ minWidth: 3000 }}>
+            <colgroup>
+              <col style={{ width: 280 }} />
+              <col style={{ width: 110 }} />
+              <col style={{ width: 100 }} />
+              {months.map((m) => (
+                <Fragment key={m}>
+                  <col style={{ width: 56 }} />
+                  <col style={{ width: 80 }} />
+                  <col style={{ width: 64 }} />
+                </Fragment>
+              ))}
+              <col style={{ width: 90 }} />
+            </colgroup>
             <thead>
               <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
-                <th className="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 z-10 w-[320px] min-w-[320px]">Product</th>
-                <th className="text-left font-medium px-3 py-2 w-[120px] min-w-[120px]">Manufacturer</th>
-                <th className="text-right font-medium px-3 py-2 w-[90px] min-w-[90px]">
+                <th className="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 z-10">Product</th>
+                <th className="text-left font-medium px-3 py-2">Manufacturer</th>
+                <th className="text-right font-medium px-3 py-2">
                       Opening
                       <span className="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
                     </th>
                 {monthHeaders}
-                <th className="text-right font-medium px-3 py-2 bg-gray-100 border-l border-gray-200 min-w-[100px]">Total shortfall</th>
+                <th className="text-right font-medium px-2 py-2 border-l border-gray-200">Short</th>
               </tr>
               <tr className="bg-gray-50 text-[10px] text-gray-500">
                 <th className="sticky left-0 bg-gray-50 z-10"></th>
@@ -350,6 +376,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                   months={months}
                   forecastByMonth={forecastFor(p.id)}
                   productionByMonth={productionFor(p.id)}
+                  commentedCells={commentedCells}
                   showManufacturerChip
                 />
               ))}

@@ -272,19 +272,26 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
             </summary>
 
             <div className="border-t border-gray-100 overflow-x-auto">
-              <table className="w-full text-xs" style={{ minWidth: 1700 }}>
+              <table className="w-full text-xs table-fixed" style={{ minWidth: 1700 }}>
+                <colgroup>
+                  <col style={{ width: 280 }} />
+                  <col style={{ width: 110 }} />
+                  {months.map((m) => <col key={m} style={{ width: 80 }} />)}
+                  <col style={{ width: 78 }} />
+                  <col style={{ width: 90 }} />
+                </colgroup>
                 <thead>
                   <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
-                    <th className="text-left font-medium px-4 py-2 w-[320px] min-w-[320px]">Ingredient</th>
-                    <th className="text-right font-medium px-3 py-2 w-[110px] min-w-[110px]">
+                    <th className="text-left font-medium px-4 py-2">Ingredient</th>
+                    <th className="text-right font-medium px-3 py-2">
                       Opening
                       <span className="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
                     </th>
                     {months.map((m) => (
-                      <th key={m} className="text-right font-medium px-2 py-2 border-l border-gray-200 min-w-[72px]">{monthLabel(m)}</th>
+                      <th key={m} className="text-right font-medium px-2 py-2 border-l border-gray-200">{monthLabel(m)}</th>
                     ))}
-                    <th className="text-right font-medium px-3 py-2 bg-gray-100 border-l border-gray-200 min-w-[90px]">12-mo total</th>
-                    <th className="text-right font-medium px-3 py-2 bg-gray-100 border-l border-gray-200 min-w-[100px]">Total shortfall</th>
+                    <th className="text-right font-medium px-2 py-2 bg-gray-50 border-l border-gray-200">12-mo</th>
+                    <th className="text-right font-medium px-2 py-2 border-l border-gray-200">Short</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -81,41 +81,44 @@ export function PackagingDemandRow({ row, months, commentedCells }: Props) {
           const arriving = row.arrivingByMonth.get(m) ?? 0
           const pos      = row.arrivingPosByMonth.get(m) ?? []
           const bal      = balanceByMonth.get(m) ?? 0
-          const pct      = v > 0 ? Math.round((bal / v) * 100) : null
-          const pctCls = pct == null
-            ? ''
-            : state === 'red'   ? 'text-red-600'
-            : state === 'amber' ? 'text-amber-600'
-            : pct >= 100        ? 'text-emerald-600'
-                                : 'text-amber-600'
-          const cellCls =
-            state === 'red'   ? 'bg-red-50 text-red-700 font-semibold'
-            : state === 'amber' ? 'bg-amber-50 text-amber-900'
-                                : 'text-gray-700'
-          const poTitle = pos.length ? pos.map((p) => `${p.po_number}: +${fmt(p.qty)}`).join('\n') : ''
+          const short    = shortByMonth.get(m) ?? 0
+          const poTitle  = pos.length ? pos.map((p) => `${p.po_number}: +${fmt(p.qty)}`).join('\n') : ''
           const cellHasComment = commentedCells.has(`${packagingId}|${m.slice(0, 10)}`)
+
+          const cellBg =
+            state === 'red'   ? 'bg-red-50'
+            : state === 'amber' ? 'bg-amber-50'
+                                : ''
+          const numCls =
+            state === 'red'   ? 'text-red-700 font-semibold'
+            : state === 'amber' ? 'text-amber-900 font-semibold'
+                                : 'text-gray-700'
+          // One compact sub-line per cell: short qty (red), PO arriving
+          // (amber — that's what makes it amber), or "+N%" when surplus.
+          let sub: { text: string; cls: string; title?: string } | null = null
+          if (v > 0) {
+            if (state === 'red') {
+              sub = { text: `${fmt(short)} short`, cls: 'text-red-600' }
+            } else if (state === 'amber') {
+              sub = { text: `+${fmt(arriving)} PO`, cls: 'text-amber-700', title: poTitle }
+            } else if (bal > v) {
+              sub = { text: `+${Math.round((bal / v) * 100)}%`, cls: 'text-emerald-600' }
+            }
+          }
+
           return (
-            <td key={m} className={`relative px-2 py-2 text-right tabular-nums border-l border-gray-100 ${cellCls}`}>
-              <div>{v === 0 ? <span className="text-gray-300">0</span> : fmt(v)}</div>
-              {pct != null && (
-                <div className={`text-[9px] font-normal ${pctCls}`}>
-                  {state === 'red' && (shortByMonth.get(m) ?? 0) > 0 && (
-                    <>{fmt(shortByMonth.get(m) ?? 0)} short · </>
+            <td key={m} className={`relative px-2 text-right tabular-nums border-l border-gray-100 ${cellBg}`} style={{ height: 36 }}>
+              {v === 0 ? (
+                <span className="text-gray-300">0</span>
+              ) : (
+                <>
+                  <div className={`text-xs leading-tight ${numCls}`}>{fmt(v)}</div>
+                  {sub && (
+                    <div title={sub.title} className={`text-[10px] font-normal leading-tight ${sub.cls}`}>
+                      {sub.text}
+                    </div>
                   )}
-                  {pct}%
-                </div>
-              )}
-              {arriving > 0 && (
-                <div
-                  title={poTitle}
-                  className={`inline-block mt-0.5 text-[8px] px-1 py-px rounded font-medium ${
-                    state === 'amber' ? 'bg-amber-200 text-amber-900' :
-                    state === 'red'   ? 'bg-red-100 text-red-800' :
-                                        'bg-blue-100 text-blue-700'
-                  }`}
-                >
-                  +{fmt(arriving)} PO
-                </div>
+                </>
               )}
               {(state === 'red' || state === 'amber') && (
                 <span onClick={(e) => e.stopPropagation()}>
@@ -135,11 +138,13 @@ export function PackagingDemandRow({ row, months, commentedCells }: Props) {
             </td>
           )
         })}
-        <td className={`px-3 py-2 text-right tabular-nums font-semibold border-l ${lastMonthState === 'red' ? 'bg-red-100 text-red-800 border-red-200' : 'bg-gray-50 text-gray-900 border-gray-200'}`}>
+        <td className={`px-2 text-right text-xs tabular-nums border-l border-gray-200 ${
+          lastMonthState === 'red' ? 'text-red-700 font-medium bg-red-50/40' : 'text-gray-600 bg-gray-50'
+        }`}>
           {fmt(row.totalDemand)}
         </td>
-        <td className={`px-3 py-2 text-right tabular-nums font-semibold border-l border-gray-200 ${
-          totalShortfall > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-50 text-gray-400'
+        <td className={`px-2 text-right text-xs tabular-nums border-l border-gray-200 ${
+          totalShortfall > 0 ? 'text-red-700 font-semibold' : 'text-gray-300'
         }`}>
           {totalShortfall > 0 ? fmt(totalShortfall) : '—'}
         </td>

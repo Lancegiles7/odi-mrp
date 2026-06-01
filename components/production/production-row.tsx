@@ -139,8 +139,8 @@ export function ProductionRow({
       {(() => {
         const total = rows.reduce((s, r) => s + r.shortAmount, 0)
         return (
-          <td className={`px-3 py-2 text-right tabular-nums font-semibold border-l border-gray-200 ${
-            total > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-50 text-gray-400'
+          <td className={`px-2 text-right text-xs tabular-nums border-l border-gray-200 ${
+            total > 0 ? 'text-red-700 font-semibold' : 'text-gray-300'
           }`}>
             {total > 0 ? total.toLocaleString() : '—'}
           </td>
@@ -168,10 +168,10 @@ function FragmentCells({
 }) {
   return (
     <>
-      <td className={`px-2 py-2 text-right text-gray-600 border-l border-gray-200 tabular-nums ${negCls}`}>
+      <td className={`px-2 text-right text-xs text-gray-600 border-l border-gray-200 tabular-nums ${negCls}`} style={{ height: 36 }}>
         {forecast ? forecast.toLocaleString() : <span className="text-gray-300">0</span>}
       </td>
-      <td className={`px-1 py-2 text-right tabular-nums ${negCls}`}>
+      <td className={`px-1 text-right tabular-nums ${negCls}`} style={{ height: 36 }}>
         <input
           type="number"
           min={0}
@@ -196,26 +196,25 @@ function FragmentCells({
           }}
           placeholder="0"
           title={`Production for ${monthLabel(month)} — Enter to save and move down`}
-          className="w-20 text-right text-[11px] border border-gray-300 rounded px-1.5 py-0.5 bg-gray-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none"
+          className="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none"
         />
       </td>
-      <td className={`relative px-2 py-2 text-right tabular-nums ${negCls} ${balTxt}`}>
-        <div>{balance.toLocaleString()}</div>
+      <td className={`relative px-2 text-right tabular-nums ${negCls} ${balTxt}`} style={{ height: 36 }}>
+        <div className="text-xs leading-tight">{balance.toLocaleString()}</div>
         {forecast > 0 && (() => {
-          const pct = Math.round((balance / forecast) * 100)
-          const cls =
-            state === 'red'   ? 'text-red-600'
-            : state === 'amber' ? 'text-amber-600'
-            : pct >= 100      ? 'text-emerald-600'
-                              : 'text-amber-600'
-          return (
-            <div className={`text-[9px] font-normal ${cls}`}>
-              {state === 'red' && shortAmount > 0 && (
-                <>{shortAmount.toLocaleString()} short · </>
-              )}
-              {pct}%
-            </div>
-          )
+          // One compact sub-line: short qty (red), nothing for amber
+          // (the editable Prod sub-column already shows what's covering),
+          // and "+N%" surplus when the row is healthy and has buffer.
+          if (state === 'red' && shortAmount > 0) {
+            return <div className="text-[10px] font-normal leading-tight text-red-600">{shortAmount.toLocaleString()} short</div>
+          }
+          if (state === 'ok') {
+            const pct = Math.round((balance / forecast) * 100)
+            if (pct >= 100 && balance > forecast) {
+              return <div className="text-[10px] font-normal leading-tight text-emerald-600">+{pct}%</div>
+            }
+          }
+          return null
         })()}
         {/* No "+X prod" pill on Production — the Prod sub-column to the left already
             shows the value, so the pill would just duplicate it. Comment + button still

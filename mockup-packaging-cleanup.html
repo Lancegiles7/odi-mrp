@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Packaging demand — UI cleanup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  /* Locked column widths so months never drift */
+  table.fixed-grid { table-layout: fixed; }
+  .col-name      { width: 280px; }
+  .col-opening   { width: 84px;  }
+  .col-month     { width: 80px;  }
+  .col-12mo      { width: 78px;  }
+  .col-short     { width: 90px;  }
+  /* Smaller opening input */
+  input.opening-input {
+    width: 60px; padding: 2px 6px; text-align: right; font-size: 11px;
+    border: 1px dashed #d1d5db; border-radius: 4px; background: white;
+  }
+</style>
+</head>
+<body class="bg-gray-50 p-6">
+
+<div class="max-w-[1900px] mx-auto space-y-6">
+
+  <!-- ───────── HEADER ───────── -->
+  <div>
+    <h1 class="text-2xl font-semibold">Packaging demand — proposed cleanup</h1>
+    <p class="text-sm text-gray-500 mt-1">
+      Even column widths · slimmer totals · single-line shortfall cells · compact opening input.
+    </p>
+  </div>
+
+  <!-- ───────── BEFORE / AFTER NOTES ───────── -->
+  <div class="grid grid-cols-2 gap-4">
+    <div class="bg-white border border-gray-200 rounded-md p-4">
+      <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">What changes</div>
+      <ul class="text-sm text-gray-700 space-y-1.5 leading-relaxed">
+        <li>• Every month column is exactly <span class="font-semibold">80px</span> (was content-sized — drifted from 72px to ~120px depending on cell content)</li>
+        <li>• Shortfall cells go from 3 lines → <span class="font-semibold">2 lines</span> (balance + "X short")</li>
+        <li>• &ldquo;Total shortfall&rdquo; column drops the full red tint — red <span class="font-semibold">number</span> on plain background</li>
+        <li>• &ldquo;12-mo total&rdquo; uses lighter gray (gray-50), smaller text</li>
+        <li>• Opening input: <span class="font-semibold">w-60px</span>, dashed border, no chunky input box</li>
+        <li>• Row height locked to 32px regardless of state — no jumpy rows like &ldquo;Pouch Berry SRT&rdquo; vs &ldquo;Vanilla Pouch SRT&rdquo;</li>
+      </ul>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-md p-4">
+      <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">What stays</div>
+      <ul class="text-sm text-gray-700 space-y-1.5 leading-relaxed">
+        <li>• Top &ldquo;Shortfalls by month&rdquo; summary pill strip (already shipped)</li>
+        <li>• Red = shortfall · Amber = covered by PO arriving · Green = surplus</li>
+        <li>• Click row to expand &amp; see consuming products</li>
+        <li>• Comment popovers on red / amber cells</li>
+        <li>• Edit opening stock → popover with audit history</li>
+        <li>• PO chip (+5,001) when an open PO arrives in that month</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ───────── TILE STRIP (unchanged, for context) ───────── -->
+  <div class="grid grid-cols-3 gap-3">
+    <div class="p-3 bg-white border border-gray-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-gray-500">Packaging items</div>
+      <div class="text-lg font-semibold text-gray-900">26</div>
+      <div class="text-[11px] text-gray-500">across 4 suppliers</div>
+    </div>
+    <div class="p-3 bg-red-50 border border-red-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-red-700">Shortfalls</div>
+      <div class="text-lg font-semibold text-red-800">9</div>
+      <div class="text-[11px] text-red-700">items short</div>
+    </div>
+    <div class="p-3 bg-white border border-gray-200 rounded-md">
+      <div class="text-[11px] uppercase font-semibold text-gray-500">Source</div>
+      <div class="text-lg font-semibold text-gray-900">production plan</div>
+      <div class="text-[11px] text-gray-500">× per-product BOM</div>
+    </div>
+  </div>
+
+  <!-- ───────── TOP SUMMARY STRIP (already shipped) ───────── -->
+  <div class="bg-white border border-gray-200 rounded-lg p-3">
+    <div class="text-[10px] uppercase tracking-wider font-semibold text-gray-500 mb-2">
+      Shortfalls by month
+      <span class="ml-1 normal-case tracking-normal text-gray-400 font-normal">— short / total with demand · totals across the page</span>
+    </div>
+    <div class="grid gap-1.5" style="grid-template-columns: repeat(12, minmax(64px, 1fr));">
+      <div class="rounded px-1.5 py-1.5 text-center bg-red-50 text-red-700">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Jun 26</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5">2<span class="text-xs opacity-60 font-normal"> / </span>26</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-red-50 text-red-700">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Jul 26</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5">13<span class="text-xs opacity-60 font-normal"> / </span>34</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-red-50 text-red-700">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Aug 26</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5">11<span class="text-xs opacity-60 font-normal"> / </span>26</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-red-50 text-red-700">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Sept 26</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5">16<span class="text-xs opacity-60 font-normal"> / </span>26</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-red-50 text-red-700">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Oct 26</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5">2<span class="text-xs opacity-60 font-normal"> / </span>4</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-red-50 text-red-700">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Nov 26</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5">8<span class="text-xs opacity-60 font-normal"> / </span>8</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-gray-50 text-gray-600">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Dec 26</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5 opacity-80">0<span class="text-xs opacity-60 font-normal"> / </span>0</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-gray-50 text-gray-600">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Jan 27</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5 opacity-80">0<span class="text-xs opacity-60 font-normal"> / </span>0</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-red-50 text-red-700">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Feb 27</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5">8<span class="text-xs opacity-60 font-normal"> / </span>8</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-gray-50 text-gray-600">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Mar 27</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5 opacity-80">0<span class="text-xs opacity-60 font-normal"> / </span>0</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-gray-50 text-gray-600">
+        <div class="text-[9px] uppercase font-semibold opacity-70">Apr 27</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5 opacity-80">0<span class="text-xs opacity-60 font-normal"> / </span>0</div>
+      </div>
+      <div class="rounded px-1.5 py-1.5 text-center bg-gray-50 text-gray-600">
+        <div class="text-[9px] uppercase font-semibold opacity-70">May 27</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5 opacity-80">0<span class="text-xs opacity-60 font-normal"> / </span>0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── ACCORDION 1 — ABBE PACKAGING (cleaned) ───────── -->
+  <details open class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+      <div class="flex items-center gap-3">
+        <span class="text-gray-400">▼</span>
+        <span class="font-semibold text-sm">Abbe Packaging</span>
+        <span class="text-xs text-gray-500">4 items</span>
+      </div>
+      <span class="text-xs text-red-600 font-medium">4 shortfalls</span>
+    </summary>
+
+    <div class="border-t border-gray-100 overflow-x-auto">
+      <table class="fixed-grid w-full text-xs">
+        <colgroup>
+          <col class="col-name" />
+          <col class="col-opening" />
+          <col class="col-month" /><col class="col-month" /><col class="col-month" />
+          <col class="col-month" /><col class="col-month" /><col class="col-month" />
+          <col class="col-month" /><col class="col-month" /><col class="col-month" />
+          <col class="col-month" /><col class="col-month" /><col class="col-month" />
+          <col class="col-12mo" />
+          <col class="col-short" />
+        </colgroup>
+        <thead>
+          <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+            <th class="text-left px-4 py-2 font-medium">Packaging</th>
+            <th class="text-right px-3 py-2 font-medium">
+              Opening
+              <span class="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
+            </th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jun 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jul 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Aug 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Sept 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Oct 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Nov 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Dec 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jan 27</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Feb 27</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Mar 27</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Apr 27</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">May 27</th>
+            <th class="text-right px-2 py-2 font-medium bg-gray-50 border-l border-gray-200">12-mo</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Short</th>
+          </tr>
+        </thead>
+        <tbody class="text-gray-700">
+          <!-- Row 1: Chicken Puree SRT -->
+          <tr class="border-t border-gray-100 hover:bg-gray-50/50" style="height:34px;">
+            <td class="px-4 py-1.5">
+              <div class="text-[10px] text-gray-400 font-mono">PAK-PUR-CKN-SRT</div>
+              <div class="text-xs font-medium text-gray-900">Chicken Puree SRT <span class="text-gray-400 font-normal">(each)</span></div>
+            </td>
+            <td class="px-3 py-1.5 text-right">
+              <input type="text" class="opening-input" value="3,178" />
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">1,823 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">5,001 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">5,001 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs tabular-nums text-gray-600 bg-gray-50">15,003</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs font-semibold tabular-nums text-red-700">11,825</td>
+          </tr>
+
+          <!-- Row 2: Pouch Berry SRT (with surplus example) -->
+          <tr class="border-t border-gray-100 hover:bg-gray-50/50" style="height:34px;">
+            <td class="px-4 py-1.5">
+              <div class="text-[10px] text-gray-400 font-mono">PAK-PUR-BER-SRT</div>
+              <div class="text-xs font-medium text-gray-900">Pouch Berry SRT <span class="text-gray-400 font-normal">(each)</span></div>
+            </td>
+            <td class="px-3 py-1.5 text-right">
+              <input type="text" class="opening-input" value="4,915" />
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100">
+              <div class="text-xs font-semibold tabular-nums text-gray-700">1,395</div>
+              <div class="text-[10px] text-emerald-600 opacity-80 tabular-nums leading-tight">+252%</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">1,481 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">5,001 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">5,001 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs tabular-nums text-gray-600 bg-gray-50">16,398</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs font-semibold tabular-nums text-red-700">11,483</td>
+          </tr>
+
+          <!-- Row 3: Vanilla Pouch SRT (amber example — covered by PO) -->
+          <tr class="border-t border-gray-100 hover:bg-gray-50/50" style="height:34px;">
+            <td class="px-4 py-1.5">
+              <div class="text-[10px] text-gray-400 font-mono">PAK-PUR-VAN-SRT</div>
+              <div class="text-xs font-medium text-gray-900">Vanilla Pouch SRT <span class="text-gray-400 font-normal">(each)</span></div>
+            </td>
+            <td class="px-3 py-1.5 text-right">
+              <input type="text" class="opening-input" value="254" />
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-amber-50">
+              <div class="text-xs font-semibold tabular-nums text-amber-800">5,001</div>
+              <div class="text-[10px] text-amber-700 opacity-80 tabular-nums leading-tight">PO covers</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">5,001 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">5,001 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs tabular-nums text-gray-600 bg-gray-50">15,003</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs font-semibold tabular-nums text-red-700">14,749</td>
+          </tr>
+
+          <!-- Row 4: Veg Puree SRT -->
+          <tr class="border-t border-gray-100 hover:bg-gray-50/50" style="height:34px;">
+            <td class="px-4 py-1.5">
+              <div class="text-[10px] text-gray-400 font-mono">PAK-PUR-VEG-SRT</div>
+              <div class="text-xs font-medium text-gray-900">Veg Puree SRT <span class="text-gray-400 font-normal">(each)</span></div>
+            </td>
+            <td class="px-3 py-1.5 text-right">
+              <input type="text" class="opening-input" value="3,510" />
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">1,491 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">5,001 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">5,001</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">5,001 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs tabular-nums text-gray-600 bg-gray-50">15,003</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs font-semibold tabular-nums text-red-700">11,493</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <!-- ───────── ACCORDION 2 — BJ BALL ───────── -->
+  <details open class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <summary class="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+      <div class="flex items-center gap-3">
+        <span class="text-gray-400">▼</span>
+        <span class="font-semibold text-sm">BJ Ball T/A Caspak Products</span>
+        <span class="text-xs text-gray-500">2 items</span>
+      </div>
+      <span class="text-xs text-red-600 font-medium">2 shortfalls</span>
+    </summary>
+
+    <div class="border-t border-gray-100 overflow-x-auto">
+      <table class="fixed-grid w-full text-xs">
+        <colgroup>
+          <col class="col-name" />
+          <col class="col-opening" />
+          <col class="col-month" /><col class="col-month" /><col class="col-month" />
+          <col class="col-month" /><col class="col-month" /><col class="col-month" />
+          <col class="col-month" /><col class="col-month" /><col class="col-month" />
+          <col class="col-month" /><col class="col-month" /><col class="col-month" />
+          <col class="col-12mo" />
+          <col class="col-short" />
+        </colgroup>
+        <thead>
+          <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+            <th class="text-left px-4 py-2 font-medium">Packaging</th>
+            <th class="text-right px-3 py-2 font-medium">
+              Opening
+              <span class="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
+            </th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jun 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jul 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Aug 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Sept 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Oct 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Nov 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Dec 26</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jan 27</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Feb 27</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Mar 27</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Apr 27</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">May 27</th>
+            <th class="text-right px-2 py-2 font-medium bg-gray-50 border-l border-gray-200">12-mo</th>
+            <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Short</th>
+          </tr>
+        </thead>
+        <tbody class="text-gray-700">
+          <tr class="border-t border-gray-100 hover:bg-gray-50/50" style="height:34px;">
+            <td class="px-4 py-1.5">
+              <div class="text-[10px] text-gray-400 font-mono">PAK-MLT-BLU-PCH</div>
+              <div class="text-xs font-medium text-gray-900">Melts Blueberry Pouch <span class="text-gray-400 font-normal">(each)</span></div>
+            </td>
+            <td class="px-3 py-1.5 text-right">
+              <input type="text" class="opening-input" value="—" />
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">2,860</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">2,860 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">2,860</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">2,860 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">2,860</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">2,860 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">2,860</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">2,860 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs tabular-nums text-gray-600 bg-gray-50">11,440</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs font-semibold tabular-nums text-red-700">11,440</td>
+          </tr>
+          <tr class="border-t border-gray-100 hover:bg-gray-50/50" style="height:34px;">
+            <td class="px-4 py-1.5">
+              <div class="text-[10px] text-gray-400 font-mono">PAK-MLT-STR-PCH</div>
+              <div class="text-xs font-medium text-gray-900">Melts Strawberry Pouch <span class="text-gray-400 font-normal">(each)</span></div>
+            </td>
+            <td class="px-3 py-1.5 text-right">
+              <input type="text" class="opening-input" value="—" />
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">2,860</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">2,860 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">2,860</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">2,860 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">2,860</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">2,860 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 bg-red-50">
+              <div class="text-xs font-semibold tabular-nums text-red-700">2,860</div>
+              <div class="text-[10px] text-red-600 opacity-80 tabular-nums leading-tight">2,860 short</div>
+            </td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-gray-300">0</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs tabular-nums text-gray-600 bg-gray-50">11,440</td>
+            <td class="text-right px-2 border-l border-gray-100 text-xs font-semibold tabular-nums text-red-700">11,440</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <!-- ───────── FOOTNOTE ───────── -->
+  <div class="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm text-amber-900">
+    <strong>Note on the screenshot:</strong> the per-accordion "Shortfalls by month" row you see in the current production page should already be gone — last commit moved that to a single strip at the top. If you're still seeing it, the Vercel deploy may still be running, or a hard refresh (Cmd+Shift+R) will pick it up.
+  </div>
+
+</div>
+</body>
+</html>
