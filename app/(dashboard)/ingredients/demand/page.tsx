@@ -12,7 +12,7 @@ import {
   convertGramsToIngredientUom, monthShortfallStates,
 } from '@/lib/ingredient-demand'
 import { IngredientDemandRow } from '@/components/ingredients/ingredient-demand-row'
-import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
+import { MonthlyShortfallTheadRow } from '@/components/inventory/monthly-shortfall-thead-row'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 
 export const metadata: Metadata = { title: 'Ingredient demand' }
@@ -157,13 +157,11 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     arrivalsByIngredient,
   })
 
-  // ── Derived totals for tiles + monthly shortfall strip ─────
+  // ── Derived totals for tiles ───────────────────────────────
   let totalIngredients = 0
   let totalShortfalls = 0
   const demandByUnit = new Map<string, number>()
   let openingSumKg = 0
-  const monthlyTotals = new Map<string, number>(months.map((m) => [m, 0]))
-  const monthlyShorts = new Map<string, number>(months.map((m) => [m, 0]))
   const allIngredientIds: string[] = []
 
   for (const g of groups) {
@@ -174,18 +172,23 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       const opening = row.ingredient.opening_stock_override ?? 0
       if (hasAnyShortfall(row, opening, months)) totalShortfalls++
       if (unit === 'kg') openingSumKg += opening
-
       allIngredientIds.push(row.ingredient.id)
-      const states = monthShortfallStates(row, opening, months)
+    }
+  }
+
+  // Per-group monthly shortfall counts feed the thead row inside each accordion.
+  function shortfallCountsForGroup(rows: typeof groups[number]['ingredients']) {
+    const totals = new Map<string, number>(months.map((m) => [m, 0]))
+    const shorts = new Map<string, number>(months.map((m) => [m, 0]))
+    for (const row of rows) {
+      const opening = row.ingredient.opening_stock_override ?? 0
+      const states  = monthShortfallStates(row, opening, months)
       for (const m of months) {
-        if ((row.demandByMonth.get(m) ?? 0) > 0) {
-          monthlyTotals.set(m, (monthlyTotals.get(m) ?? 0) + 1)
-        }
-        if (states.get(m) === 'red') {
-          monthlyShorts.set(m, (monthlyShorts.get(m) ?? 0) + 1)
-        }
+        if ((row.demandByMonth.get(m) ?? 0) > 0) totals.set(m, (totals.get(m) ?? 0) + 1)
+        if (states.get(m) === 'red')             shorts.set(m, (shorts.get(m) ?? 0) + 1)
       }
     }
+    return { totals, shorts }
   }
 
   const commentedCells = await getCellsWithComments('ingredient', allIngredientIds, firstMonth, lastMonth)
@@ -241,8 +244,6 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
         <Tile label="Opening stock" value={`${Math.round(openingSumKg).toLocaleString()} kg`} sub="kg-tracked ingredients" />
       </div>
 
-      <MonthlyShortfallStrip months={months} totalsByMonth={monthlyTotals} shortByMonth={monthlyShorts} />
-
       {groups.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
           No ingredient demand to show. Add BOMs to products, or set an opening stock override.
@@ -252,6 +253,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       {groups.map((g) => {
         const shortCount = g.ingredients.reduce((n, r) =>
           n + (hasAnyShortfall(r, r.ingredient.opening_stock_override ?? 0, months) ? 1 : 0), 0)
+        const { totals: groupTotals, shorts: groupShorts } = shortfallCountsForGroup(g.ingredients)
         return (
           <details key={g.supplier.id ?? 'none'} className="bg-white rounded-lg border border-gray-200 overflow-hidden" open={shortCount > 0}>
             <summary className="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
@@ -270,6 +272,13 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
             <div className="border-t border-gray-100 overflow-x-auto">
               <table className="w-full text-xs" style={{ minWidth: 1700 }}>
                 <thead>
+                  <MonthlyShortfallTheadRow
+                    months={months}
+                    totalsByMonth={groupTotals}
+                    shortByMonth={groupShorts}
+                    leadingColSpan={2}
+                    trailingColSpan={2}
+                  />
                   <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                     <th className="text-left font-medium px-4 py-2 w-[320px] min-w-[320px]">Ingredient</th>
                     <th className="text-right font-medium px-3 py-2 w-[110px] min-w-[110px]">

@@ -10,7 +10,7 @@ import { getPlanningAnchor } from '@/lib/settings'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
-import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
+import { MonthlyShortfallTheadRow } from '@/components/inventory/monthly-shortfall-thead-row'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 import type { DemandForecast, ProductionPlan } from '@/lib/types/database.types'
 
@@ -90,19 +90,20 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     return out
   }
 
-  // Per-month shortfall counts for the strip + per-cell state for comments.
-  // We compute the rolling balance once per product so the strip and
-  // the rows agree (and so we know which cells are red/amber).
-  const monthlyTotals  = new Map<string, number>(months.map((m) => [m, 0]))
-  const monthlyShorts  = new Map<string, number>(months.map((m) => [m, 0]))
-  for (const p of allProducts) {
-    const f = forecastFor(p.id)
-    const pr = productionFor(p.id)
-    const rolling = calcRollingBalance(months, openingFor(p), (m) => f[m] ?? 0, (m) => pr[m] ?? 0)
-    for (const r of rolling) {
-      if (r.forecast > 0) monthlyTotals.set(r.month, (monthlyTotals.get(r.month) ?? 0) + 1)
-      if (r.state === 'red') monthlyShorts.set(r.month, (monthlyShorts.get(r.month) ?? 0) + 1)
+  // Per-group monthly shortfall counts for the strip thead row inside each accordion.
+  function shortfallCountsForGroup(items: ProductRow[]) {
+    const totals = new Map<string, number>(months.map((m) => [m, 0]))
+    const shorts = new Map<string, number>(months.map((m) => [m, 0]))
+    for (const p of items) {
+      const f = forecastFor(p.id)
+      const pr = productionFor(p.id)
+      const rolling = calcRollingBalance(months, openingFor(p), (m) => f[m] ?? 0, (m) => pr[m] ?? 0)
+      for (const r of rolling) {
+        if (r.forecast > 0)     totals.set(r.month, (totals.get(r.month) ?? 0) + 1)
+        if (r.state === 'red')  shorts.set(r.month, (shorts.get(r.month) ?? 0) + 1)
+      }
     }
+    return { totals, shorts }
   }
 
   // Bulk-fetch which (product, month) cells already have a comment.
@@ -198,16 +199,11 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           <span>Opening stock = manual override where set, else inventory on hand.</span>
         </div>
 
-        <MonthlyShortfallStrip
-          months={months}
-          totalsByMonth={monthlyTotals}
-          shortByMonth={monthlyShorts}
-        />
-
         {Array.from(manufacturers.entries()).map(([key, items]) => {
           const label = key === UNASSIGNED ? 'Manufacturer not set' : key
           const chip  = key === UNASSIGNED ? null : (MANUFACTURER_CHIP_COLOURS[key] ?? null)
           const short = shortfallCount(items)
+          const { totals: groupTotals, shorts: groupShorts } = shortfallCountsForGroup(items)
           return (
             <details key={key} className="bg-white rounded-lg border border-gray-200 overflow-hidden" open={short > 0}>
               <summary className="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
@@ -225,6 +221,15 @@ export default async function ProductionPage({ searchParams }: PageProps) {
               <div className="border-t border-gray-100 overflow-x-auto">
                 <table className="w-full text-xs" style={{ minWidth: 2800 }}>
                   <thead>
+                    <MonthlyShortfallTheadRow
+                      months={months}
+                      totalsByMonth={groupTotals}
+                      shortByMonth={groupShorts}
+                      leadingColSpan={2}
+                      monthColSpan={3}
+                      trailingColSpan={1}
+                      stickyLeading
+                    />
                     <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                       <th className="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 z-10 w-[320px] min-w-[320px]">Product</th>
                       <th className="text-right font-medium px-3 py-2 w-[90px] min-w-[90px]">
@@ -307,16 +312,26 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         <Tile label="Opening stock" value={totals.opening.toLocaleString()} sub="units on hand" />
       </div>
 
-      <MonthlyShortfallStrip
-        months={months}
-        totalsByMonth={monthlyTotals}
-        shortByMonth={monthlyShorts}
-      />
-
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs" style={{ minWidth: 3000 }}>
             <thead>
+              {(() => {
+                // View-all has no per-manufacturer accordion, so the strip
+                // shows counts across the whole filtered set.
+                const { totals: viewAllTotals, shorts: viewAllShorts } = shortfallCountsForGroup(filtered)
+                return (
+                  <MonthlyShortfallTheadRow
+                    months={months}
+                    totalsByMonth={viewAllTotals}
+                    shortByMonth={viewAllShorts}
+                    leadingColSpan={3}
+                    monthColSpan={3}
+                    trailingColSpan={1}
+                    stickyLeading
+                  />
+                )
+              })()}
               <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                 <th className="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 z-10 w-[320px] min-w-[320px]">Product</th>
                 <th className="text-left font-medium px-3 py-2 w-[120px] min-w-[120px]">Manufacturer</th>

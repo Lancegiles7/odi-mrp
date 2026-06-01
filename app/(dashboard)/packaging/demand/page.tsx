@@ -6,7 +6,7 @@ import { rollingMonths, indexProduction, getProductionCell, indexDemand, getGran
 import { getPlanningAnchor } from '@/lib/settings'
 import { aggregatePackagingDemand, hasAnyShortfall, monthShortfallStates, type PackagingRow } from '@/lib/packaging-demand'
 import { PackagingDemandRow } from '@/components/packaging/packaging-demand-row'
-import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
+import { MonthlyShortfallTheadRow } from '@/components/inventory/monthly-shortfall-thead-row'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 import { PRODUCT_GROUP_LABELS } from '@/lib/constants'
 
@@ -169,20 +169,19 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
   const totalItems      = uniqueRows.length
   const totalShortfalls = uniqueRows.filter((r) => hasAnyShortfall(r, r.packaging.opening_stock_override ?? 0, months)).length
 
-  // Monthly shortfall strip data
-  const monthlyTotals = new Map<string, number>(months.map((m) => [m, 0]))
-  const monthlyShorts = new Map<string, number>(months.map((m) => [m, 0]))
-  for (const r of uniqueRows) {
-    const opening = r.packaging.opening_stock_override ?? 0
-    const states  = monthShortfallStates(r, opening, months)
-    for (const m of months) {
-      if ((r.demandByMonth.get(m) ?? 0) > 0) {
-        monthlyTotals.set(m, (monthlyTotals.get(m) ?? 0) + 1)
-      }
-      if (states.get(m) === 'red') {
-        monthlyShorts.set(m, (monthlyShorts.get(m) ?? 0) + 1)
+  // Per-group monthly shortfall counts feed the thead row inside each accordion.
+  function shortfallCountsForGroup(rows: PackagingRow[]) {
+    const totals = new Map<string, number>(months.map((m) => [m, 0]))
+    const shorts = new Map<string, number>(months.map((m) => [m, 0]))
+    for (const r of rows) {
+      const opening = r.packaging.opening_stock_override ?? 0
+      const states  = monthShortfallStates(r, opening, months)
+      for (const m of months) {
+        if ((r.demandByMonth.get(m) ?? 0) > 0) totals.set(m, (totals.get(m) ?? 0) + 1)
+        if (states.get(m) === 'red')           shorts.set(m, (shorts.get(m) ?? 0) + 1)
       }
     }
+    return { totals, shorts }
   }
 
   const commentedCells = await getCellsWithComments(
@@ -247,8 +246,6 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
         <Tile label="Source" value={sourceLabel} sub={`× per-product BOM (${pp?.length ?? 0} links)`} />
       </div>
 
-      <MonthlyShortfallStrip months={months} totalsByMonth={monthlyTotals} shortByMonth={monthlyShorts} />
-
       {renderGroups.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
           No packaging demand to show. Add a packaging item, link it to a product&rsquo;s BOM, or set an opening-stock override.
@@ -257,6 +254,7 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
 
       {renderGroups.map((g) => {
         const shortCount = g.rows.reduce((n, r) => n + (hasAnyShortfall(r, r.packaging.opening_stock_override ?? 0, months) ? 1 : 0), 0)
+        const { totals: groupTotals, shorts: groupShorts } = shortfallCountsForGroup(g.rows)
         return (
           <details key={g.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden" open={shortCount > 0}>
             <summary className="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
@@ -273,6 +271,13 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
             <div className="border-t border-gray-100 overflow-x-auto">
               <table className="w-full text-xs" style={{ minWidth: 1700 }}>
                 <thead>
+                  <MonthlyShortfallTheadRow
+                    months={months}
+                    totalsByMonth={groupTotals}
+                    shortByMonth={groupShorts}
+                    leadingColSpan={2}
+                    trailingColSpan={2}
+                  />
                   <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                     <th className="text-left px-4 py-2 font-medium w-[320px] min-w-[320px]">Packaging</th>
                     <th className="text-right px-3 py-2 font-medium w-[110px] min-w-[110px]">
