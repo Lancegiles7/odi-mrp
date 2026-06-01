@@ -198,7 +198,14 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           <span>Opening stock = manual override where set, else inventory on hand.</span>
         </div>
 
-        <MonthlyShortfallStrip months={months} totalsByMonth={monthlyTotals} shortByMonth={monthlyShorts} />
+        <MonthlyShortfallStrip
+          months={months}
+          totalsByMonth={monthlyTotals}
+          shortByMonth={monthlyShorts}
+          leadingWidthPx={410}    /* Product 320 + Opening 90 */
+          monthMinPx={200}        /* month group = Fcst + Prod + Bal */
+          trailingWidthPx={0}
+        />
 
         {Array.from(manufacturers.entries()).map(([key, items]) => {
           const label = key === UNASSIGNED ? 'Manufacturer not set' : key
@@ -301,7 +308,14 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         <Tile label="Opening stock" value={totals.opening.toLocaleString()} sub="units on hand" />
       </div>
 
-      <MonthlyShortfallStrip months={months} totalsByMonth={monthlyTotals} shortByMonth={monthlyShorts} />
+      <MonthlyShortfallStrip
+        months={months}
+        totalsByMonth={monthlyTotals}
+        shortByMonth={monthlyShorts}
+        leadingWidthPx={530}    /* Product 320 + Manufacturer 120 + Opening 90 */
+        monthMinPx={200}
+        trailingWidthPx={0}
+      />
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
