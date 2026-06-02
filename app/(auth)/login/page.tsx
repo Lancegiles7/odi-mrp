@@ -10,7 +10,8 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ searchParams }: LoginPageProps) {
-  const hasError = searchParams.error === '1'
+  const hasError      = searchParams.error === '1'
+  const isDeactivated = searchParams.error === 'deactivated'
 
   return (
     <div className="w-full max-w-sm">
@@ -34,6 +35,13 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
             <p className="text-sm text-red-700">
               Invalid email or password. Please try again.
+            </p>
+          </div>
+        )}
+        {isDeactivated && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+            <p className="text-sm text-amber-800">
+              Your account has been deactivated. Please contact an admin.
             </p>
           </div>
         )}

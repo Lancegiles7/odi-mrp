@@ -172,6 +172,11 @@ export default async function SettingsPage({ searchParams }: PageProps) {
             title="PO companies"
             description="Legal entities (Odi Nutrition Ltd, Vision Made Co Pty Ltd) that drive the PO PDF letterhead."
           />
+          <ReferenceLink
+            href="/settings/users"
+            title="Users"
+            description="Invite, edit and deactivate users. Five roles available (Admin, Operations, Supply chain, Finance, Read only)."
+          />
         </ul>
       </div>
     </div>

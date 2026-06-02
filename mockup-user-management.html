@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>User management — proposal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+</style>
+</head>
+<body class="bg-gray-50 p-6">
+
+<div class="max-w-[1200px] mx-auto space-y-6">
+
+  <!-- ═════════ HEADER ═════════ -->
+  <div>
+    <h1 class="text-2xl font-semibold">User management — proposal</h1>
+    <p class="text-sm text-gray-500 mt-1">In-app screens to invite, manage, and remove users. No more Supabase dashboard work.</p>
+  </div>
+
+  <!-- ═════════ THE GOOD NEWS ═════════ -->
+  <div class="bg-emerald-50 border border-emerald-200 rounded-md p-4">
+    <div class="text-xs uppercase tracking-wider font-semibold text-emerald-800 mb-2">What's already in place (we don't have to build this)</div>
+    <ul class="text-sm text-emerald-900 space-y-1.5 leading-relaxed">
+      <li>✓ <span class="font-semibold">user_profiles table</span> with role + active/inactive — exists since day 1</li>
+      <li>✓ <span class="font-semibold">Five roles defined</span> with full database-level permission policies (RLS) — see below</li>
+      <li>✓ <span class="font-semibold">Sidebar already gates by role</span> — non-admins don't see settings, users, trash, etc.</li>
+      <li>✓ <span class="font-semibold">Invite email callback</span> — when a user clicks an invite link, they're routed to /reset-password to set their password</li>
+      <li>✓ <span class="font-semibold">Header shows current user + role</span> and has a logout button</li>
+    </ul>
+    <p class="text-sm text-emerald-900 mt-2 italic">The pain last time was that we had to do all this in the Supabase dashboard. The plumbing is sound — we just need the screens.</p>
+  </div>
+
+  <!-- ═════════ WHAT WE'D BUILD ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-md p-4">
+    <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">What we'd build</div>
+    <ol class="text-sm text-gray-700 space-y-1.5 leading-relaxed list-decimal pl-5">
+      <li><span class="font-semibold">Settings → Users</span> — list page with name, email, role, status, last sign-in</li>
+      <li><span class="font-semibold">Invite user</span> button → modal with full name, email, role. Sends an invite email via Supabase.</li>
+      <li><span class="font-semibold">Edit user</span> page — change role, deactivate, resend invite, danger-zone delete</li>
+      <li><span class="font-semibold">My profile</span> — every user can edit their own full name &amp; password</li>
+      <li><span class="font-semibold">Deactivate vs delete</span> — soft-deactivate preserves audit history ("Atma created this PO"); hard-delete only available when no records reference them</li>
+    </ol>
+  </div>
+
+  <!-- ═════════ ROLES MATRIX ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-200">
+      <div class="text-sm font-semibold">The five roles (already defined in the database)</div>
+      <p class="text-xs text-gray-500 mt-0.5">When you invite a new user you pick one of these. Permissions are enforced at the database level — you can't accidentally over-share.</p>
+    </div>
+    <table class="w-full text-xs">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+          <th class="text-left px-4 py-2 font-medium w-[140px]">Role</th>
+          <th class="text-left px-3 py-2 font-medium">Can do</th>
+          <th class="text-left px-3 py-2 font-medium w-[140px]">Typical user</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-medium text-[11px]">Admin</span></td>
+          <td class="px-3 py-2.5 text-gray-700">Everything. Manage users, edit settings, all reads + writes.</td>
+          <td class="px-3 py-2.5 text-gray-700">Owner / you</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-medium text-[11px]">Operations</span></td>
+          <td class="px-3 py-2.5 text-gray-700">Read everything. Edit products, BOMs, production plan, ingredients.</td>
+          <td class="px-3 py-2.5 text-gray-700">Production manager</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium text-[11px]">Supply chain</span></td>
+          <td class="px-3 py-2.5 text-gray-700">Read everything. Edit ingredients, suppliers, raise + receive POs.</td>
+          <td class="px-3 py-2.5 text-gray-700">Purchasing / planner</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium text-[11px]">Finance</span></td>
+          <td class="px-3 py-2.5 text-gray-700">Read everything. Raise POs (no delete). View costs &amp; reporting.</td>
+          <td class="px-3 py-2.5 text-gray-700">Accountant / CFO</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-medium text-[11px]">Read only</span></td>
+          <td class="px-3 py-2.5 text-gray-700">Look but don't touch — view-only across the whole system.</td>
+          <td class="px-3 py-2.5 text-gray-700">External advisor / board</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="px-5 py-2.5 bg-gray-50 border-t border-gray-100 text-[11px] text-gray-500">
+      The role names &amp; permissions above are <em>locked in by the database policies</em>. If you ever want to tweak them (e.g. give Finance the ability to delete POs), that's a separate small change — but the five-role split as-is covers most teams.
+    </div>
+  </div>
+
+  <!-- ═════════ SCREEN 1 — USERS LIST ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div>
+        <div class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Screen 1 · Settings → Users</div>
+        <div class="text-sm font-semibold mt-0.5">Users</div>
+        <p class="text-xs text-gray-500 mt-0.5">5 active · 1 inactive</p>
+      </div>
+      <button class="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-md">+ Invite user</button>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <tr>
+          <th class="text-left px-5 py-2 font-medium">Name</th>
+          <th class="text-left px-3 py-2 font-medium">Email</th>
+          <th class="text-left px-3 py-2 font-medium">Role</th>
+          <th class="text-left px-3 py-2 font-medium">Status</th>
+          <th class="text-left px-3 py-2 font-medium">Last sign-in</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody class="text-[13px]">
+        <tr class="border-t border-gray-100">
+          <td class="px-5 py-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-full bg-purple-100 text-purple-700 inline-flex items-center justify-center font-semibold text-[11px]">LG</span>
+              <div>
+                <div class="font-medium">Lance Giles <span class="ml-1 text-[10px] text-gray-400">(you)</span></div>
+              </div>
+            </div>
+          </td>
+          <td class="px-3 py-2.5 text-gray-700">lance@odinutrition.com</td>
+          <td class="px-3 py-2.5"><span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-medium text-[11px]">Admin</span></td>
+          <td class="px-3 py-2.5"><span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Active</span></td>
+          <td class="px-3 py-2.5 text-gray-600 text-[12px]">2 Jun 2026, 09:14</td>
+          <td class="px-3 py-2.5 text-right"><a class="text-xs text-blue-600 hover:underline font-medium">Edit</a></td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-5 py-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 inline-flex items-center justify-center font-semibold text-[11px]">AO</span>
+              <div class="font-medium">Atma Okan</div>
+            </div>
+          </td>
+          <td class="px-3 py-2.5 text-gray-700">atma@odinutrition.com</td>
+          <td class="px-3 py-2.5"><span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-medium text-[11px]">Operations</span></td>
+          <td class="px-3 py-2.5"><span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Active</span></td>
+          <td class="px-3 py-2.5 text-gray-600 text-[12px]">1 Jun 2026, 16:42</td>
+          <td class="px-3 py-2.5 text-right"><a class="text-xs text-blue-600 hover:underline font-medium">Edit</a></td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-5 py-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center font-semibold text-[11px]">SJ</span>
+              <div class="font-medium">Sarah Jenkins</div>
+            </div>
+          </td>
+          <td class="px-3 py-2.5 text-gray-700">sarah@odinutrition.com</td>
+          <td class="px-3 py-2.5"><span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium text-[11px]">Supply chain</span></td>
+          <td class="px-3 py-2.5"><span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Active</span></td>
+          <td class="px-3 py-2.5 text-gray-600 text-[12px]">31 May 2026, 11:08</td>
+          <td class="px-3 py-2.5 text-right"><a class="text-xs text-blue-600 hover:underline font-medium">Edit</a></td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-5 py-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-full bg-amber-100 text-amber-700 inline-flex items-center justify-center font-semibold text-[11px]">MK</span>
+              <div class="font-medium">Mark Kim</div>
+            </div>
+          </td>
+          <td class="px-3 py-2.5 text-gray-700">mark@odinutrition.com</td>
+          <td class="px-3 py-2.5"><span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium text-[11px]">Finance</span></td>
+          <td class="px-3 py-2.5">
+            <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Invited</span>
+            <div class="text-[10px] text-gray-500 mt-0.5">sent 30 May — not yet accepted</div>
+          </td>
+          <td class="px-3 py-2.5 text-gray-400 text-[12px]">—</td>
+          <td class="px-3 py-2.5 text-right"><a class="text-xs text-blue-600 hover:underline font-medium">Edit</a></td>
+        </tr>
+        <tr class="border-t border-gray-100 opacity-60">
+          <td class="px-5 py-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-full bg-gray-200 text-gray-500 inline-flex items-center justify-center font-semibold text-[11px]">PT</span>
+              <div class="font-medium text-gray-600">Pete Thompson</div>
+            </div>
+          </td>
+          <td class="px-3 py-2.5 text-gray-500">pete@external.com</td>
+          <td class="px-3 py-2.5"><span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium text-[11px]">Read only</span></td>
+          <td class="px-3 py-2.5"><span class="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Inactive</span></td>
+          <td class="px-3 py-2.5 text-gray-500 text-[12px]">18 Mar 2026</td>
+          <td class="px-3 py-2.5 text-right"><a class="text-xs text-blue-600 hover:underline font-medium">Edit</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ═════════ SCREEN 2 — INVITE MODAL ═════════ -->
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <div class="text-[11px] uppercase tracking-wider font-semibold text-gray-500 mb-2">Screen 2 · Invite user modal</div>
+      <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-xl max-w-md">
+        <div class="text-sm font-semibold mb-1">Invite a new user</div>
+        <p class="text-xs text-gray-500 mb-4">They'll receive an email with a link to set their password and sign in.</p>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Full name <span class="text-red-500">*</span></label>
+            <input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" placeholder="Mark Kim" />
+          </div>
+          <div>
+            <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Email <span class="text-red-500">*</span></label>
+            <input type="email" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" placeholder="mark@odinutrition.com" />
+          </div>
+          <div>
+            <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Role <span class="text-red-500">*</span></label>
+            <select class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white">
+              <option>Admin — full access including users &amp; settings</option>
+              <option>Operations — production, products, BOMs</option>
+              <option>Supply chain — ingredients, suppliers, POs</option>
+              <option selected>Finance — view all + raise POs</option>
+              <option>Read only — view-only</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-5 flex justify-end gap-2">
+          <button class="px-3 py-1.5 text-xs border border-gray-300 rounded-md">Cancel</button>
+          <button class="px-3 py-1.5 text-xs bg-gray-900 text-white rounded-md">Send invite</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════ SCREEN 3 — EDIT USER ═════════ -->
+    <div>
+      <div class="text-[11px] uppercase tracking-wider font-semibold text-gray-500 mb-2">Screen 3 · Edit user (admin view)</div>
+      <div class="bg-white border border-gray-200 rounded-lg p-5">
+        <div class="flex items-center gap-3 pb-3 border-b border-gray-100 mb-4">
+          <span class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center font-semibold text-sm">SJ</span>
+          <div>
+            <div class="font-semibold text-sm">Sarah Jenkins</div>
+            <div class="text-xs text-gray-500">sarah@odinutrition.com · last sign-in 31 May</div>
+          </div>
+        </div>
+        <div class="space-y-3 text-sm">
+          <div>
+            <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Full name</label>
+            <input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value="Sarah Jenkins" />
+          </div>
+          <div>
+            <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Role</label>
+            <select class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white">
+              <option>Admin</option>
+              <option>Operations</option>
+              <option selected>Supply chain</option>
+              <option>Finance</option>
+              <option>Read only</option>
+            </select>
+          </div>
+          <label class="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked class="rounded border-gray-300" />
+            <span>Active</span>
+            <span class="text-gray-400">— inactive users can't sign in but their history is preserved</span>
+          </label>
+          <div class="flex justify-between pt-3 border-t border-gray-100 mt-4">
+            <button class="px-3 py-1.5 text-xs border border-gray-300 rounded-md">Resend invite email</button>
+            <div class="flex gap-2">
+              <button class="px-3 py-1.5 text-xs border border-gray-300 rounded-md">Cancel</button>
+              <button class="px-3 py-1.5 text-xs bg-gray-900 text-white rounded-md">Save</button>
+            </div>
+          </div>
+        </div>
+        <div class="mt-5 pt-4 border-t border-red-200">
+          <div class="text-xs font-semibold text-red-700 mb-1">Danger zone</div>
+          <p class="text-[11px] text-gray-500 mb-2">Deactivation preserves audit trail (recommended). Delete is permanent and blocked if this user is referenced by any records.</p>
+          <div class="flex gap-2">
+            <button class="px-3 py-1.5 text-xs text-amber-700 border border-amber-300 rounded-md">Deactivate</button>
+            <button class="px-3 py-1.5 text-xs text-red-700 border border-red-300 rounded-md">Delete permanently</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════ SCREEN 4 — MY PROFILE ═════════ -->
+  <div>
+    <div class="text-[11px] uppercase tracking-wider font-semibold text-gray-500 mb-2">Screen 4 · My profile (every user, not just admins)</div>
+    <div class="bg-white border border-gray-200 rounded-lg p-5 max-w-2xl">
+      <div class="text-sm font-semibold mb-1">My profile</div>
+      <p class="text-xs text-gray-500 mb-4">Update your name or change your password.</p>
+      <div class="space-y-3 text-sm">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Full name</label>
+            <input class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value="Lance Giles" />
+          </div>
+          <div>
+            <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Email</label>
+            <input class="w-full border border-gray-200 bg-gray-50 rounded-md px-2 py-1.5 text-sm text-gray-500" value="lance@odinutrition.com" readonly />
+            <p class="text-[10px] text-gray-400 mt-0.5">Email is fixed — ask an admin to change it</p>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Role</label>
+          <div class="inline-flex"><span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-medium text-[11px]">Admin</span></div>
+        </div>
+        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+          <button class="px-3 py-1.5 text-xs border border-gray-300 rounded-md">Change password</button>
+          <button class="px-3 py-1.5 text-xs bg-gray-900 text-white rounded-md">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════ INVITE FLOW ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-md p-4">
+    <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">What the invitee sees</div>
+    <ol class="text-sm text-gray-700 space-y-1.5 leading-relaxed list-decimal pl-5">
+      <li>You click "Invite user", fill name/email/role, hit send.</li>
+      <li>They receive an email from Supabase: "You've been invited to Odi MRP — click to set your password."</li>
+      <li>They click the link → land on the existing /reset-password page (already built).</li>
+      <li>They set a password → land on the dashboard, signed in, with the role you assigned.</li>
+      <li>Their row in the Users page flips from "Invited" to "Active" on first sign-in.</li>
+    </ol>
+  </div>
+
+  <!-- ═════════ TECH NOTE ═════════ -->
+  <div class="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm text-amber-900">
+    <strong>One small prerequisite:</strong> Supabase's "invite user" API needs a <em>service role key</em> set as an environment variable in Vercel. I'll send you the 30-second instructions when we're ready to deploy — it's a paste-one-string-into-Vercel job, no code change. Without it, the screens still work for editing existing users but the invite button can't email new ones.
+  </div>
+
+  <!-- ═════════ DECISIONS WANTED ═════════ -->
+  <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+    <div class="text-xs uppercase tracking-wider font-semibold text-blue-900 mb-2">A few decisions before I build</div>
+    <ul class="text-sm text-blue-900 space-y-2">
+      <li>• <span class="font-semibold">Five roles as-is, or tweak?</span> The current split (admin / operations / supply chain / finance / read-only) is what the DB enforces today. Happy to change permission boundaries but that's a small extra job.</li>
+      <li>• <span class="font-semibold">Self-service role change?</span> By default, users can't change their own role — only admins can. Good?</li>
+      <li>• <span class="font-semibold">Delete behaviour</span>: when a user is hard-deleted, what they created (POs, products, ingredient edits) stays in the system but the "created by" credit becomes blank. Alternative: block delete entirely if they've created anything (recommend deactivate instead). I'd go with <span class="font-semibold">block + force-deactivate</span> — safer.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { logout } from '@/app/(auth)/login/actions'
 import { formatRoleLabel } from '@/lib/utils'
 
@@ -12,10 +13,10 @@ export function Header({ userName, userRole }: HeaderProps) {
       {/* Left: breadcrumb slot (populated per-page in future) */}
       <div />
 
-      {/* Right: user info + sign out */}
+      {/* Right: name → profile link + sign out */}
       <div className="flex items-center gap-5">
-        <div className="text-right">
-          <p className="text-sm font-medium text-gray-900 leading-tight">
+        <Link href="/profile" className="text-right group" title="Edit your profile">
+          <p className="text-sm font-medium text-gray-900 leading-tight group-hover:text-gray-700 transition-colors">
             {userName}
           </p>
           {userRole && (
@@ -23,7 +24,7 @@ export function Header({ userName, userRole }: HeaderProps) {
               {formatRoleLabel(userRole)}
             </p>
           )}
-        </div>
+        </Link>
 
         <form action={logout}>
           <button

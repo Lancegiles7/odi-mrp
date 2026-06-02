@@ -42,7 +42,8 @@ const ICON_MAP = {
   '/stock-movements': ArrowLeftRight,
   '/reporting/budget-vs-actual': ClipboardCheck,
   '/settings':        SettingsIcon,
-  '/users':           Users,
+  '/settings/users':  Users,
+  '/profile':         Users,
 } as const
 
 const NAV_GROUPS = [
@@ -90,7 +91,7 @@ const ADMIN_GROUP = {
   items: [
     { name: 'Settings',           href: '/settings' },
     { name: 'Product trash',      href: '/products/trash' },
-    { name: 'Users',              href: '/users' },
+    { name: 'Users',              href: '/settings/users' },
   ],
 }
 

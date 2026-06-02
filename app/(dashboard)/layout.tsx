@@ -19,11 +19,19 @@ export default async function DashboardLayout({
 
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('full_name, role_id, roles(name)')
+    .select('full_name, role_id, is_active, roles(name)')
     .eq('id', user.id)
-    .single()
+    .single() as unknown as { data: { full_name: string; role_id: string; is_active: boolean; roles: { name: string } | null } | null }
 
-  const roleName = (profile?.roles as { name: string } | null)?.name ?? null
+  // Deactivated users are signed out immediately and bounced to the login
+  // page with a clear message. (Belt-and-braces — RLS would block their
+  // queries anyway, but it's nicer to fail fast at the front door.)
+  if (profile && !profile.is_active) {
+    await supabase.auth.signOut()
+    redirect('/login?error=deactivated')
+  }
+
+  const roleName = profile?.roles?.name ?? null
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
