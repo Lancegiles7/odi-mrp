@@ -263,18 +263,37 @@ export const SOFT_DELETE_WINDOW_DAYS = 30
 
 // ============================================================
 // DEMAND CHANNELS (order = display order on the demand page)
+//
+// As of migration 032, pipefill is split per country.
+// 'pipefill' → 'pipefill_nz' (existing data); 'pipefill_au' added.
+// Country is encoded as a separate field so callers can group /
+// subtotal without parsing the channel name.
 // ============================================================
+export type ChannelCountry = 'NZ' | 'AUS'
+
 export const DEMAND_CHANNELS = [
-  { value: 'ecomm_nz',  label: 'Ecomm NZ'  },
-  { value: 'retail_nz', label: 'Retail NZ' },
-  { value: 'ecomm_au',  label: 'Ecomm AU'  },
-  { value: 'retail_au', label: 'Retail AU' },
-  { value: 'pipefill',  label: 'Pipefill'  },
+  { value: 'ecomm_nz',    label: 'Ecomm NZ',    country: 'NZ'  as const, isPipefill: false },
+  { value: 'retail_nz',   label: 'Retail NZ',   country: 'NZ'  as const, isPipefill: false },
+  { value: 'pipefill_nz', label: 'Pipefill NZ', country: 'NZ'  as const, isPipefill: true  },
+  { value: 'ecomm_au',    label: 'Ecomm AUS',   country: 'AUS' as const, isPipefill: false },
+  { value: 'retail_au',   label: 'Retail AUS',  country: 'AUS' as const, isPipefill: false },
+  { value: 'pipefill_au', label: 'Pipefill AUS',country: 'AUS' as const, isPipefill: true  },
 ] as const
 
 export const DEMAND_CHANNEL_LABELS: Record<string, string> = Object.fromEntries(
   DEMAND_CHANNELS.map((c) => [c.value, c.label])
 )
+
+export const NZ_CHANNELS  = DEMAND_CHANNELS.filter((c) => c.country === 'NZ').map((c) => c.value)
+export const AUS_CHANNELS = DEMAND_CHANNELS.filter((c) => c.country === 'AUS').map((c) => c.value)
+export const NZ_CHANNEL_SET  = new Set<string>(NZ_CHANNELS)
+export const AUS_CHANNEL_SET = new Set<string>(AUS_CHANNELS)
+
+export function channelCountry(ch: string): ChannelCountry | null {
+  if (NZ_CHANNEL_SET.has(ch))  return 'NZ'
+  if (AUS_CHANNEL_SET.has(ch)) return 'AUS'
+  return null
+}
 
 
 // ============================================================

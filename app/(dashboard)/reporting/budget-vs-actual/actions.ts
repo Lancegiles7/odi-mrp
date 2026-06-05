@@ -358,16 +358,18 @@ export async function snapshotBudgetForFY(fyStart: string): Promise<{ ok: boolea
     return { ok: false, error: e instanceof Error ? e.message : 'Failed to load demand forecasts' }
   }
 
-  // Map demand_forecasts.channel → bva_budget_snapshots.channel
-  // (pipefill is region-agnostic on the demand side; for now route to NZ samples)
+  // Map demand_forecasts.channel → bva_budget_snapshots.channel.
+  // Post-migration 032, pipefill is split by country and routes to the
+  // matching samples bucket.
   function mapChannel(src: string): Channel | null {
     switch (src) {
-      case 'ecomm_nz':  return 'nz_d2c'
-      case 'retail_nz': return 'nz_retail'
-      case 'pipefill':  return 'nz_samples'
-      case 'ecomm_au':  return 'au_d2c'
-      case 'retail_au': return 'au_retail'
-      default:          return null
+      case 'ecomm_nz':    return 'nz_d2c'
+      case 'retail_nz':   return 'nz_retail'
+      case 'pipefill_nz': return 'nz_samples'
+      case 'ecomm_au':    return 'au_d2c'
+      case 'retail_au':   return 'au_retail'
+      case 'pipefill_au': return 'au_samples'
+      default:            return null
     }
   }
 

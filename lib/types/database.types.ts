@@ -831,7 +831,8 @@ export type DemandChannel =
   | 'retail_nz'
   | 'ecomm_au'
   | 'retail_au'
-  | 'pipefill'
+  | 'pipefill_nz'
+  | 'pipefill_au'
 
 // Commonly used joined types
 export type UserProfileWithRole = UserProfile & {

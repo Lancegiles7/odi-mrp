@@ -2,10 +2,13 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
-import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
+import {
+  PRODUCT_GROUPS, NZ_CHANNEL_SET, AUS_CHANNEL_SET, channelCountry,
+  type ChannelCountry,
+} from '@/lib/constants'
 import { rollingMonths, indexDemand, monthLabel } from '@/lib/demand'
 import { getPlanningAnchor } from '@/lib/settings'
-import { DemandProductTable, type DemandProductData } from '@/components/demand/demand-product-table'
+import { DemandProductTable, type DemandProductData, type CountryFilter } from '@/components/demand/demand-product-table'
 import { CompleteMonthButton } from '@/components/demand/complete-month-button'
 import type { DemandChannel, DemandForecast, ProductGroup } from '@/lib/types/database.types'
 
@@ -19,7 +22,18 @@ interface ProductRow {
   is_active: boolean
 }
 
-export default async function DemandPage() {
+interface PageProps {
+  searchParams: { country?: string }
+}
+
+function parseCountry(raw: string | undefined): CountryFilter {
+  if (raw === 'nz' || raw === 'NZ')   return 'NZ'
+  if (raw === 'aus' || raw === 'AUS') return 'AUS'
+  return 'all'
+}
+
+export default async function DemandPage({ searchParams }: PageProps) {
+  const country = parseCountry(searchParams.country)
   const supabase = createClient()
 
   const anchor = await getPlanningAnchor()
@@ -82,12 +96,19 @@ export default async function DemandPage() {
     ...(byGroup.has(null) ? [{ key: null, label: 'Uncategorised', items: byGroup.get(null)! }] : []),
   ]
 
-  function yearTotalFor(productId: string): number {
+  // Country-filter-aware year total. When viewing NZ only, the group
+  // total at the accordion summary reflects NZ demand only — matches
+  // what the user sees inside.
+  function yearTotalFor(productId: string, filter: CountryFilter = country): number {
     let s = 0
     const byMonth = idx.get(productId)
     if (!byMonth) return 0
     byMonth.forEach((byCh) => {
-      byCh.forEach((v) => { s += v.units })
+      byCh.forEach((v, ch) => {
+        if (filter === 'NZ'  && !NZ_CHANNEL_SET.has(ch))  return
+        if (filter === 'AUS' && !AUS_CHANNEL_SET.has(ch)) return
+        s += v.units
+      })
     })
     return s
   }
@@ -96,6 +117,34 @@ export default async function DemandPage() {
     return items.reduce((s, p) => s + yearTotalFor(p.id), 0)
   }
 
+  // Page-level tiles: total split by country + pipefill share.
+  let totalAll = 0, totalNZ = 0, totalAUS = 0, pipefillNZ = 0, pipefillAUS = 0
+  for (const p of allProducts) {
+    const byMonth = idx.get(p.id)
+    if (!byMonth) continue
+    byMonth.forEach((byCh) => {
+      byCh.forEach((v, ch) => {
+        totalAll += v.units
+        const c = channelCountry(ch)
+        if (c === 'NZ')  totalNZ  += v.units
+        if (c === 'AUS') totalAUS += v.units
+        if (ch === 'pipefill_nz') pipefillNZ  += v.units
+        if (ch === 'pipefill_au') pipefillAUS += v.units
+      })
+    })
+  }
+  const pctNZ  = totalAll > 0 ? Math.round((totalNZ  / totalAll) * 100) : 0
+  const pctAUS = totalAll > 0 ? Math.round((totalAUS / totalAll) * 100) : 0
+
+  // Active button styling for the country filter pill row.
+  const pillBase = 'px-3 py-1.5 text-xs font-medium'
+  const pillActive = (c: CountryFilter) =>
+    country === c
+      ? c === 'NZ'  ? 'bg-emerald-800 text-white'
+      : c === 'AUS' ? 'bg-amber-700 text-white'
+                    : 'bg-gray-900 text-white'
+      : 'bg-white text-gray-700 hover:bg-gray-50'
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between">
@@ -103,9 +152,18 @@ export default async function DemandPage() {
           <h1 className="text-2xl font-semibold">Demand</h1>
           <p className="text-sm text-gray-500 mt-1">
             Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)})
+            {country !== 'all' && (
+              <> · <span className="font-semibold text-gray-800">{country === 'NZ' ? 'NZ only' : 'AUS only'}</span></>
+            )}
           </p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-3 items-center">
+          {/* Country filter pills */}
+          <div className="inline-flex rounded-md border border-gray-300 overflow-hidden">
+            <Link href="/demand"          className={`${pillBase} ${pillActive('all')}`}>All</Link>
+            <Link href="/demand?country=nz"  className={`${pillBase} border-l border-gray-300 ${pillActive('NZ')}`}>NZ</Link>
+            <Link href="/demand?country=aus" className={`${pillBase} border-l border-gray-300 ${pillActive('AUS')}`}>AUS</Link>
+          </div>
           <CompleteMonthButton firstMonth={firstMonth} hasAnchorOverride={anchor.getTime() !== Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)} />
           <Link
             href="/demand/import"
@@ -113,6 +171,30 @@ export default async function DemandPage() {
           >
             + Import XLSX
           </Link>
+        </div>
+      </div>
+
+      {/* Page-level country split tiles */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="p-3 bg-white border border-gray-200 rounded-md">
+          <div className="text-[11px] uppercase font-semibold text-gray-500">Total 12mo</div>
+          <div className="text-lg font-semibold text-gray-900 tabular-nums">{totalAll.toLocaleString()}</div>
+          <div className="text-[11px] text-gray-500">all channels · all countries</div>
+        </div>
+        <div className="p-3 bg-white border border-gray-200 rounded-md border-l-4 border-l-emerald-800">
+          <div className="text-[11px] uppercase font-semibold text-gray-500">NZ 12mo</div>
+          <div className="text-lg font-semibold text-gray-900 tabular-nums">{totalNZ.toLocaleString()}</div>
+          <div className="text-[11px] text-gray-500">{pctNZ}% of total · {pipefillNZ.toLocaleString()} pipefill</div>
+        </div>
+        <div className="p-3 bg-white border border-gray-200 rounded-md border-l-4 border-l-amber-700">
+          <div className="text-[11px] uppercase font-semibold text-gray-500">AUS 12mo</div>
+          <div className="text-lg font-semibold text-gray-900 tabular-nums">{totalAUS.toLocaleString()}</div>
+          <div className="text-[11px] text-gray-500">{pctAUS}% of total · {pipefillAUS.toLocaleString()} pipefill</div>
+        </div>
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <div className="text-[11px] uppercase font-semibold text-blue-700">Pipefill 12mo</div>
+          <div className="text-lg font-semibold text-blue-900 tabular-nums">{(pipefillNZ + pipefillAUS).toLocaleString()}</div>
+          <div className="text-[11px] text-blue-700">NZ {pipefillNZ.toLocaleString()} · AUS {pipefillAUS.toLocaleString()}</div>
         </div>
       </div>
 
@@ -178,6 +260,7 @@ export default async function DemandPage() {
                 skuCode={p.sku_code}
                 months={months}
                 initialData={dataFor(p.id)}
+                countryFilter={country}
                 collapsed
               />
             ))}

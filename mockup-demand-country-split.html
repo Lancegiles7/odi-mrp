@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Demand — NZ / AUS split</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  /* Locked-grid table so every month column is the same width regardless of cell content */
+  table.fixed-grid { table-layout: fixed; }
+  .col-label   { width: 240px; }
+  .col-month   { width: 64px;  }
+  .col-total   { width: 92px;  }
+</style>
+</head>
+<body class="bg-gray-50 p-6">
+
+<div class="max-w-[1700px] mx-auto space-y-6">
+
+  <!-- ═════════ HEADER ═════════ -->
+  <div>
+    <h1 class="text-2xl font-semibold">Demand — NZ / AUS split</h1>
+    <p class="text-sm text-gray-500 mt-1">Proposal: country subtotals + a grand total, with a one-click filter to see all / NZ-only / AUS-only.</p>
+  </div>
+
+  <!-- ═════════ SUMMARY OF CHANGES ═════════ -->
+  <div class="grid grid-cols-2 gap-4">
+    <div class="bg-white border border-gray-200 rounded-md p-4">
+      <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">What changes</div>
+      <ul class="text-sm text-gray-700 space-y-1.5 leading-relaxed">
+        <li>• <span class="font-semibold">Channels go from 5 → 6</span>: add <code class="bg-gray-100 px-1 rounded text-[11px]">pipefill_au</code> alongside the new <code class="bg-gray-100 px-1 rounded text-[11px]">pipefill_nz</code></li>
+        <li>• <span class="font-semibold">Every product table</span> groups rows under "NZ" and "AUS" headings with subtotal rows</li>
+        <li>• <span class="font-semibold">Grand Total row</span> at the bottom (NZ Total + AUS Total)</li>
+        <li>• <span class="font-semibold">Filter pills</span> at the page top: All · NZ · AUS — re-renders the tables to show only that country's block</li>
+        <li>• <span class="font-semibold">Tiles + accordion totals</span> respond to the filter (when NZ is selected, the totals are NZ-only)</li>
+      </ul>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-md p-4">
+      <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">Migration (one SQL run)</div>
+      <ul class="text-sm text-gray-700 space-y-1.5 leading-relaxed">
+        <li>• Rename existing <code class="bg-gray-100 px-1 rounded text-[11px]">pipefill</code> rows → <code class="bg-gray-100 px-1 rounded text-[11px]">pipefill_nz</code> (one UPDATE)</li>
+        <li>• Add <code class="bg-gray-100 px-1 rounded text-[11px]">pipefill_au</code> to the allowed channel list (CHECK constraint update)</li>
+        <li>• All existing pipefill values are treated as <span class="font-semibold">NZ</span>, per your spec</li>
+        <li>• No data loss — pure relabel + add</li>
+        <li>• <span class="font-semibold">Where pipefill_au gets typed in</span>: same place as the others — the new AUS row on every product table is editable just like the rest</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═════════ TOP FILTER + TILES (ALL view) ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-lg p-5">
+    <div class="flex items-start justify-between">
+      <div>
+        <h2 class="text-xl font-semibold">Demand</h2>
+        <p class="text-sm text-gray-500 mt-0.5">Rolling 12 months (Apr 26 → Mar 27)</p>
+      </div>
+      <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+        <button class="px-3 py-1.5 font-medium bg-gray-900 text-white">All</button>
+        <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-white text-gray-700 hover:bg-gray-50">NZ</button>
+        <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-white text-gray-700 hover:bg-gray-50">AUS</button>
+      </div>
+    </div>
+    <p class="text-[11px] text-gray-500 mt-2">Showing both NZ and AUS demand · click NZ or AUS to focus on one country.</p>
+
+    <div class="grid grid-cols-4 gap-3 mt-4">
+      <div class="p-3 bg-white border border-gray-200 rounded-md">
+        <div class="text-[11px] uppercase font-semibold text-gray-500">Total 12mo</div>
+        <div class="text-lg font-semibold text-gray-900">2.4M units</div>
+        <div class="text-[11px] text-gray-500">all channels · all countries</div>
+      </div>
+      <div class="p-3 bg-white border border-gray-200 rounded-md border-l-4" style="border-left-color:#0e3b1f">
+        <div class="text-[11px] uppercase font-semibold text-gray-500">NZ 12mo</div>
+        <div class="text-lg font-semibold text-gray-900">1.6M units</div>
+        <div class="text-[11px] text-gray-500">67% of total · 280k pipefill</div>
+      </div>
+      <div class="p-3 bg-white border border-gray-200 rounded-md border-l-4" style="border-left-color:#b58000">
+        <div class="text-[11px] uppercase font-semibold text-gray-500">AUS 12mo</div>
+        <div class="text-lg font-semibold text-gray-900">0.8M units</div>
+        <div class="text-[11px] text-gray-500">33% of total · 95k pipefill</div>
+      </div>
+      <div class="p-3 bg-blue-50 border border-blue-200 rounded-md">
+        <div class="text-[11px] uppercase font-semibold text-blue-700">Pipefill 12mo</div>
+        <div class="text-lg font-semibold text-blue-900">375k units</div>
+        <div class="text-[11px] text-blue-700">NZ 280k · AUS 95k</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════ VIEW 1 — ALL FILTER, ONE PRODUCT EXPANDED ═════════ -->
+  <div>
+    <div class="flex items-center gap-2 mb-2">
+      <span class="px-2 py-0.5 rounded bg-gray-900 text-white text-[10px] font-semibold uppercase tracking-wider">View 1</span>
+      <span class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Filter = All · one product expanded</span>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <!-- Accordion header for product group -->
+      <div class="px-5 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+        <div class="flex items-center gap-3 text-sm">
+          <span class="text-gray-400">▼</span>
+          <span class="font-semibold">Puffs</span>
+          <span class="text-xs text-gray-500">3 products</span>
+        </div>
+        <div class="text-xs text-gray-500">Group total <span class="font-semibold text-gray-900 ml-1">724,000 units</span></div>
+      </div>
+
+      <!-- Product header -->
+      <div class="px-5 py-2.5 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-3 text-sm">
+          <span class="text-gray-400">▼</span>
+          <span class="font-mono text-[11px] text-gray-500">FG-ODI-PUF-BAN</span>
+          <span class="font-medium">Banana Puff <span class="text-gray-400 text-[11px] ml-1">(each)</span></span>
+        </div>
+        <div class="text-xs text-gray-500">Year total <span class="font-semibold text-gray-900 ml-1">248,000</span></div>
+      </div>
+
+      <!-- Product table -->
+      <div class="overflow-x-auto">
+        <table class="fixed-grid w-full text-xs" style="min-width: 1100px;">
+          <colgroup>
+            <col class="col-label" />
+            <col class="col-month" /><col class="col-month" /><col class="col-month" /><col class="col-month" />
+            <col class="col-month" /><col class="col-month" /><col class="col-month" /><col class="col-month" />
+            <col class="col-month" /><col class="col-month" /><col class="col-month" /><col class="col-month" />
+            <col class="col-total" />
+          </colgroup>
+          <thead>
+            <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+              <th class="text-left px-4 py-2 font-medium">Channel</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Apr</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">May</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jun</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jul</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Aug</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Sep</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Oct</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Nov</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Dec</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jan</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Feb</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Mar</th>
+              <th class="text-right px-2 py-2 font-medium bg-gray-100 border-l border-gray-200">12-mo</th>
+            </tr>
+          </thead>
+          <tbody class="text-[12px] tabular-nums">
+
+            <!-- ───── NZ BLOCK ───── -->
+            <tr class="bg-emerald-50/40">
+              <th colspan="14" class="text-left px-4 py-1 font-semibold text-[10px] uppercase tracking-wider text-emerald-800 border-l-2" style="border-left-color:#0e3b1f">
+                New Zealand
+              </th>
+            </tr>
+            <tr class="hover:bg-gray-50/60">
+              <td class="px-4 py-1.5 text-gray-700">Ecomm NZ</td>
+              <td class="px-2 py-1.5 text-right">1,000</td><td class="px-2 py-1.5 text-right">1,200</td>
+              <td class="px-2 py-1.5 text-right">1,100</td><td class="px-2 py-1.5 text-right">1,250</td>
+              <td class="px-2 py-1.5 text-right">1,400</td><td class="px-2 py-1.5 text-right">1,300</td>
+              <td class="px-2 py-1.5 text-right">1,200</td><td class="px-2 py-1.5 text-right">1,100</td>
+              <td class="px-2 py-1.5 text-right">1,500</td><td class="px-2 py-1.5 text-right">1,600</td>
+              <td class="px-2 py-1.5 text-right">1,400</td><td class="px-2 py-1.5 text-right">1,250</td>
+              <td class="px-2 py-1.5 text-right text-gray-600 bg-gray-50">15,300</td>
+            </tr>
+            <tr class="hover:bg-gray-50/60">
+              <td class="px-4 py-1.5 text-gray-700">Retail NZ</td>
+              <td class="px-2 py-1.5 text-right">5,000</td><td class="px-2 py-1.5 text-right">4,800</td>
+              <td class="px-2 py-1.5 text-right">5,200</td><td class="px-2 py-1.5 text-right">5,400</td>
+              <td class="px-2 py-1.5 text-right">5,600</td><td class="px-2 py-1.5 text-right">5,500</td>
+              <td class="px-2 py-1.5 text-right">5,000</td><td class="px-2 py-1.5 text-right">4,800</td>
+              <td class="px-2 py-1.5 text-right">5,500</td><td class="px-2 py-1.5 text-right">6,000</td>
+              <td class="px-2 py-1.5 text-right">5,800</td><td class="px-2 py-1.5 text-right">5,400</td>
+              <td class="px-2 py-1.5 text-right text-gray-600 bg-gray-50">64,000</td>
+            </tr>
+            <tr class="hover:bg-gray-50/60 bg-blue-50/60">
+              <td class="px-4 py-1.5 text-blue-800">Pipefill NZ</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">500</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">1,000</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">800</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">500</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700 bg-blue-100/50">2,800</td>
+            </tr>
+            <tr class="bg-emerald-50/60 border-t border-emerald-200">
+              <td class="px-4 py-1.5 font-semibold text-emerald-900">NZ Total</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">6,500</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">6,000</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">6,300</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">7,650</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">7,000</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">6,800</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">7,000</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">5,900</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">7,000</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">8,100</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">7,200</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900">6,650</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-emerald-900 bg-emerald-100">82,100</td>
+            </tr>
+
+            <!-- ───── AUS BLOCK ───── -->
+            <tr class="bg-amber-50/40">
+              <th colspan="14" class="text-left px-4 py-1 font-semibold text-[10px] uppercase tracking-wider text-amber-900 border-l-2" style="border-left-color:#b58000">
+                Australia
+              </th>
+            </tr>
+            <tr class="hover:bg-gray-50/60">
+              <td class="px-4 py-1.5 text-gray-700">Ecomm AUS</td>
+              <td class="px-2 py-1.5 text-right">800</td><td class="px-2 py-1.5 text-right">900</td>
+              <td class="px-2 py-1.5 text-right">850</td><td class="px-2 py-1.5 text-right">900</td>
+              <td class="px-2 py-1.5 text-right">950</td><td class="px-2 py-1.5 text-right">1,000</td>
+              <td class="px-2 py-1.5 text-right">900</td><td class="px-2 py-1.5 text-right">850</td>
+              <td class="px-2 py-1.5 text-right">1,100</td><td class="px-2 py-1.5 text-right">1,200</td>
+              <td class="px-2 py-1.5 text-right">1,000</td><td class="px-2 py-1.5 text-right">900</td>
+              <td class="px-2 py-1.5 text-right text-gray-600 bg-gray-50">11,350</td>
+            </tr>
+            <tr class="hover:bg-gray-50/60">
+              <td class="px-4 py-1.5 text-gray-700">Retail AUS</td>
+              <td class="px-2 py-1.5 text-right">3,000</td><td class="px-2 py-1.5 text-right">2,800</td>
+              <td class="px-2 py-1.5 text-right">3,100</td><td class="px-2 py-1.5 text-right">3,300</td>
+              <td class="px-2 py-1.5 text-right">3,200</td><td class="px-2 py-1.5 text-right">3,100</td>
+              <td class="px-2 py-1.5 text-right">3,000</td><td class="px-2 py-1.5 text-right">2,800</td>
+              <td class="px-2 py-1.5 text-right">3,400</td><td class="px-2 py-1.5 text-right">3,600</td>
+              <td class="px-2 py-1.5 text-right">3,500</td><td class="px-2 py-1.5 text-right">3,200</td>
+              <td class="px-2 py-1.5 text-right text-gray-600 bg-gray-50">38,000</td>
+            </tr>
+            <tr class="hover:bg-gray-50/60 bg-blue-50/60">
+              <td class="px-4 py-1.5 text-blue-800">Pipefill AUS</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700 bg-blue-100/50">0</td>
+            </tr>
+            <tr class="bg-amber-50/60 border-t border-amber-200">
+              <td class="px-4 py-1.5 font-semibold text-amber-900">AUS Total</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">3,800</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">3,700</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">3,950</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">4,200</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">4,150</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">4,100</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">3,900</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">3,650</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">4,500</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">4,800</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">4,500</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900">4,100</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-amber-900 bg-amber-100">49,350</td>
+            </tr>
+
+            <!-- ───── GRAND TOTAL ───── -->
+            <tr class="bg-gray-900 text-white">
+              <td class="px-4 py-2 font-semibold text-[11px] uppercase tracking-wider">Grand Total</td>
+              <td class="px-2 py-2 text-right font-semibold">10,300</td>
+              <td class="px-2 py-2 text-right font-semibold">9,700</td>
+              <td class="px-2 py-2 text-right font-semibold">10,250</td>
+              <td class="px-2 py-2 text-right font-semibold">11,850</td>
+              <td class="px-2 py-2 text-right font-semibold">11,150</td>
+              <td class="px-2 py-2 text-right font-semibold">10,900</td>
+              <td class="px-2 py-2 text-right font-semibold">10,900</td>
+              <td class="px-2 py-2 text-right font-semibold">9,550</td>
+              <td class="px-2 py-2 text-right font-semibold">11,500</td>
+              <td class="px-2 py-2 text-right font-semibold">12,900</td>
+              <td class="px-2 py-2 text-right font-semibold">11,700</td>
+              <td class="px-2 py-2 text-right font-semibold">10,750</td>
+              <td class="px-2 py-2 text-right font-bold bg-gray-800">131,450</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════ VIEW 2 — NZ FILTER ═════════ -->
+  <div>
+    <div class="flex items-center gap-2 mb-2">
+      <span class="px-2 py-0.5 rounded text-white text-[10px] font-semibold uppercase tracking-wider" style="background-color:#0e3b1f">View 2</span>
+      <span class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Filter = NZ · same product, only NZ rows</span>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <!-- Top filter pills (NZ selected) -->
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium text-gray-700">Showing:</span>
+          <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+            <button class="px-3 py-1 bg-white text-gray-700">All</button>
+            <button class="px-3 py-1 border-l border-gray-300 text-white" style="background-color:#0e3b1f">NZ</button>
+            <button class="px-3 py-1 border-l border-gray-300 bg-white text-gray-700">AUS</button>
+          </div>
+        </div>
+        <div class="text-xs text-gray-500">Year total NZ <span class="font-semibold text-gray-900 ml-1">82,100</span></div>
+      </div>
+
+      <!-- Product header -->
+      <div class="px-5 py-2.5 border-b border-gray-100">
+        <div class="flex items-center gap-3 text-sm">
+          <span class="text-gray-400">▼</span>
+          <span class="font-mono text-[11px] text-gray-500">FG-ODI-PUF-BAN</span>
+          <span class="font-medium">Banana Puff <span class="text-gray-400 text-[11px] ml-1">(each)</span></span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="fixed-grid w-full text-xs" style="min-width: 1100px;">
+          <colgroup>
+            <col class="col-label" />
+            <col class="col-month" /><col class="col-month" /><col class="col-month" /><col class="col-month" />
+            <col class="col-month" /><col class="col-month" /><col class="col-month" /><col class="col-month" />
+            <col class="col-month" /><col class="col-month" /><col class="col-month" /><col class="col-month" />
+            <col class="col-total" />
+          </colgroup>
+          <thead>
+            <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+              <th class="text-left px-4 py-2 font-medium">Channel</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Apr</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">May</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jun</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jul</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Aug</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Sep</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Oct</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Nov</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Dec</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jan</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Feb</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Mar</th>
+              <th class="text-right px-2 py-2 font-medium bg-gray-100 border-l border-gray-200">12-mo</th>
+            </tr>
+          </thead>
+          <tbody class="text-[12px] tabular-nums">
+            <tr class="hover:bg-gray-50/60">
+              <td class="px-4 py-1.5 text-gray-700">Ecomm NZ</td>
+              <td class="px-2 py-1.5 text-right">1,000</td><td class="px-2 py-1.5 text-right">1,200</td>
+              <td class="px-2 py-1.5 text-right">1,100</td><td class="px-2 py-1.5 text-right">1,250</td>
+              <td class="px-2 py-1.5 text-right">1,400</td><td class="px-2 py-1.5 text-right">1,300</td>
+              <td class="px-2 py-1.5 text-right">1,200</td><td class="px-2 py-1.5 text-right">1,100</td>
+              <td class="px-2 py-1.5 text-right">1,500</td><td class="px-2 py-1.5 text-right">1,600</td>
+              <td class="px-2 py-1.5 text-right">1,400</td><td class="px-2 py-1.5 text-right">1,250</td>
+              <td class="px-2 py-1.5 text-right text-gray-600 bg-gray-50">15,300</td>
+            </tr>
+            <tr class="hover:bg-gray-50/60">
+              <td class="px-4 py-1.5 text-gray-700">Retail NZ</td>
+              <td class="px-2 py-1.5 text-right">5,000</td><td class="px-2 py-1.5 text-right">4,800</td>
+              <td class="px-2 py-1.5 text-right">5,200</td><td class="px-2 py-1.5 text-right">5,400</td>
+              <td class="px-2 py-1.5 text-right">5,600</td><td class="px-2 py-1.5 text-right">5,500</td>
+              <td class="px-2 py-1.5 text-right">5,000</td><td class="px-2 py-1.5 text-right">4,800</td>
+              <td class="px-2 py-1.5 text-right">5,500</td><td class="px-2 py-1.5 text-right">6,000</td>
+              <td class="px-2 py-1.5 text-right">5,800</td><td class="px-2 py-1.5 text-right">5,400</td>
+              <td class="px-2 py-1.5 text-right text-gray-600 bg-gray-50">64,000</td>
+            </tr>
+            <tr class="hover:bg-gray-50/60 bg-blue-50/60">
+              <td class="px-4 py-1.5 text-blue-800">Pipefill NZ</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">500</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">1,000</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">800</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">500</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700 bg-blue-100/50">2,800</td>
+            </tr>
+            <tr class="border-t" style="background-color:#0e3b1f; color:white;">
+              <td class="px-4 py-2 font-semibold text-[11px] uppercase tracking-wider">NZ Total</td>
+              <td class="px-2 py-2 text-right font-semibold">6,500</td>
+              <td class="px-2 py-2 text-right font-semibold">6,000</td>
+              <td class="px-2 py-2 text-right font-semibold">6,300</td>
+              <td class="px-2 py-2 text-right font-semibold">7,650</td>
+              <td class="px-2 py-2 text-right font-semibold">7,000</td>
+              <td class="px-2 py-2 text-right font-semibold">6,800</td>
+              <td class="px-2 py-2 text-right font-semibold">7,000</td>
+              <td class="px-2 py-2 text-right font-semibold">5,900</td>
+              <td class="px-2 py-2 text-right font-semibold">7,000</td>
+              <td class="px-2 py-2 text-right font-semibold">8,100</td>
+              <td class="px-2 py-2 text-right font-semibold">7,200</td>
+              <td class="px-2 py-2 text-right font-semibold">6,650</td>
+              <td class="px-2 py-2 text-right font-bold" style="background-color:#072516">82,100</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="text-[11px] text-gray-500 mt-2 italic">AUS rows are completely hidden, and the bottom row is "NZ Total" only — there's no Grand Total when only one country is showing because they'd be identical.</p>
+  </div>
+
+  <!-- ═════════ VIEW 3 — AUS FILTER ═════════ -->
+  <div>
+    <div class="flex items-center gap-2 mb-2">
+      <span class="px-2 py-0.5 rounded text-white text-[10px] font-semibold uppercase tracking-wider" style="background-color:#b58000">View 3</span>
+      <span class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Filter = AUS · same product, only AUS rows</span>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium text-gray-700">Showing:</span>
+          <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+            <button class="px-3 py-1 bg-white text-gray-700">All</button>
+            <button class="px-3 py-1 border-l border-gray-300 bg-white text-gray-700">NZ</button>
+            <button class="px-3 py-1 border-l border-gray-300 text-white" style="background-color:#b58000">AUS</button>
+          </div>
+        </div>
+        <div class="text-xs text-gray-500">Year total AUS <span class="font-semibold text-gray-900 ml-1">49,350</span></div>
+      </div>
+
+      <div class="px-5 py-2.5 border-b border-gray-100">
+        <div class="flex items-center gap-3 text-sm">
+          <span class="text-gray-400">▼</span>
+          <span class="font-mono text-[11px] text-gray-500">FG-ODI-PUF-BAN</span>
+          <span class="font-medium">Banana Puff <span class="text-gray-400 text-[11px] ml-1">(each)</span></span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="fixed-grid w-full text-xs" style="min-width: 1100px;">
+          <colgroup>
+            <col class="col-label" />
+            <col class="col-month" /><col class="col-month" /><col class="col-month" /><col class="col-month" />
+            <col class="col-month" /><col class="col-month" /><col class="col-month" /><col class="col-month" />
+            <col class="col-month" /><col class="col-month" /><col class="col-month" /><col class="col-month" />
+            <col class="col-total" />
+          </colgroup>
+          <thead>
+            <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+              <th class="text-left px-4 py-2 font-medium">Channel</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Apr</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">May</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jun</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jul</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Aug</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Sep</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Oct</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Nov</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Dec</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Jan</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Feb</th>
+              <th class="text-right px-2 py-2 font-medium border-l border-gray-200">Mar</th>
+              <th class="text-right px-2 py-2 font-medium bg-gray-100 border-l border-gray-200">12-mo</th>
+            </tr>
+          </thead>
+          <tbody class="text-[12px] tabular-nums">
+            <tr class="hover:bg-gray-50/60">
+              <td class="px-4 py-1.5 text-gray-700">Ecomm AUS</td>
+              <td class="px-2 py-1.5 text-right">800</td><td class="px-2 py-1.5 text-right">900</td>
+              <td class="px-2 py-1.5 text-right">850</td><td class="px-2 py-1.5 text-right">900</td>
+              <td class="px-2 py-1.5 text-right">950</td><td class="px-2 py-1.5 text-right">1,000</td>
+              <td class="px-2 py-1.5 text-right">900</td><td class="px-2 py-1.5 text-right">850</td>
+              <td class="px-2 py-1.5 text-right">1,100</td><td class="px-2 py-1.5 text-right">1,200</td>
+              <td class="px-2 py-1.5 text-right">1,000</td><td class="px-2 py-1.5 text-right">900</td>
+              <td class="px-2 py-1.5 text-right text-gray-600 bg-gray-50">11,350</td>
+            </tr>
+            <tr class="hover:bg-gray-50/60">
+              <td class="px-4 py-1.5 text-gray-700">Retail AUS</td>
+              <td class="px-2 py-1.5 text-right">3,000</td><td class="px-2 py-1.5 text-right">2,800</td>
+              <td class="px-2 py-1.5 text-right">3,100</td><td class="px-2 py-1.5 text-right">3,300</td>
+              <td class="px-2 py-1.5 text-right">3,200</td><td class="px-2 py-1.5 text-right">3,100</td>
+              <td class="px-2 py-1.5 text-right">3,000</td><td class="px-2 py-1.5 text-right">2,800</td>
+              <td class="px-2 py-1.5 text-right">3,400</td><td class="px-2 py-1.5 text-right">3,600</td>
+              <td class="px-2 py-1.5 text-right">3,500</td><td class="px-2 py-1.5 text-right">3,200</td>
+              <td class="px-2 py-1.5 text-right text-gray-600 bg-gray-50">38,000</td>
+            </tr>
+            <tr class="hover:bg-gray-50/60 bg-blue-50/60">
+              <td class="px-4 py-1.5 text-blue-800">Pipefill AUS <span class="text-[10px] text-blue-600 ml-1">(new — type here to add AUS pipefill)</span></td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700">0</td><td class="px-2 py-1.5 text-right text-blue-700">0</td>
+              <td class="px-2 py-1.5 text-right text-blue-700 bg-blue-100/50">0</td>
+            </tr>
+            <tr class="border-t" style="background-color:#b58000; color:white;">
+              <td class="px-4 py-2 font-semibold text-[11px] uppercase tracking-wider">AUS Total</td>
+              <td class="px-2 py-2 text-right font-semibold">3,800</td>
+              <td class="px-2 py-2 text-right font-semibold">3,700</td>
+              <td class="px-2 py-2 text-right font-semibold">3,950</td>
+              <td class="px-2 py-2 text-right font-semibold">4,200</td>
+              <td class="px-2 py-2 text-right font-semibold">4,150</td>
+              <td class="px-2 py-2 text-right font-semibold">4,100</td>
+              <td class="px-2 py-2 text-right font-semibold">3,900</td>
+              <td class="px-2 py-2 text-right font-semibold">3,650</td>
+              <td class="px-2 py-2 text-right font-semibold">4,500</td>
+              <td class="px-2 py-2 text-right font-semibold">4,800</td>
+              <td class="px-2 py-2 text-right font-semibold">4,500</td>
+              <td class="px-2 py-2 text-right font-semibold">4,100</td>
+              <td class="px-2 py-2 text-right font-bold" style="background-color:#7a5800">49,350</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════ KNOCK-ON EFFECTS ═════════ -->
+  <div class="bg-amber-50 border border-amber-200 rounded-md p-4">
+    <div class="text-xs uppercase tracking-wider font-semibold text-amber-900 mb-2">Knock-on effects (heads-up — easy, but real)</div>
+    <ul class="text-sm text-amber-900 space-y-1.5 leading-relaxed">
+      <li>• <span class="font-semibold">Demand import</span> — the XLSX importer needs an extra section for "Pipefill AUS" rows. I'll add that as part of the build.</li>
+      <li>• <span class="font-semibold">Production / Ingredient demand / Packaging demand</span> — these all roll up demand × BOMs. They'll keep working without changes (the rollup is country-agnostic). But if you also want a country filter on those pages, that's a separate small task.</li>
+      <li>• <span class="font-semibold">Budget vs Actual report</span> — currently maps pipefill → 'nz_samples' region. We'll split that to nz_samples vs au_samples to keep the report accurate.</li>
+      <li>• <span class="font-semibold">Filter persistence</span> — the All/NZ/AUS choice would be stored in the URL (<code class="bg-amber-100 px-1 rounded text-[11px]">?country=nz</code>) so it survives a refresh and you can bookmark "NZ view".</li>
+    </ul>
+  </div>
+
+  <!-- ═════════ NEXT-STEP QUESTION ═════════ -->
+  <div class="bg-emerald-50 border border-emerald-200 rounded-md p-4 text-sm text-emerald-900">
+    <strong>Happy with this shape?</strong> If yes, I'll write the migration (rename pipefill → pipefill_nz, add pipefill_au), then update the Demand page table + the tiles + the import. ~45 min of work. Tell me to go and I'll start.
+  </div>
+
+</div>
+</body>
+</html>
