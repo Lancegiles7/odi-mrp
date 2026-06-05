@@ -44,6 +44,7 @@ const ICON_MAP = {
   '/settings':        SettingsIcon,
   '/settings/users':  Users,
   '/profile':         Users,
+  '/enhancements':    ClipboardCheck,
 } as const
 
 const NAV_GROUPS = [
@@ -86,14 +87,15 @@ const NAV_GROUPS = [
   },
 ]
 
-const ADMIN_GROUP = {
-  label: 'Admin',
-  items: [
-    { name: 'Settings',           href: '/settings' },
-    { name: 'Product trash',      href: '/products/trash' },
-    { name: 'Users',              href: '/settings/users' },
-  ],
-}
+// Items flagged `adminOnly` are filtered out for non-admins below. The
+// Admin group label stays so the items sit in a consistent spot for
+// everyone; non-admins just see the items they're allowed (Enhancements).
+const ADMIN_GROUP_ITEMS = [
+  { name: 'Settings',     href: '/settings',        adminOnly: true  },
+  { name: 'Product trash', href: '/products/trash', adminOnly: true  },
+  { name: 'Users',        href: '/settings/users',  adminOnly: true  },
+  { name: 'Enhancements', href: '/enhancements',    adminOnly: false },
+]
 
 interface SidebarProps {
   userRole: string | null
@@ -102,10 +104,12 @@ interface SidebarProps {
 export function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname()
 
-  const groups =
-    userRole === ROLES.ADMIN
-      ? [...NAV_GROUPS, ADMIN_GROUP]
-      : NAV_GROUPS
+  // Build the Admin group dynamically — items filter per role. Non-admins
+  // see only items where adminOnly === false (today: just Enhancements).
+  const adminItems = ADMIN_GROUP_ITEMS.filter((i) => !i.adminOnly || userRole === ROLES.ADMIN)
+  const groups = adminItems.length > 0
+    ? [...NAV_GROUPS, { label: 'Admin', items: adminItems }]
+    : NAV_GROUPS
 
   // Pick the single nav item whose href is the longest prefix of the
   // current path — avoids "/ingredients" lighting up on "/ingredients/demand".

@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Enhancement log — proposal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+</style>
+</head>
+<body class="bg-gray-50 p-6">
+
+<div class="max-w-[1400px] mx-auto space-y-6">
+
+  <!-- ═════════ HEADER ═════════ -->
+  <div>
+    <h1 class="text-2xl font-semibold">Enhancement log — proposal</h1>
+    <p class="text-sm text-gray-500 mt-1">A single in-app place where the team lodges ideas. You triage, decide what to build, and the status flows back to them.</p>
+  </div>
+
+  <!-- ═════════ SUMMARY ═════════ -->
+  <div class="grid grid-cols-2 gap-4">
+    <div class="bg-white border border-gray-200 rounded-md p-4">
+      <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">For the team</div>
+      <ul class="text-sm text-gray-700 space-y-1.5 leading-relaxed">
+        <li>• Sidebar link <span class="font-semibold">"Enhancements"</span> (visible to everyone)</li>
+        <li>• <span class="font-semibold">+ Submit</span> button: title · description · category · priority</li>
+        <li>• See everyone else's submissions and their status</li>
+        <li>• <span class="font-semibold">+1 vote</span> on others' ideas to show support — helps you see what's in demand</li>
+        <li>• Comments on any item (questions, clarifications)</li>
+      </ul>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-md p-4">
+      <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">For you (admin)</div>
+      <ul class="text-sm text-gray-700 space-y-1.5 leading-relaxed">
+        <li>• "Needs review" tile at the top — count of new submissions waiting for triage</li>
+        <li>• Change status: New → Under review → Approved → In progress → Built / Declined</li>
+        <li>• Add a status note when changing (e.g. "Declined — overlaps with budget report")</li>
+        <li>• When "Built", paste a link to where in the app it lives so the submitter can go and try it</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═════════ SCREEN 1 — LIST PAGE ═════════ -->
+  <div>
+    <div class="flex items-center gap-2 mb-2">
+      <span class="px-2 py-0.5 rounded bg-gray-900 text-white text-[10px] font-semibold uppercase tracking-wider">Screen 1</span>
+      <span class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">/enhancements — list page</span>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-5">
+      <!-- Header -->
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h2 class="text-xl font-semibold">Enhancements</h2>
+          <p class="text-sm text-gray-500 mt-0.5">Suggest improvements to the MRP system. Lance reviews and prioritises what gets built.</p>
+        </div>
+        <button class="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800">+ Submit enhancement</button>
+      </div>
+
+      <!-- Tiles -->
+      <div class="grid grid-cols-5 gap-3 mb-4">
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-md">
+          <div class="text-[11px] uppercase font-semibold text-amber-800">Needs review</div>
+          <div class="text-lg font-semibold text-amber-900">4</div>
+        </div>
+        <div class="p-3 bg-white border border-gray-200 rounded-md">
+          <div class="text-[11px] uppercase font-semibold text-gray-500">Approved</div>
+          <div class="text-lg font-semibold text-gray-900">7</div>
+        </div>
+        <div class="p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <div class="text-[11px] uppercase font-semibold text-blue-700">In progress</div>
+          <div class="text-lg font-semibold text-blue-900">2</div>
+        </div>
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-md">
+          <div class="text-[11px] uppercase font-semibold text-emerald-800">Built this quarter</div>
+          <div class="text-lg font-semibold text-emerald-900">23</div>
+        </div>
+        <div class="p-3 bg-white border border-gray-200 rounded-md">
+          <div class="text-[11px] uppercase font-semibold text-gray-500">Total open</div>
+          <div class="text-lg font-semibold text-gray-900">13</div>
+        </div>
+      </div>
+
+      <!-- Filter pills + sort -->
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div class="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+          <button class="px-3 py-1.5 font-medium bg-gray-900 text-white">All</button>
+          <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-amber-50 text-amber-800">Needs review <span class="text-[10px] ml-0.5">(4)</span></button>
+          <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-white text-gray-700">Approved</button>
+          <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-white text-gray-700">In progress</button>
+          <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-white text-gray-700">Built</button>
+          <button class="px-3 py-1.5 font-medium border-l border-gray-300 bg-white text-gray-700">Declined</button>
+        </div>
+        <div class="flex items-center gap-3">
+          <select class="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white">
+            <option>Sort: Newest</option>
+            <option>Most votes</option>
+            <option>Priority (high → low)</option>
+            <option>Last updated</option>
+          </select>
+          <select class="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white">
+            <option>All categories</option>
+            <option>Demand</option>
+            <option>Production</option>
+            <option>Ingredients</option>
+            <option>Packaging</option>
+            <option>Purchase orders</option>
+            <option>Inventory</option>
+            <option>Reporting</option>
+            <option>Other</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Enhancement cards (one per item) -->
+      <div class="space-y-2">
+
+        <!-- New / Needs review -->
+        <div class="border border-amber-200 bg-amber-50/40 rounded-md p-4 hover:bg-amber-50 cursor-pointer">
+          <div class="flex items-start gap-4">
+            <!-- Vote button -->
+            <button class="flex flex-col items-center px-2 py-1 rounded border border-gray-300 bg-white hover:border-gray-400 min-w-[44px]">
+              <span class="text-gray-600 text-xs">▲</span>
+              <span class="font-semibold text-sm">7</span>
+            </button>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium uppercase tracking-wider">New</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-medium uppercase tracking-wider">High priority</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-medium uppercase tracking-wider">Purchase orders</span>
+              </div>
+              <div class="font-semibold text-sm">PO PDF should show batch / lot numbers when receipting</div>
+              <p class="text-xs text-gray-600 mt-1 line-clamp-2">When we receipt a PO, we capture batch numbers. Currently they don't appear on the PDF reprint. Would help with audit traceability...</p>
+              <div class="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
+                <span>Atma Okan · 2 hours ago</span>
+                <span>·</span>
+                <span>💬 3 comments</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Approved -->
+        <div class="border border-gray-200 rounded-md p-4 hover:bg-gray-50 cursor-pointer">
+          <div class="flex items-start gap-4">
+            <button class="flex flex-col items-center px-2 py-1 rounded border border-emerald-300 bg-emerald-50 min-w-[44px]">
+              <span class="text-emerald-700 text-xs">▲</span>
+              <span class="font-semibold text-sm text-emerald-800">12</span>
+            </button>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium uppercase tracking-wider">Approved</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium uppercase tracking-wider">Medium priority</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-medium uppercase tracking-wider">Reporting</span>
+              </div>
+              <div class="font-semibold text-sm">Monthly stock-on-hand snapshot exportable to XLSX</div>
+              <p class="text-xs text-gray-600 mt-1 line-clamp-2">Currently the SOH report is on screen only. Need an XLSX export for the accountant each month-end.</p>
+              <div class="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
+                <span>Sarah Jenkins · 4 days ago</span>
+                <span>·</span>
+                <span>💬 1 comment</span>
+                <span>·</span>
+                <span class="text-emerald-700">Queued — Lance to build next</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- In progress -->
+        <div class="border border-blue-200 bg-blue-50/40 rounded-md p-4 hover:bg-blue-50 cursor-pointer">
+          <div class="flex items-start gap-4">
+            <button class="flex flex-col items-center px-2 py-1 rounded border border-gray-300 bg-white min-w-[44px]">
+              <span class="text-gray-600 text-xs">▲</span>
+              <span class="font-semibold text-sm">5</span>
+            </button>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium uppercase tracking-wider">In progress</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-medium uppercase tracking-wider">Ingredients</span>
+              </div>
+              <div class="font-semibold text-sm">Add expiry tracking to ingredient documents</div>
+              <p class="text-xs text-gray-600 mt-1 line-clamp-2">COAs and certificates have an expiry date — would be great to flag when they need renewing.</p>
+              <div class="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
+                <span>Atma Okan · 1 week ago</span>
+                <span>·</span>
+                <span>💬 2 comments</span>
+                <span>·</span>
+                <span class="text-blue-700">Lance is on it</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Built -->
+        <div class="border border-gray-200 rounded-md p-4 hover:bg-gray-50 cursor-pointer opacity-80">
+          <div class="flex items-start gap-4">
+            <button class="flex flex-col items-center px-2 py-1 rounded border border-gray-300 bg-white min-w-[44px]">
+              <span class="text-gray-600 text-xs">▲</span>
+              <span class="font-semibold text-sm">15</span>
+            </button>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium uppercase tracking-wider">✓ Built</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-medium uppercase tracking-wider">Ingredients</span>
+              </div>
+              <div class="font-semibold text-sm">Document storage on ingredients (COA, spec sheets)</div>
+              <p class="text-xs text-gray-600 mt-1 line-clamp-2">Need a place to upload COAs and spec sheets per ingredient.</p>
+              <div class="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
+                <span>Sarah Jenkins · 3 weeks ago</span>
+                <span>·</span>
+                <span>💬 4 comments</span>
+                <span>·</span>
+                <a class="text-emerald-700 hover:underline font-medium">→ Try it on the Ingredients page</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Declined -->
+        <div class="border border-gray-200 rounded-md p-4 hover:bg-gray-50 cursor-pointer opacity-60">
+          <div class="flex items-start gap-4">
+            <button class="flex flex-col items-center px-2 py-1 rounded border border-gray-300 bg-white min-w-[44px]">
+              <span class="text-gray-600 text-xs">▲</span>
+              <span class="font-semibold text-sm">2</span>
+            </button>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 font-medium uppercase tracking-wider">Declined</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-medium uppercase tracking-wider">Settings</span>
+              </div>
+              <div class="font-semibold text-sm">Light mode / dark mode toggle</div>
+              <p class="text-xs text-gray-600 mt-1 line-clamp-2">Would prefer dark mode for late-night work.</p>
+              <div class="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
+                <span>Mark Kim · 1 month ago</span>
+                <span>·</span>
+                <span class="text-gray-600 italic">"Not core to MRP — parking for now"</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════ SCREEN 2 — DETAIL VIEW ═════════ -->
+  <div>
+    <div class="flex items-center gap-2 mb-2">
+      <span class="px-2 py-0.5 rounded bg-gray-900 text-white text-[10px] font-semibold uppercase tracking-wider">Screen 2</span>
+      <span class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Detail view — clicked into one enhancement</span>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-5">
+      <a class="text-sm text-gray-500 hover:underline">← Enhancements</a>
+
+      <div class="flex items-start gap-4 mt-3">
+        <button class="flex flex-col items-center px-3 py-2 rounded border border-gray-300 bg-white hover:border-gray-400">
+          <span class="text-gray-600 text-sm">▲</span>
+          <span class="font-semibold text-lg">7</span>
+          <span class="text-[9px] text-gray-500 uppercase">votes</span>
+        </button>
+        <div class="flex-1">
+          <div class="flex items-center gap-2 flex-wrap mb-2">
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium uppercase tracking-wider">New · awaiting review</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-medium uppercase tracking-wider">High priority</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-medium uppercase tracking-wider">Purchase orders</span>
+          </div>
+          <h2 class="text-xl font-semibold">PO PDF should show batch / lot numbers when receipting</h2>
+          <div class="text-xs text-gray-500 mt-1">Submitted by Atma Okan · 2 hours ago</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-5 mt-6">
+        <!-- Left + middle: description + comments -->
+        <div class="col-span-2 space-y-4">
+          <div>
+            <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">Description</div>
+            <div class="prose prose-sm text-sm text-gray-800 whitespace-pre-line">When we receipt a PO, we capture batch numbers (from migration 016 onwards). However, when we reprint the PO PDF after receipt, the batch numbers don't show up next to the receipted line items.
+
+This would be really useful for the QC audit trail — when we have to demonstrate which batch came in against which order, right now we have to cross-reference two separate reports.
+
+Suggest adding a small "Batch" column to the table on the PDF, filled in only when the line has been receipted.</div>
+          </div>
+
+          <!-- Comments -->
+          <div>
+            <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">Comments (3)</div>
+            <div class="space-y-3">
+              <div class="bg-gray-50 rounded p-3 text-sm">
+                <div class="text-xs text-gray-500 mb-1"><span class="font-medium text-gray-700">Sarah Jenkins</span> · 1 hour ago</div>
+                <div>+1 — we have the same issue at month-end stock take.</div>
+              </div>
+              <div class="bg-emerald-50/60 border border-emerald-200 rounded p-3 text-sm">
+                <div class="text-xs text-emerald-700 mb-1">
+                  <span class="font-medium">Lance Giles (admin)</span> · 30 min ago
+                </div>
+                <div>Good catch — straightforward to add. Approving and putting it in the queue for next week.</div>
+              </div>
+              <div class="bg-gray-50 rounded p-3 text-sm">
+                <div class="text-xs text-gray-500 mb-1"><span class="font-medium text-gray-700">Atma Okan</span> · 5 min ago</div>
+                <div>Thanks Lance — also if we could include the supplier's invoice number when known.</div>
+              </div>
+            </div>
+
+            <!-- New comment box -->
+            <div class="mt-3">
+              <textarea rows="2" placeholder="Add a comment..." class="w-full text-sm border border-gray-300 rounded-md px-3 py-2"></textarea>
+              <button class="mt-2 px-3 py-1.5 text-xs bg-gray-900 text-white rounded-md">Post comment</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Activity + Admin -->
+        <div class="space-y-4">
+          <!-- Admin actions card (only visible to admins) -->
+          <div class="bg-amber-50 border border-amber-200 rounded-md p-4">
+            <div class="text-xs uppercase tracking-wider font-semibold text-amber-900 mb-2">Admin · change status</div>
+            <select class="w-full text-sm border border-amber-300 rounded-md px-2 py-1.5 bg-white">
+              <option>New · awaiting review</option>
+              <option>Under review</option>
+              <option>Approved</option>
+              <option>In progress</option>
+              <option>Built</option>
+              <option>Declined</option>
+              <option>On hold</option>
+            </select>
+            <textarea rows="2" placeholder="Optional note for the submitter..." class="w-full mt-2 text-sm border border-amber-300 rounded-md px-2 py-1.5 bg-white"></textarea>
+            <div class="mt-2">
+              <label class="block text-[10px] uppercase tracking-wider text-amber-900 mb-1 font-semibold">Built — link to where it lives</label>
+              <input type="text" placeholder="/ingredients/[id] or /demand?country=nz" class="w-full text-xs border border-amber-300 rounded-md px-2 py-1.5 bg-white font-mono" />
+            </div>
+            <button class="mt-2 w-full px-3 py-1.5 text-xs bg-amber-700 text-white rounded-md">Save status change</button>
+          </div>
+
+          <!-- Activity timeline -->
+          <div>
+            <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">Activity</div>
+            <ul class="space-y-2 text-xs">
+              <li class="text-gray-600"><span class="font-medium text-gray-800">Atma Okan</span> submitted · 2 hours ago</li>
+              <li class="text-gray-600"><span class="font-medium text-gray-800">Sarah Jenkins</span> voted up · 1 hour ago</li>
+              <li class="text-gray-600"><span class="font-medium text-gray-800">Lance Giles</span> commented · 30 min ago</li>
+              <li class="text-gray-600"><span class="font-medium text-gray-800">Atma Okan</span> commented · 5 min ago</li>
+            </ul>
+          </div>
+
+          <!-- Voters list -->
+          <div>
+            <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">Supporters (7)</div>
+            <div class="flex flex-wrap gap-1">
+              <span class="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">Atma Okan</span>
+              <span class="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">Sarah Jenkins</span>
+              <span class="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">Mark Kim</span>
+              <span class="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">+ 4 more</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════ SCREEN 3 — SUBMIT FORM ═════════ -->
+  <div>
+    <div class="flex items-center gap-2 mb-2">
+      <span class="px-2 py-0.5 rounded bg-gray-900 text-white text-[10px] font-semibold uppercase tracking-wider">Screen 3</span>
+      <span class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Submit form — clicked "+ Submit enhancement"</span>
+    </div>
+
+    <div class="max-w-lg bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100">
+        <h3 class="text-sm font-semibold">Submit an enhancement</h3>
+        <p class="text-[11px] text-gray-500 mt-0.5">Lance reviews these and decides what to build. Be specific — examples help.</p>
+      </div>
+      <div class="px-5 py-4 space-y-3 text-sm">
+        <div>
+          <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1 font-semibold">Title <span class="text-red-500">*</span></label>
+          <input type="text" maxlength="120" placeholder="Short one-liner — what would you like to see?" class="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm" />
+        </div>
+        <div>
+          <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1 font-semibold">Description <span class="text-red-500">*</span></label>
+          <textarea rows="4" placeholder="What's the problem this would solve? When would you use it? Any examples?" class="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1 font-semibold">Category <span class="text-red-500">*</span></label>
+            <select class="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white">
+              <option>— Pick one —</option>
+              <option>Demand</option>
+              <option>Production</option>
+              <option>Ingredients</option>
+              <option>Packaging</option>
+              <option>Purchase orders</option>
+              <option>Inventory</option>
+              <option>Reporting</option>
+              <option>Settings / Admin</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1 font-semibold">Priority</label>
+            <select class="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white" defaultValue="medium">
+              <option value="low">Low — nice-to-have</option>
+              <option value="medium" selected>Medium — would help</option>
+              <option value="high">High — slowing me down</option>
+              <option value="urgent">Urgent — blocking me</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
+        <button class="px-3 py-1.5 text-xs border border-gray-300 rounded-md bg-white">Cancel</button>
+        <button class="px-3 py-1.5 text-xs bg-gray-900 text-white rounded-md">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════ SCREEN 4 — STATUS FLOW ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-md p-4">
+    <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-3">Status flow</div>
+    <div class="flex items-center gap-2 text-xs flex-wrap">
+      <span class="px-2 py-1 rounded-full bg-amber-100 text-amber-800 font-medium">New</span>
+      <span class="text-gray-400">→</span>
+      <span class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 font-medium">Under review</span>
+      <span class="text-gray-400">→</span>
+      <span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 font-medium">Approved</span>
+      <span class="text-gray-400">→</span>
+      <span class="px-2 py-1 rounded-full bg-blue-100 text-blue-800 font-medium">In progress</span>
+      <span class="text-gray-400">→</span>
+      <span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 font-medium">✓ Built</span>
+      <span class="text-gray-400 mx-3">·</span>
+      <span class="px-2 py-1 rounded-full bg-gray-200 text-gray-600 font-medium">Declined</span>
+      <span class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 font-medium">On hold</span>
+    </div>
+    <p class="text-[11px] text-gray-500 mt-2">When you set status to "Built", you can paste a link to where in the app it lives — the submitter gets a "→ Try it on …" link in the list.</p>
+  </div>
+
+  <!-- ═════════ BUILD PLAN ═════════ -->
+  <div class="bg-white border border-gray-200 rounded-md p-4">
+    <div class="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-2">What we'd build</div>
+    <ol class="text-sm text-gray-700 space-y-1.5 leading-relaxed list-decimal pl-5">
+      <li><span class="font-semibold">Migration 035</span> · 3 tables: <code class="bg-gray-100 px-1 rounded text-[11px]">enhancements</code> (the items), <code class="bg-gray-100 px-1 rounded text-[11px]">enhancement_votes</code> (one-per-user upvotes), <code class="bg-gray-100 px-1 rounded text-[11px]">enhancement_comments</code>. RLS so any signed-in user can read + write, status changes admin-only.</li>
+      <li><span class="font-semibold">/enhancements list page</span> — tiles, filter pills, sort dropdown, card list. Visible to all roles.</li>
+      <li><span class="font-semibold">/enhancements/[id] detail page</span> — full description, comments, voters, admin status panel.</li>
+      <li><span class="font-semibold">Submit modal</span> — title + description + category + priority.</li>
+      <li><span class="font-semibold">Sidebar link</span> "Enhancements" in a new "Feedback" section, visible to everyone.</li>
+    </ol>
+  </div>
+
+</div>
+</body>
+</html>

@@ -335,6 +335,46 @@ export const INGREDIENT_STATUSES = [
 
 
 // ============================================================
+// ENHANCEMENT LOG — categories, priorities, statuses
+// ============================================================
+export const ENHANCEMENT_CATEGORIES = [
+  { value: 'demand',          label: 'Demand'           },
+  { value: 'production',      label: 'Production'       },
+  { value: 'ingredients',     label: 'Ingredients'      },
+  { value: 'packaging',       label: 'Packaging'        },
+  { value: 'purchase_orders', label: 'Purchase orders'  },
+  { value: 'inventory',       label: 'Inventory'        },
+  { value: 'reporting',       label: 'Reporting'        },
+  { value: 'settings',        label: 'Settings / Admin' },
+  { value: 'other',           label: 'Other'            },
+] as const
+
+export const ENHANCEMENT_CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  ENHANCEMENT_CATEGORIES.map((c) => [c.value, c.label]),
+)
+
+export const ENHANCEMENT_PRIORITIES = [
+  { value: 'low',     label: 'Low',     hint: 'Nice-to-have',   chip: 'bg-gray-100 text-gray-700'   },
+  { value: 'medium',  label: 'Medium',  hint: 'Would help',     chip: 'bg-amber-100 text-amber-800' },
+  { value: 'high',    label: 'High',    hint: 'Slowing me down', chip: 'bg-rose-100 text-rose-800'  },
+  { value: 'urgent',  label: 'Urgent',  hint: 'Blocking me',    chip: 'bg-red-100 text-red-800'     },
+] as const
+
+export const ENHANCEMENT_STATUSES = [
+  { value: 'new',          label: 'New · awaiting review',  short: 'New',          chip: 'bg-amber-100 text-amber-800'   },
+  { value: 'under_review', label: 'Under review',           short: 'Under review', chip: 'bg-gray-100 text-gray-700'     },
+  { value: 'approved',     label: 'Approved',               short: 'Approved',     chip: 'bg-emerald-100 text-emerald-800' },
+  { value: 'in_progress',  label: 'In progress',            short: 'In progress',  chip: 'bg-blue-100 text-blue-800'     },
+  { value: 'built',        label: 'Built',                  short: '✓ Built',     chip: 'bg-emerald-100 text-emerald-800' },
+  { value: 'declined',     label: 'Declined',               short: 'Declined',     chip: 'bg-gray-200 text-gray-600'     },
+  { value: 'on_hold',      label: 'On hold',                short: 'On hold',      chip: 'bg-gray-100 text-gray-700'     },
+] as const
+
+export const ENHANCEMENT_STATUS_BY_VALUE = new Map(ENHANCEMENT_STATUSES.map((s) => [s.value, s]))
+export const ENHANCEMENT_PRIORITY_BY_VALUE = new Map(ENHANCEMENT_PRIORITIES.map((p) => [p.value, p]))
+
+
+// ============================================================
 // MANUFACTURERS (suggested list — products.manufacturer is free text)
 // ============================================================
 export const MANUFACTURERS = [

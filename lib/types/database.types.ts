@@ -847,6 +847,10 @@ export type IngredientStatus = 'confirmed' | 'at_risk' | 'pending' | 'inactive'
 export type IngredientCertification = 'gfsi' | 'haccp' | 'brc' | 'iso_22000' | 'fssc_22000'
 export type IngredientDocType = 'coa' | 'spec' | 'allergen' | 'nutrition' | 'cert' | 'pricing' | 'other'
 
+export type EnhancementStatus   = 'new' | 'under_review' | 'approved' | 'in_progress' | 'built' | 'declined' | 'on_hold'
+export type EnhancementPriority = 'low' | 'medium' | 'high' | 'urgent'
+export type EnhancementCategory = 'demand' | 'production' | 'ingredients' | 'packaging' | 'purchase_orders' | 'inventory' | 'reporting' | 'settings' | 'other'
+
 // BOM item joined with its ingredient — used throughout BOM views/editor
 export type BomItemWithIngredient = BomItem & {
   ingredients: Pick<
