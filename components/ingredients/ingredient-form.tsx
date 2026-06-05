@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { Ingredient, Supplier } from '@/lib/types/database.types'
-import { UNITS_OF_MEASURE, SUPPORTED_CURRENCIES, type CurrencyCode } from '@/lib/constants'
+import { UNITS_OF_MEASURE, SUPPORTED_CURRENCIES, INGREDIENT_CERTIFICATIONS, type CurrencyCode } from '@/lib/constants'
 import { SupplierPicker } from './supplier-picker'
 import { OriginalOrderSection } from '@/components/shared/original-order-section'
 import type { FxRatesJson } from '@/lib/settings'
@@ -35,6 +35,7 @@ interface IngredientFormProps {
 
 const STATUS_OPTIONS = [
   { value: 'confirmed', label: 'Confirmed' },
+  { value: 'at_risk',   label: 'At risk' },
   { value: 'pending',   label: 'Pending' },
   { value: 'inactive',  label: 'Inactive' },
 ]
@@ -206,6 +207,42 @@ export function IngredientForm({
               placeholder="e.g. 2 weeks"
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
             />
+          </div>
+
+          {/* Origin + Certification — new in migration 033. Free-text origin
+              keeps things flexible when sourcing changes; certification is a
+              fixed enum so colour-coding stays consistent. */}
+          <div>
+            <label htmlFor="origin" className="block text-sm font-medium text-gray-700 mb-1.5">
+              Origin
+            </label>
+            <input
+              id="origin"
+              name="origin"
+              type="text"
+              defaultValue={(ingredient as unknown as { origin?: string | null })?.origin ?? ''}
+              placeholder="e.g. Peru, New Zealand"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">Country of origin — free text.</p>
+          </div>
+
+          <div>
+            <label htmlFor="certification" className="block text-sm font-medium text-gray-700 mb-1.5">
+              Certification on file
+            </label>
+            <select
+              id="certification"
+              name="certification"
+              defaultValue={(ingredient as unknown as { certification?: string | null })?.certification ?? ''}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+            >
+              <option value="">— None on record —</option>
+              {INGREDIENT_CERTIFICATIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-gray-500 mt-1">Drives the certification chip on the list page.</p>
           </div>
         </div>
       </div>

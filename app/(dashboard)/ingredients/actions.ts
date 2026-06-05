@@ -150,6 +150,9 @@ interface IngredientPayload {
   original_order_notes: string | null
   current_soh:          number | null
   current_soh_as_of:    string | null
+  // Migration 033 — origin (country, free-text) and certification (enum)
+  origin:               string | null
+  certification:        string | null
 }
 
 const SUPPORTED_CURRENCIES_SET = new Set(['NZD', 'AUD', 'USD', 'EUR', 'GBP'])
@@ -208,6 +211,9 @@ async function buildPayloadFromForm(
     original_order_notes: str(formData.get('original_order_notes')),
     current_soh:          parseNumeric(formData.get('current_soh')),
     current_soh_as_of:    str(formData.get('current_soh_as_of')),
+    // Migration 033 — origin (free text) + certification (enum value or null)
+    origin:               str(formData.get('origin')),
+    certification:        str(formData.get('certification')),
   }
 }
 

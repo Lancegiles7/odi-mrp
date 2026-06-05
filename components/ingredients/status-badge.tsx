@@ -4,15 +4,19 @@ import type { IngredientStatus } from '@/lib/types/database.types'
 const CONFIG: Record<IngredientStatus, { label: string; className: string }> = {
   confirmed: {
     label: 'Confirmed',
-    className: 'bg-green-100 text-green-700',
+    className: 'bg-emerald-100 text-emerald-800',
+  },
+  at_risk: {
+    label: 'At risk',
+    className: 'bg-amber-100 text-amber-800',
   },
   pending: {
     label: 'Pending',
-    className: 'bg-amber-100 text-amber-700',
+    className: 'bg-gray-100 text-gray-600',
   },
   inactive: {
     label: 'Inactive',
-    className: 'bg-gray-100 text-gray-500',
+    className: 'bg-gray-200 text-gray-500',
   },
 }
 

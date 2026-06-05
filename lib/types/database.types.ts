@@ -843,7 +843,9 @@ export type PurchaseOrderWithSupplier = PurchaseOrder & {
   suppliers: Pick<Supplier, 'id' | 'name' | 'code'>
 }
 
-export type IngredientStatus = 'confirmed' | 'pending' | 'inactive'
+export type IngredientStatus = 'confirmed' | 'at_risk' | 'pending' | 'inactive'
+export type IngredientCertification = 'gfsi' | 'haccp' | 'brc' | 'iso_22000' | 'fssc_22000'
+export type IngredientDocType = 'coa' | 'spec' | 'allergen' | 'nutrition' | 'cert' | 'pricing' | 'other'
 
 // BOM item joined with its ingredient — used throughout BOM views/editor
 export type BomItemWithIngredient = BomItem & {

@@ -3,15 +3,21 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ROLES } from '@/lib/constants'
+import { ROLES, INGREDIENT_CERTIFICATIONS } from '@/lib/constants'
 import { StatusBadge } from '@/components/ingredients/status-badge'
 import { PriceHistory } from '@/components/ingredients/price-history'
 import { DeleteIngredientButton } from '@/components/ingredients/delete-ingredient-button'
+import { IngredientDocuments } from '@/components/ingredients/ingredient-documents'
+import type { UploadedDoc } from '@/app/(dashboard)/ingredients/[id]/documents/actions'
 import type {
   IngredientStatus,
+  IngredientCertification,
+  IngredientDocType,
   IngredientWithSupplier,
   IngredientPriceHistory,
 } from '@/lib/types/database.types'
+
+const CERT_BY_VALUE = new Map(INGREDIENT_CERTIFICATIONS.map((c) => [c.value, c]))
 
 export const metadata: Metadata = { title: 'Ingredient' }
 
@@ -54,32 +60,38 @@ export default async function IngredientDetailPage({ params, searchParams }: Pag
 
   if (!ingredient) notFound()
 
-  // List of ACTIVE products whose active BOM references this ingredient —
-  // shown in the Delete confirmation so the user can see what's affected.
-  // (Admin-only, but cheap enough to always fetch.)
+  // List of ACTIVE products whose active BOM references this ingredient.
+  // Now also returns quantity_g so the detail page can show "Xg / unit"
+  // next to each product, and the Delete dialog gets the same data.
   const { data: activeBomLinks } = await supabase
     .from('bom_items')
-    .select('boms!inner(product_id, is_active)')
+    .select('quantity_g, boms!inner(product_id, is_active)')
     .eq('ingredient_id', params.id)
-    .eq('boms.is_active', true) as unknown as { data: Array<{ boms: { product_id: string; is_active: boolean } | null }> | null }
+    .eq('boms.is_active', true) as unknown as { data: Array<{ quantity_g: number; boms: { product_id: string; is_active: boolean } | null }> | null }
 
-  const inUseProductIds = Array.from(new Set(
-    (activeBomLinks ?? [])
-      .map((r) => r.boms?.product_id)
-      .filter((id): id is string => !!id),
-  ))
+  const productQty = new Map<string, number>()
+  for (const link of activeBomLinks ?? []) {
+    const pid = link.boms?.product_id
+    if (!pid) continue
+    productQty.set(pid, (productQty.get(pid) ?? 0) + Number(link.quantity_g ?? 0))
+  }
+  const inUseProductIds = Array.from(productQty.keys())
 
   const { data: inUseProductRows } = inUseProductIds.length === 0
-    ? { data: [] as Array<{ id: string; name: string }> }
+    ? { data: [] as Array<{ id: string; name: string; product_type: string | null }> }
     : await supabase
         .from('products')
-        .select('id, name')
+        .select('id, name, product_type')
         .in('id', inUseProductIds)
         .eq('is_active', true)
         .is('deleted_at', null)
-        .order('name') as unknown as { data: Array<{ id: string; name: string }> | null }
+        .order('name') as unknown as { data: Array<{ id: string; name: string; product_type: string | null }> | null }
 
   const inUseProducts = inUseProductRows ?? []
+  const inUseProductsWithQty = inUseProducts.map((p) => ({
+    ...p,
+    quantity_g: productQty.get(p.id) ?? 0,
+  }))
 
   // Count distinct suppliers also-linked ingredients for the "shared with" line
   let sharedCount = 0
@@ -95,6 +107,36 @@ export default async function IngredientDetailPage({ params, searchParams }: Pag
 
   const latest = history?.[0] ?? null
 
+  // ── Documents ─────────────────────────────────────────────────
+  const { data: docRows } = await supabase
+    .from('ingredient_documents')
+    .select(`
+      id, file_name, doc_type, size_bytes, notes, expires_at, uploaded_at,
+      user_profiles!ingredient_documents_uploaded_by_fkey ( full_name )
+    `)
+    .eq('ingredient_id', params.id)
+    .order('uploaded_at', { ascending: false }) as unknown as { data: Array<{
+      id: string; file_name: string; doc_type: IngredientDocType;
+      size_bytes: number | null; notes: string | null; expires_at: string | null;
+      uploaded_at: string;
+      user_profiles: { full_name: string | null } | null
+    }> | null }
+
+  const initialDocs: UploadedDoc[] = (docRows ?? []).map((d) => ({
+    id:              d.id,
+    file_name:       d.file_name,
+    doc_type:        d.doc_type,
+    size_bytes:      d.size_bytes,
+    notes:           d.notes,
+    expires_at:      d.expires_at,
+    uploaded_at:     d.uploaded_at,
+    uploaded_by_name: d.user_profiles?.full_name ?? null,
+  }))
+
+  const cert = (ingredient as unknown as { certification?: string | null }).certification
+  const certInfo = cert ? CERT_BY_VALUE.get(cert as IngredientCertification) : null
+  const origin = (ingredient as unknown as { origin?: string | null }).origin
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -103,16 +145,22 @@ export default async function IngredientDetailPage({ params, searchParams }: Pag
           <Link href="/ingredients" className="text-sm text-gray-500 hover:text-gray-900">
             ← Ingredients
           </Link>
-          <div className="mt-2 flex items-center gap-3">
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-semibold">{ingredient.name}</h1>
             <StatusBadge status={ingredient.status as IngredientStatus} />
             {ingredient.is_organic ? (
-              <span className="px-2 py-0.5 text-xs rounded bg-green-50 text-green-700">Organic</span>
+              <span className="px-2 py-0.5 text-xs rounded bg-emerald-100 text-emerald-700 font-medium">Organic</span>
             ) : (
-              <span className="px-2 py-0.5 text-xs rounded bg-orange-50 text-orange-700">Non-Organic</span>
+              <span className="px-2 py-0.5 text-xs rounded bg-orange-100 text-orange-700 font-medium">Non-Organic</span>
+            )}
+            {certInfo && (
+              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${certInfo.chip}`}>{certInfo.label}</span>
             )}
           </div>
-          <div className="mt-1 text-xs font-mono text-gray-600">{ingredient.sku_code}</div>
+          <div className="mt-1 text-xs text-gray-600 flex items-center gap-3">
+            <span className="font-mono">{ingredient.sku_code}</span>
+            {origin && <span>· Origin: <span className="font-medium">{origin}</span></span>}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
@@ -149,6 +197,8 @@ export default async function IngredientDetailPage({ params, searchParams }: Pag
           <dl className="space-y-2 text-sm">
             <Row label="Unit of measure" value={ingredient.unit_of_measure} />
             <Row label="Lead time" value={ingredient.lead_time} />
+            <Row label="Origin" value={origin ?? null} />
+            <Row label="Certification" value={certInfo?.label ?? null} />
             <Row label="Used in" value={usedInCount != null ? `${usedInCount} BOM line${usedInCount === 1 ? '' : 's'}` : '—'} />
             <Row label="Reorder point" value={ingredient.reorder_point != null ? `${ingredient.reorder_point}` : null} />
           </dl>
@@ -225,6 +275,40 @@ export default async function IngredientDetailPage({ params, searchParams }: Pag
           <PriceHistory history={history ?? []} />
         </div>
       </div>
+
+      {/* Used in BOMs — full list (was a count before). */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-semibold">Used in (BOMs)</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {inUseProductsWithQty.length === 0
+              ? 'Not used in any active product BOM yet.'
+              : `${inUseProductsWithQty.length} active product${inUseProductsWithQty.length === 1 ? '' : 's'} use${inUseProductsWithQty.length === 1 ? 's' : ''} this ingredient.`}
+          </p>
+        </div>
+        {inUseProductsWithQty.length > 0 && (
+          <ul className="divide-y divide-gray-100 text-sm">
+            {inUseProductsWithQty.map((p) => (
+              <li key={p.id}>
+                <Link
+                  href={`/products/${p.id}`}
+                  className="flex items-center justify-between px-5 py-2.5 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="font-medium text-gray-900 hover:underline">{p.name}</span>
+                  <span className="text-xs text-gray-500 tabular-nums">{p.quantity_g.toLocaleString()} g / unit</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Documents — uploads stored in Storage bucket `ingredient-docs`. */}
+      <IngredientDocuments
+        ingredientId={ingredient.id}
+        ingredientName={ingredient.name}
+        initialDocs={initialDocs}
+      />
     </div>
   )
 }

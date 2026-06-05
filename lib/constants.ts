@@ -297,6 +297,44 @@ export function channelCountry(ch: string): ChannelCountry | null {
 
 
 // ============================================================
+// INGREDIENT — certifications + document types
+// (locked-in lists driven by check constraints in DB)
+// ============================================================
+export const INGREDIENT_CERTIFICATIONS = [
+  { value: 'gfsi',       label: 'GFSI',       short: 'GFSI',  chip: 'bg-emerald-100 text-emerald-800' },
+  { value: 'haccp',      label: 'HACCP',      short: 'HACCP', chip: 'bg-amber-100 text-amber-800'     },
+  { value: 'brc',        label: 'BRC',        short: 'BRC',   chip: 'bg-blue-100 text-blue-800'       },
+  { value: 'iso_22000',  label: 'ISO 22000',  short: 'ISO',   chip: 'bg-indigo-100 text-indigo-800'   },
+  { value: 'fssc_22000', label: 'FSSC 22000', short: 'FSSC',  chip: 'bg-purple-100 text-purple-800'   },
+] as const
+
+export const INGREDIENT_CERTIFICATION_LABELS: Record<string, string> = Object.fromEntries(
+  INGREDIENT_CERTIFICATIONS.map((c) => [c.value, c.label]),
+)
+
+export const INGREDIENT_DOC_TYPES = [
+  { value: 'coa',       label: 'COA',           long: 'Certificate of Analysis', chip: 'bg-purple-100 text-purple-800' },
+  { value: 'spec',      label: 'Spec sheet',    long: 'Spec sheet',              chip: 'bg-blue-100 text-blue-800'     },
+  { value: 'allergen',  label: 'Allergen',      long: 'Allergen statement',      chip: 'bg-amber-100 text-amber-800'   },
+  { value: 'nutrition', label: 'Nutrition',     long: 'Nutritional info',        chip: 'bg-pink-100 text-pink-800'     },
+  { value: 'cert',      label: 'Certification', long: 'Certification certificate', chip: 'bg-emerald-100 text-emerald-800' },
+  { value: 'pricing',   label: 'Pricing',       long: 'Pricing / quote',         chip: 'bg-indigo-100 text-indigo-800' },
+  { value: 'other',     label: 'Other',         long: 'Other',                   chip: 'bg-gray-100 text-gray-700'     },
+] as const
+
+export const INGREDIENT_DOC_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  INGREDIENT_DOC_TYPES.map((t) => [t.value, t.label]),
+)
+
+export const INGREDIENT_STATUSES = [
+  { value: 'confirmed', label: 'Confirmed', chip: 'bg-emerald-100 text-emerald-800' },
+  { value: 'at_risk',   label: 'At risk',   chip: 'bg-amber-100 text-amber-800'     },
+  { value: 'pending',   label: 'Pending',   chip: 'bg-gray-100 text-gray-600'       },
+  { value: 'inactive',  label: 'Inactive',  chip: 'bg-gray-200 text-gray-500'       },
+] as const
+
+
+// ============================================================
 // MANUFACTURERS (suggested list — products.manufacturer is free text)
 // ============================================================
 export const MANUFACTURERS = [
