@@ -16,6 +16,8 @@ interface Props {
   months: string[]
   /** Set of "ingredientId|yyyy-mm-01" keys that already have at least one comment. */
   commentedCells: Set<string>
+  /** Bulk-fetched opening-stock summary: drives the clock-button render. */
+  openingHistory?: { hasHistory: boolean; hasComment: boolean }
 }
 
 function fmt(n: number): string {
@@ -26,7 +28,7 @@ function fmt(n: number): string {
   return n.toFixed(2)
 }
 
-export function IngredientDemandRow({ row, months, commentedCells }: Props) {
+export function IngredientDemandRow({ row, months, commentedCells, openingHistory }: Props) {
   const [open, setOpen] = useState(false)
   const [override, setOverride] = useState<number | null>(row.ingredient.opening_stock_override)
   const [error, setError] = useState<string | null>(null)
@@ -84,6 +86,8 @@ export function IngredientDemandRow({ row, months, commentedCells }: Props) {
             onSave={onSave}
             onLoadHistory={onLoadHistory}
             onSaved={handleSaved}
+            hasHistory={openingHistory?.hasHistory}
+            hasComment={openingHistory?.hasComment}
           />
         </td>
 
@@ -97,13 +101,21 @@ export function IngredientDemandRow({ row, months, commentedCells }: Props) {
           const poTitle  = pos.length ? pos.map((p) => `${p.po_number}: +${fmt(p.qty)}`).join('\n') : ''
           const cellHasComment = commentedCells.has(`${ingredientId}|${m.slice(0, 10)}`)
 
+          // Cell background:
+          //  red    = shortfall (today)
+          //  amber  = would be short but an open PO covers it (today)
+          //  green  = NEW — demand fully covered by opening stock alone, no
+          //           PO needed. Flips from amber → green on receipt.
+          //  blank  = no demand this month
           const cellBg =
             state === 'red'   ? 'bg-red-50'
             : state === 'amber' ? 'bg-amber-50'
+            : v > 0           ? 'bg-emerald-50'
                                 : ''
           const numCls =
             state === 'red'   ? 'text-red-700 font-semibold'
             : state === 'amber' ? 'text-amber-900 font-semibold'
+            : v > 0           ? 'text-emerald-800 font-semibold'
                                 : 'text-gray-700'
           let sub: { text: string; cls: string; title?: string } | null = null
           if (v > 0) {
@@ -112,7 +124,7 @@ export function IngredientDemandRow({ row, months, commentedCells }: Props) {
             } else if (state === 'amber') {
               sub = { text: `+${fmt(arriving)} PO`, cls: 'text-amber-700', title: poTitle }
             } else if (bal > v) {
-              sub = { text: `+${Math.round((bal / v) * 100)}%`, cls: 'text-emerald-600' }
+              sub = { text: `+${Math.round((bal / v) * 100)}%`, cls: 'text-emerald-700' }
             }
           }
 

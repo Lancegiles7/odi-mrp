@@ -24,6 +24,8 @@ interface Props {
   forecastByMonth: Record<string, number>
   productionByMonth: Record<string, number>
   commentedCells: Set<string>      // "productId|yyyy-mm-01" keys
+  /** Bulk-fetched opening-stock summary: drives the clock-button render. */
+  openingHistory?: { hasHistory: boolean; hasComment: boolean }
   showManufacturerChip?: boolean   // true on the flat "view all" table
 }
 
@@ -37,7 +39,7 @@ interface Props {
 export function ProductionRow({
   productId, skuCode, productName, manufacturer, isActive,
   openingStock, openingStockOverride, months, forecastByMonth, productionByMonth,
-  commentedCells, showManufacturerChip,
+  commentedCells, openingHistory, showManufacturerChip,
 }: Props) {
   const [prod, setProd] = useState<Record<string, number>>(productionByMonth)
   const [opening, setOpening] = useState<number>(openingStock)
@@ -104,6 +106,8 @@ export function ProductionRow({
           onSave={useCallback((v, note) => updateOpeningStockOverride(productId, v, note), [productId])}
           onLoadHistory={useCallback(() => getOpeningStockHistory(productId), [productId])}
           onSaved={handleOpeningSaved}
+          hasHistory={openingHistory?.hasHistory}
+          hasComment={openingHistory?.hasComment}
         />
       </td>
 

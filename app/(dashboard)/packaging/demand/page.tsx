@@ -8,6 +8,7 @@ import { aggregatePackagingDemand, hasAnyShortfall, monthShortfallStates, type P
 import { PackagingDemandRow } from '@/components/packaging/packaging-demand-row'
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
+import { getPackagingOpeningStockSummary } from '@/lib/opening-stock-summary'
 import { PRODUCT_GROUP_LABELS } from '@/lib/constants'
 
 export const metadata: Metadata = { title: 'Packaging demand' }
@@ -183,12 +184,10 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     }
   }
 
-  const commentedCells = await getCellsWithComments(
-    'packaging',
-    uniqueRows.map((r) => r.packaging.id),
-    firstMonth,
-    lastMonth,
-  )
+  const [commentedCells, openingHistorySummary] = await Promise.all([
+    getCellsWithComments('packaging', uniqueRows.map((r) => r.packaging.id), firstMonth, lastMonth),
+    getPackagingOpeningStockSummary(uniqueRows.map((r) => r.packaging.id)),
+  ])
 
   const sourceLabel = source === 'production' ? 'production plan' : 'demand forecast'
   const groupLabel  = groupBy === 'supplier' ? 'supplier' : 'product group'
@@ -293,7 +292,13 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
                 </thead>
                 <tbody>
                   {g.rows.map((row) => (
-                    <PackagingDemandRow key={row.packaging.id} row={row} months={months} commentedCells={commentedCells} />
+                    <PackagingDemandRow
+                      key={row.packaging.id}
+                      row={row}
+                      months={months}
+                      commentedCells={commentedCells}
+                      openingHistory={openingHistorySummary.get(row.packaging.id)}
+                    />
                   ))}
                 </tbody>
               </table>

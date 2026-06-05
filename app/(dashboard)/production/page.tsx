@@ -13,6 +13,7 @@ import { ProductionRow } from '@/components/production/production-row'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
+import { getProductOpeningStockSummary } from '@/lib/opening-stock-summary'
 import type { DemandForecast, ProductionPlan } from '@/lib/types/database.types'
 
 export const metadata: Metadata = { title: 'Production schedule' }
@@ -112,13 +113,13 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   }
   const pageCounts = shortfallCountsFor(allProducts)
 
-  // Bulk-fetch which (product, month) cells already have a comment.
-  const commentedCells = await getCellsWithComments(
-    'product',
-    allProducts.map((p) => p.id),
-    firstMonth,
-    lastMonth,
-  )
+  // Bulk-fetch (a) which (product, month) cells already have a comment,
+  // and (b) which products have any opening-stock edit history and/or
+  // comments — the latter drives the clock-button render on each row.
+  const [commentedCells, openingHistorySummary] = await Promise.all([
+    getCellsWithComments('product', allProducts.map((p) => p.id), firstMonth, lastMonth),
+    getProductOpeningStockSummary(allProducts.map((p) => p.id)),
+  ])
 
   // Build manufacturer groups + derived stats
   const manufacturers = new Map<string, ProductRow[]>()
@@ -274,6 +275,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                         forecastByMonth={forecastFor(p.id)}
                         productionByMonth={productionFor(p.id)}
                         commentedCells={commentedCells}
+                        openingHistory={openingHistorySummary.get(p.id)}
                       />
                     ))}
                   </tbody>
@@ -383,6 +385,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                   forecastByMonth={forecastFor(p.id)}
                   productionByMonth={productionFor(p.id)}
                   commentedCells={commentedCells}
+                  openingHistory={openingHistorySummary.get(p.id)}
                   showManufacturerChip
                 />
               ))}

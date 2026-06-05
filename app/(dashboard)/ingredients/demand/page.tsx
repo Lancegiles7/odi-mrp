@@ -14,6 +14,7 @@ import {
 import { IngredientDemandRow } from '@/components/ingredients/ingredient-demand-row'
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
+import { getIngredientOpeningStockSummary } from '@/lib/opening-stock-summary'
 
 export const metadata: Metadata = { title: 'Ingredient demand' }
 
@@ -170,7 +171,11 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       const unit = demandUnitLabel(row.ingredient.unit_of_measure)
       demandByUnit.set(unit, (demandByUnit.get(unit) ?? 0) + row.totalDemand)
       const opening = row.ingredient.opening_stock_override ?? 0
-      if (hasAnyShortfall(row, opening, months)) totalShortfalls++
+      // Skip shortfall count for ingredients with no supplier — there's
+      // nothing the user can action on those, so they shouldn't pad the
+      // headline number. They still render in the table; only the tile
+      // and the supplier groupings reflect actionable ingredients.
+      if (row.ingredient.supplier_id && hasAnyShortfall(row, opening, months)) totalShortfalls++
       if (unit === 'kg') openingSumKg += opening
       allIngredientIds.push(row.ingredient.id)
     }
@@ -192,7 +197,10 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     }
   }
 
-  const commentedCells = await getCellsWithComments('ingredient', allIngredientIds, firstMonth, lastMonth)
+  const [commentedCells, openingHistorySummary] = await Promise.all([
+    getCellsWithComments('ingredient', allIngredientIds, firstMonth, lastMonth),
+    getIngredientOpeningStockSummary(allIngredientIds),
+  ])
 
   const demandSummaryParts: string[] = []
   for (const [u, v] of demandByUnit.entries()) {
@@ -296,7 +304,13 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
                 </thead>
                 <tbody>
                   {g.ingredients.map((row) => (
-                    <IngredientDemandRow key={row.ingredient.id} row={row} months={months} commentedCells={commentedCells} />
+                    <IngredientDemandRow
+                      key={row.ingredient.id}
+                      row={row}
+                      months={months}
+                      commentedCells={commentedCells}
+                      openingHistory={openingHistorySummary.get(row.ingredient.id)}
+                    />
                   ))}
                 </tbody>
               </table>

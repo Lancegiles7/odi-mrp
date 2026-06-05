@@ -22,6 +22,13 @@ interface Props {
   onSaved:      (next: number | null) => void
   /** Unit suffix shown next to the value (e.g. "g", "kg") — optional. */
   unitLabel?:   string
+  /** Bulk-fetched at page level: has this entity ever been edited? Controls
+   *  whether the small clock button shows next to the value. When false the
+   *  user clicks the value chip itself to open. */
+  hasHistory?:  boolean
+  /** Bulk-fetched at page level: does any prior edit have a non-empty note?
+   *  Renders the clock button in green so admins can spot "has context". */
+  hasComment?:  boolean
 }
 
 /**
@@ -36,6 +43,7 @@ interface Props {
 export function OpeningStockHistoryPopover({
   entityLabel, currentValue, description,
   onSave, onLoadHistory, onSaved, unitLabel,
+  hasHistory = false, hasComment = false,
 }: Props) {
   const [open,    setOpen]    = useState(false)
   const [value,   setValue]   = useState<string>(currentValue == null ? '' : String(currentValue))
@@ -90,32 +98,45 @@ export function OpeningStockHistoryPopover({
     })
   }
 
-  const hasHistory = rows != null && rows.length > 0
+  // History loaded inside the popover body — distinct from the prop
+  // `hasHistory`, which is the bulk-fetched signal that drives the trigger.
+  const loadedHasHistory = rows != null && rows.length > 0
 
   return (
     <>
-      {/* Trigger — value chip + clock icon button */}
+      {/* Trigger — value chip is always clickable so editing is one-click
+          even for never-touched rows. The clock button only appears once
+          there's edit history, and it goes green when a comment exists. */}
       <div className="inline-flex items-center gap-1">
-        <span
-          className={`inline-block w-20 text-right text-[11px] rounded px-1.5 py-0.5 tabular-nums border ${
-            currentValue == null
-              ? 'border-dashed border-gray-300 bg-white text-gray-400'
-              : 'border-gray-300 bg-white text-gray-900 font-medium'
-          }`}
-        >
-          {currentValue == null ? '—' : currentValue.toLocaleString()}
-        </span>
         <button
           type="button"
           onClick={() => setOpen(true)}
           title="Edit opening stock · view history"
-          className="w-5 h-5 rounded border border-gray-300 bg-white hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 text-gray-500 inline-flex items-center justify-center"
+          className={`inline-block w-20 text-right text-[11px] rounded px-1.5 py-0.5 tabular-nums border transition-colors ${
+            currentValue == null
+              ? 'border-dashed border-gray-300 bg-white text-gray-400 hover:border-gray-400'
+              : 'border-gray-300 bg-white text-gray-900 font-medium hover:border-gray-400'
+          }`}
         >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
+          {currentValue == null ? '—' : currentValue.toLocaleString()}
         </button>
+        {hasHistory && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            title={hasComment ? 'View history (has comments)' : 'View edit history'}
+            className={`w-5 h-5 rounded border inline-flex items-center justify-center transition-colors ${
+              hasComment
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                : 'border-gray-300 bg-white text-gray-500 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600'
+            }`}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {open && (
@@ -173,7 +194,7 @@ export function OpeningStockHistoryPopover({
                 <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Edit history</div>
                 {loading ? (
                   <div className="text-xs text-gray-400 py-2">Loading…</div>
-                ) : !hasHistory ? (
+                ) : !loadedHasHistory ? (
                   <div className="text-xs text-gray-400 py-2 italic">No edits yet — this would be the first change captured.</div>
                 ) : (
                   <ul className="max-h-44 overflow-auto divide-y divide-gray-100 border border-gray-200 rounded-md">
