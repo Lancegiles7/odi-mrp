@@ -7,6 +7,20 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { ROLES } from '@/lib/constants'
 
 /**
+ * Where Supabase should send invited / reset users after they click the
+ * email link. Must land on /auth/callback so the code is exchanged for a
+ * session and the user is routed to /reset-password to set a password.
+ *
+ * Without this, Supabase falls back to the project's bare Site URL (the
+ * app's front door), which can't handle the invite token — the user just
+ * gets bounced to /login with no way to set a password.
+ *
+ * Override per-environment with NEXT_PUBLIC_SITE_URL; defaults to prod.
+ */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://odi-mrp-app.vercel.app'
+const INVITE_REDIRECT = `${SITE_URL}/auth/callback?type=invite`
+
+/**
  * User-management server actions, admin-only.
  *
  * - inviteUser:   sends a Supabase invite email + creates a user_profiles row
@@ -63,6 +77,7 @@ export async function inviteUser(formData: FormData): Promise<{ ok: boolean; err
   // which routes to /reset-password where they set their initial password.
   const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { full_name: fullName },
+    redirectTo: INVITE_REDIRECT,
   })
 
   if (inviteErr || !invited?.user) {
@@ -149,7 +164,9 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean; error
   const { data: u, error: fetchErr } = await admin.auth.admin.getUserById(userId)
   if (fetchErr || !u?.user?.email) return { ok: false, error: fetchErr?.message ?? 'User not found' }
 
-  const { error } = await admin.auth.admin.inviteUserByEmail(u.user.email)
+  const { error } = await admin.auth.admin.inviteUserByEmail(u.user.email, {
+    redirectTo: INVITE_REDIRECT,
+  })
   if (error) return { ok: false, error: error.message }
 
   return { ok: true }
