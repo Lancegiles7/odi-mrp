@@ -305,7 +305,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                 (Number(product.toll)    || 0) +
                 (Number(product.margin)  || 0) +
                 (Number(product.other)   || 0) +
-                (Number(product.freight) || 0)
+                (Number(product.freight_nz ?? product.freight) || 0)
               return (
                 <div className="px-5 py-4 text-sm border-t border-gray-100 bg-gray-50/50 space-y-1">
                   {/* Packaging block (and its sub-items) */}
@@ -320,7 +320,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                     <LineItem label="Toll"          value={product.toll} />
                     <LineItem label="Margin"        value={product.margin} />
                     <LineItem label="Task / other"  value={product.other} />
-                    <LineItem label="Freight"       value={product.freight} />
+                    <LineItem label="Freight (NZ)"  value={product.freight_nz ?? product.freight} />
                     <div className="flex justify-between pt-1.5 mt-1 border-t border-gray-200">
                       <span className="text-gray-700 font-medium">Other subtotal</span>
                       <span className="font-semibold tabular-nums">{formatCurrency(otherSubtotal)}</span>
@@ -333,7 +333,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                     <span className="font-semibold tabular-nums">{formatCurrency(summary.nz_grand_total)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-gray-600">
-                    <span>÷ FX {Number(settings.fx_rates.AUD).toFixed(4)} → AU total</span>
+                    <span>AU freight {formatCurrency(product.freight_au ?? product.freight ?? 0)} · ÷ FX {Number(settings.fx_rates.AUD).toFixed(4)} → AU total</span>
                     <span className="tabular-nums">{formatCurrency(summary.au_grand_total)}</span>
                   </div>
                 </div>

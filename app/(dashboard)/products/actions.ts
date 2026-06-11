@@ -247,6 +247,7 @@ export async function updateProduct(id: string, formData: FormData) {
 
   revalidatePath('/products')
   revalidatePath(`/products/${id}`)
+  revalidatePath(`/products/${id}/print`)
   redirect(`/products/${id}`)
 }
 
