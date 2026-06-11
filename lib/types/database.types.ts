@@ -879,7 +879,7 @@ export type EnhancementCategory = 'demand' | 'production' | 'ingredients' | 'pac
 export type BomItemWithIngredient = BomItem & {
   ingredients: Pick<
     Ingredient,
-    'id' | 'name' | 'sku_code' | 'unit_of_measure' | 'total_loaded_cost' | 'is_organic'
+    'id' | 'name' | 'sku_code' | 'unit_of_measure' | 'total_loaded_cost' | 'is_organic' | 'currency' | 'price'
   >
 }
 

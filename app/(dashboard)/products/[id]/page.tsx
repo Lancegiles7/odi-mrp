@@ -33,7 +33,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
           id, version, is_active, notes,
           bom_items (
             id, ingredient_id, quantity_g, uom, price_override, notes, sort_order,
-            ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, is_organic )
+            ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, is_organic, currency, price )
           )
         )
       `)
@@ -69,6 +69,14 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
 
   const summary   = calcProductCostSummary(product, bomItems, settings)
   const typeLabel = product.product_type ? PRODUCT_GROUP_LABELS[product.product_type] ?? product.product_type : null
+
+  // BOM ingredient lines are shown in their supplier currency; the totals are
+  // NZD (loaded cost). When every line shares one foreign currency, show the
+  // conversion explicitly (e.g. AUD subtotal × FX → NZD).
+  const ingCurrencies = Array.from(new Set(bomItems.map((i) => i.ingredients.currency ?? 'NZD')))
+  const uniformForeign = ingCurrencies.length === 1 && ingCurrencies[0] !== 'NZD' ? ingCurrencies[0] : null
+  const foreignFx = uniformForeign ? (Number(settings.fx_rates[uniformForeign as keyof typeof settings.fx_rates]) || 1) : 1
+  const curSym = (c: string | null | undefined) => (c === 'AUD' ? 'A$' : c && c !== 'NZD' ? `${c} ` : '$')
 
   return (
     <div className="space-y-6">
@@ -186,9 +194,19 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
       {/* BOM table (read-only on detail; edit via Edit page which hosts the editor) */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Bill of materials</h3>
-          <div className="text-xs text-gray-500">
-            {bomItems.length} ingredient{bomItems.length === 1 ? '' : 's'}{activeBom ? ` · Version ${activeBom.version} (active)` : ''}
+          <div>
+            <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Bill of materials</h3>
+            <div className="text-xs text-gray-500 mt-0.5">
+              {bomItems.length} ingredient{bomItems.length === 1 ? '' : 's'}{activeBom ? ` · Version ${activeBom.version} (active)` : ''}
+              {uniformForeign && <span className="text-gray-400"> · prices in {uniformForeign}, converted to NZD</span>}
+            </div>
+          </div>
+          <div className="text-right bg-[#f0f4ec] border border-[#dbe7cf] rounded-lg px-4 py-2">
+            <div className="text-[11px] text-[#3b6d11]">Total ingredients · NZD</div>
+            <div className="text-xl font-bold text-[#27500a] tabular-nums">{formatCurrency(summary.ingredient_total)}</div>
+            {uniformForeign && (
+              <div className="text-[11px] text-gray-500">from {curSym(uniformForeign)}{(summary.ingredient_total / foreignFx).toFixed(2)} {uniformForeign} · ×{foreignFx.toFixed(2)}</div>
+            )}
           </div>
         </div>
         {bomItems.length === 0 ? (
@@ -206,13 +224,18 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                   <th className="text-right font-medium px-5 py-2">kg</th>
                   <th className="text-right font-medium px-5 py-2">% of wt</th>
                   <th className="text-right font-medium px-5 py-2">Serve (g)</th>
-                  <th className="text-right font-medium px-5 py-2">$/kg</th>
-                  <th className="text-right font-medium px-5 py-2">$/unit</th>
+                  <th className="text-right font-medium px-5 py-2">$/kg <span className="text-gray-400 normal-case">(supplier)</span></th>
+                  <th className="text-right font-medium px-5 py-2">$/unit <span className="text-gray-400 normal-case">(supplier)</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {bomItems.map((item) => {
                   const calc = calcBomLineValues(item, product.size_g ?? 0, product.serving_size ?? 0)
+                  // Per-line price shown in the ingredient's supplier currency.
+                  const cur        = item.ingredients.currency ?? 'NZD'
+                  const sym        = curSym(cur)
+                  const nativePerKg   = item.price_override ?? item.ingredients.price ?? 0
+                  const nativePerUnit = calc.unit_in_kg * nativePerKg
                   return (
                     <tr key={item.id}>
                       <td className="px-5 py-2.5">
@@ -228,8 +251,8 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                       <td className="px-5 py-2.5 text-right">{calc.unit_in_kg.toFixed(4)}</td>
                       <td className="px-5 py-2.5 text-right">{(calc.percentage * 100).toFixed(1)}%</td>
                       <td className="px-5 py-2.5 text-right">{calc.serve_amount.toFixed(2)}</td>
-                      <td className="px-5 py-2.5 text-right">{formatCurrency(calc.price_per_kg)}</td>
-                      <td className="px-5 py-2.5 text-right font-medium">{formatCurrency(calc.price_per_unit)}</td>
+                      <td className="px-5 py-2.5 text-right tabular-nums">{sym}{nativePerKg.toFixed(2)} <span className="text-[10px] text-gray-400">{cur}</span></td>
+                      <td className="px-5 py-2.5 text-right font-medium tabular-nums">{sym}{nativePerUnit.toFixed(2)}</td>
                     </tr>
                   )
                 })}
@@ -249,7 +272,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
 
                 {/* Subtotal per pack — includes wastage */}
                 <tr className={product.wastage_pct > 0 ? '' : 'border-t border-gray-200'}>
-                  <td colSpan={2} className="px-5 py-2 font-medium">Ingredients subtotal (per pack)</td>
+                  <td colSpan={2} className="px-5 py-2 font-medium">Ingredients subtotal (per pack) · NZD</td>
                   <td className="px-5 py-2 text-right tabular-nums">
                     {bomItems.reduce((s, i) => s + Number(i.quantity_g || 0), 0).toFixed(2)}
                   </td>
@@ -271,7 +294,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                       </td>
                     </tr>
                     <tr>
-                      <td colSpan={7} className="px-5 py-2 font-medium">Ingredient total (per serving)</td>
+                      <td colSpan={7} className="px-5 py-2 font-medium">Ingredient total (per serving) · NZD</td>
                       <td className="px-5 py-2 text-right font-semibold tabular-nums">{formatCurrency(summary.ingredient_total)}</td>
                     </tr>
                   </>
