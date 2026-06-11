@@ -7,6 +7,7 @@ import { calcProductCostSummary, calcBomLineValues } from '@/lib/costing'
 import { getAppSettings } from '@/lib/settings'
 import { PRODUCT_GROUP_LABELS, ROLES, packagingTypeLabel } from '@/lib/constants'
 import { DeleteProductButton } from '@/components/products/delete-product-button'
+import { ProductCostOverview } from '@/components/products/product-cost-overview'
 import type { BomItemWithIngredient } from '@/lib/types/database.types'
 
 export const metadata: Metadata = { title: 'Product' }
@@ -123,7 +124,8 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             <Meta label="Product type" value={typeLabel} />
             <Meta label="Size" value={product.size_g != null ? `${product.size_g} g` : null} />
             <Meta label="Serving size" value={product.serving_size != null ? `${product.serving_size} g` : null} />
-            <Meta label="RRP (inc GST)" value={product.rrp != null ? formatCurrency(product.rrp) : null} />
+            <Meta label="RRP — NZ (inc GST)" value={product.rrp != null ? formatCurrency(product.rrp) : null} />
+            <Meta label="RRP — AU (inc GST)" value={(product.rrp_au ?? product.rrp) != null ? `A${formatCurrency(product.rrp_au ?? product.rrp ?? 0)}` : null} />
             <Meta label="Hero callout" value={product.hero_call_out} colSpan />
             <Meta label="Back of pack" value={product.back_of_pack} colSpan multiline />
           </dl>
@@ -139,70 +141,47 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         </div>
       </div>
 
-      {/* Cost summary */}
+      {/* Cost summary — NZ then AU; RRP inc GST → GP (% · $) → Cost ($ · %) */}
       <div className="bg-white rounded-lg border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Cost summary</h3>
-          <div className="text-xs text-gray-500">
-            FX rate (AUD → NZD) <span className="font-mono font-semibold">{Number(settings.fx_rates.AUD).toFixed(4)}</span>
-            <span className="ml-1 text-gray-400">· NZ &amp; AU each use their own freight; AU = AU base ÷ FX</span>
-            {product.rrp != null && product.rrp > 0 && (
-              <>
-                <span className="mx-2 text-gray-300">·</span>
-                RRP ex-GST NZ <span className="font-mono font-semibold">{formatCurrency(summary.rrp_ex_gst_nz)}</span>
-                <span className="mx-1 text-gray-300">/</span>
-                AU <span className="font-mono font-semibold">{formatCurrency(summary.rrp_ex_gst_au)}</span>
-              </>
-            )}
-          </div>
+          <span className="text-xs text-gray-500">FX (AUD → NZD) <span className="font-mono font-semibold">{Number(settings.fx_rates.AUD).toFixed(4)}</span></span>
         </div>
 
-        {/* Row 1 — cost build-up */}
-        <div className="grid grid-cols-4 gap-3">
-          <Tile
-            label={summary.serving_multiplier !== 1 ? 'Ingredient total (per serving)' : 'Ingredient total'}
-            value={formatCurrency(summary.ingredient_total)}
-            sub={
-              summary.serving_multiplier !== 1
-                ? `pack ${formatCurrency(summary.ingredient_total_per_pack)} × ${summary.serving_multiplier.toFixed(2)}`
-                : product.wastage_pct > 0
-                  ? `+${(product.wastage_pct * 100).toFixed(1)}% wastage`
-                  : 'From BOM lines'
-            }
+        <div className="grid grid-cols-2 gap-3">
+          <MarketCard
+            name="New Zealand" currency="NZD" headerClass="bg-gray-900" sym="$"
+            rrp={product.rrp}
+            gp={summary.gp_nz} gpAmount={summary.gp_nz_amount}
+            cost={summary.nz_grand_total} cos={summary.cos_nz}
           />
-          <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="Ing + pkg + toll + margin + task + NZ freight" />
-          <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub={`incl. NZ freight ${formatCurrency(product.freight_nz ?? product.freight ?? 0)}`} dark />
-          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`incl. AU freight ${formatCurrency(product.freight_au ?? product.freight ?? 0)} · ÷ ${Number(settings.fx_rates.AUD).toFixed(4)} FX`} />
+          <MarketCard
+            name="Australia" currency="AUD" headerClass="bg-[#1e3a5f]" sym="A$"
+            rrp={product.rrp_au ?? product.rrp}
+            gp={summary.gp_au} gpAmount={summary.gp_au_amount}
+            cost={summary.au_grand_total} cos={summary.cos_au}
+          />
         </div>
 
-        {/* Row 2 — COS + GP split across NZ / AU */}
-        <div className="grid grid-cols-4 gap-3 mt-3">
-          <Tile
-            label="COS NZ"
-            value={summary.cos_nz !== null ? `${(summary.cos_nz * 100).toFixed(1)}%` : '—'}
-            sub={`${formatCurrency(summary.nz_grand_total)} of ${formatCurrency(summary.rrp_ex_gst_nz)} ex-GST`}
-            accent
-          />
-          <Tile
-            label="GP NZ"
-            value={summary.gp_nz_amount !== null ? formatCurrency(summary.gp_nz_amount) : '—'}
-            sub={summary.gp_nz !== null ? `${(summary.gp_nz * 100).toFixed(1)}% of ex-GST RRP` : '—'}
-            positive
-          />
-          <Tile
-            label="COS AU"
-            value={summary.cos_au !== null ? `${(summary.cos_au * 100).toFixed(1)}%` : '—'}
-            sub={`${formatCurrency(summary.au_grand_total)} of ${formatCurrency(summary.rrp_ex_gst_au)} ex-GST`}
-            accent
-          />
-          <Tile
-            label="GP AU"
-            value={summary.gp_au_amount !== null ? formatCurrency(summary.gp_au_amount) : '—'}
-            sub={summary.gp_au !== null ? `${(summary.gp_au * 100).toFixed(1)}% of ex-GST RRP` : '—'}
-            positive
-          />
+        <div className="mt-3 pt-2.5 border-t border-gray-100 text-[11px] text-gray-400 flex justify-between gap-4">
+          <span>Cost build-up · Ingredients {formatCurrency(summary.ingredient_total)} → NZ total {formatCurrency(summary.nz_grand_total)}</span>
+          <span>GP % and Cost % are on ex-GST RRP ({formatCurrency(summary.rrp_ex_gst_nz)} NZ / A{formatCurrency(summary.rrp_ex_gst_au)} AU)</span>
         </div>
       </div>
+
+      {/* Whole-BOM cost & margin, toggleable NZD / AUD */}
+      <ProductCostOverview
+        fx={Number(settings.fx_rates.AUD)}
+        ingredientTotal={summary.ingredient_total}
+        packaging={Number(product.packaging) || 0}
+        toll={Number(product.toll) || 0}           tollCurrency={product.toll_currency ?? 'AUD'}
+        margin={Number(product.margin) || 0}       marginCurrency={product.margin_currency ?? 'AUD'}
+        other={Number(product.other) || 0}         otherCurrency={product.other_currency ?? 'AUD'}
+        freightNz={Number(product.freight_nz ?? product.freight) || 0} freightNzCurrency={product.freight_nz_currency ?? 'NZD'}
+        freightAu={Number(product.freight_au ?? product.freight) || 0} freightAuCurrency={product.freight_au_currency ?? 'NZD'}
+        rrpExNz={summary.rrp_ex_gst_nz}
+        rrpExAu={summary.rrp_ex_gst_au}
+      />
 
       {/* BOM table (read-only on detail; edit via Edit page which hosts the editor) */}
       <div className="bg-white rounded-lg border border-gray-200">
@@ -300,45 +279,15 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
               </tfoot>
             </table>
 
-            {(() => {
-              const otherSubtotal =
-                (Number(product.toll)    || 0) +
-                (Number(product.margin)  || 0) +
-                (Number(product.other)   || 0) +
-                (Number(product.freight_nz ?? product.freight) || 0)
-              return (
-                <div className="px-5 py-4 text-sm border-t border-gray-100 bg-gray-50/50 space-y-1">
-                  {/* Packaging block (and its sub-items) */}
-                  <PackagingBreakdown
-                    links={packagingLinks ?? []}
-                    total={Number(product.packaging) || 0}
-                  />
-
-                  {/* Divider between packaging and the "other" items */}
-                  <div className="pt-3 mt-2 border-t border-gray-200">
-                    <div className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5">Other</div>
-                    <LineItem label="Toll"          value={product.toll} />
-                    <LineItem label="Margin"        value={product.margin} />
-                    <LineItem label="Task / other"  value={product.other} />
-                    <LineItem label="Freight (NZ)"  value={product.freight_nz ?? product.freight} />
-                    <div className="flex justify-between pt-1.5 mt-1 border-t border-gray-200">
-                      <span className="text-gray-700 font-medium">Other subtotal</span>
-                      <span className="font-semibold tabular-nums">{formatCurrency(otherSubtotal)}</span>
-                    </div>
-                  </div>
-
-                  {/* Base cost + AU conversion */}
-                  <div className="flex justify-between pt-2 mt-2 border-t border-gray-300 text-base">
-                    <span className="font-semibold">Base cost (NZ total)</span>
-                    <span className="font-semibold tabular-nums">{formatCurrency(summary.nz_grand_total)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>AU freight {formatCurrency(product.freight_au ?? product.freight ?? 0)} · ÷ FX {Number(settings.fx_rates.AUD).toFixed(4)} → AU total</span>
-                    <span className="tabular-nums">{formatCurrency(summary.au_grand_total)}</span>
-                  </div>
-                </div>
-              )
-            })()}
+            {/* Packaging sub-items. Toll / margin / task / freight and the
+                NZ & AU totals (with per-line currency) are in the cost &
+                margin panel above, toggleable by currency. */}
+            <div className="px-5 py-4 text-sm border-t border-gray-100 bg-gray-50/50 space-y-1">
+              <PackagingBreakdown
+                links={packagingLinks ?? []}
+                total={Number(product.packaging) || 0}
+              />
+            </div>
           </>
         )}
       </div>
@@ -397,6 +346,45 @@ function LineItem({ label, value }: { label: string; value: number | null }) {
     <div className="flex justify-between">
       <span className="text-gray-600">{label}</span>
       <span className="font-medium">{value != null ? formatCurrency(value) : '—'}</span>
+    </div>
+  )
+}
+
+// Per-market cost card: RRP (inc GST) → GP (% · $) → Cost ($ · %).
+function MarketCard({
+  name, currency, headerClass, sym, rrp, gp, gpAmount, cost, cos,
+}: {
+  name: string; currency: string; headerClass: string; sym: string
+  rrp: number | null; gp: number | null; gpAmount: number | null
+  cost: number; cos: number | null
+}) {
+  const money = (v: number) => `${sym}${Number(v).toFixed(2)}`
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className={`${headerClass} text-white px-3.5 py-2 text-sm font-semibold`}>
+        {name} <span className="text-xs text-white/50 font-normal">{currency}</span>
+      </div>
+      <div className="p-3.5">
+        <div className="flex justify-between items-baseline pb-2.5 border-b border-gray-100">
+          <span className="text-sm text-gray-500">RRP (inc GST)</span>
+          <span className="text-base font-semibold tabular-nums">{rrp != null && rrp > 0 ? money(rrp) : '—'}</span>
+        </div>
+        <div className="flex justify-between items-baseline py-2.5 border-b border-gray-100">
+          <span className="text-sm text-emerald-700">GP</span>
+          <span className="tabular-nums text-emerald-800">
+            {gp !== null
+              ? <><b className="text-lg">{Math.round(gp * 100)}%</b> <span className="text-sm">· {money(gpAmount ?? 0)}</span></>
+              : '—'}
+          </span>
+        </div>
+        <div className="flex justify-between items-baseline pt-2.5">
+          <span className="text-sm text-gray-500">Cost</span>
+          <span className="tabular-nums">
+            <b className="text-base">{money(cost)}</b>
+            {cos !== null && <span className="text-sm text-gray-500"> · {Math.round(cos * 100)}%</span>}
+          </span>
+        </div>
+      </div>
     </div>
   )
 }

@@ -111,6 +111,7 @@ export type Database = {
           back_of_pack: string | null
           serving_size: number | null
           rrp: number | null
+          rrp_au: number | null
           packaging: number | null
           toll: number | null
           margin: number | null
@@ -119,6 +120,11 @@ export type Database = {
           freight: number | null                   // legacy single value; superseded by freight_nz/au
           freight_nz: number | null
           freight_au: number | null
+          toll_currency: string
+          margin_currency: string
+          other_currency: string
+          freight_nz_currency: string
+          freight_au_currency: string
           apply_fx: boolean
           wastage_pct: number
           manufacturer: string | null
@@ -142,6 +148,7 @@ export type Database = {
           back_of_pack?: string | null
           serving_size?: number | null
           rrp?: number | null
+          rrp_au?: number | null
           packaging?: number | null
           toll?: number | null
           margin?: number | null
@@ -150,6 +157,11 @@ export type Database = {
           freight?: number | null
           freight_nz?: number | null
           freight_au?: number | null
+          toll_currency?: string
+          margin_currency?: string
+          other_currency?: string
+          freight_nz_currency?: string
+          freight_au_currency?: string
           apply_fx?: boolean
           wastage_pct?: number
           manufacturer?: string | null
@@ -173,6 +185,7 @@ export type Database = {
           back_of_pack?: string | null
           serving_size?: number | null
           rrp?: number | null
+          rrp_au?: number | null
           packaging?: number | null
           toll?: number | null
           margin?: number | null
@@ -181,6 +194,11 @@ export type Database = {
           freight?: number | null
           freight_nz?: number | null
           freight_au?: number | null
+          toll_currency?: string
+          margin_currency?: string
+          other_currency?: string
+          freight_nz_currency?: string
+          freight_au_currency?: string
           apply_fx?: boolean
           wastage_pct?: number
           manufacturer?: string | null

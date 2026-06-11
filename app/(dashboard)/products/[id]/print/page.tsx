@@ -179,15 +179,24 @@ export default async function ProductPrintPage({ params }: PageProps) {
               ? `pack ${formatCurrency(summary.ingredient_total_per_pack)} × ${summary.serving_multiplier.toFixed(2)}`
               : product.wastage_pct > 0 ? `+${(product.wastage_pct * 100).toFixed(1)}% wastage` : 'From BOM lines'}
           />
-          <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="Ing + pkg + toll + margin + task + NZ freight" />
-          <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub="Base — always NZD" dark />
-          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`÷ ${Number(settings.fx_rates.AUD).toFixed(4)} FX → AUD`} />
+          <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="NZ total (all lines → NZD)" />
+          <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub="every line converted → NZD" dark />
+          <Tile label="AU grand total" value={`A${formatCurrency(summary.au_grand_total)}`} sub="every line converted → AUD" />
         </div>
-        <div className="grid grid-cols-4 gap-2 mb-5">
-          <Tile label="COS NZ" value={summary.cos_nz !== null ? `${(summary.cos_nz * 100).toFixed(1)}%` : '—'} sub={`${formatCurrency(summary.nz_grand_total)} of ${formatCurrency(summary.rrp_ex_gst_nz)} ex-GST`} accent />
-          <Tile label="GP NZ"  value={summary.gp_nz_amount !== null ? formatCurrency(summary.gp_nz_amount) : '—'} sub={summary.gp_nz !== null ? `${(summary.gp_nz * 100).toFixed(1)}% of ex-GST RRP` : '—'} positive />
-          <Tile label="COS AU" value={summary.cos_au !== null ? `${(summary.cos_au * 100).toFixed(1)}%` : '—'} sub={`${formatCurrency(summary.au_grand_total)} of ${formatCurrency(summary.rrp_ex_gst_au)} ex-GST`} accent />
-          <Tile label="GP AU"  value={summary.gp_au_amount !== null ? formatCurrency(summary.gp_au_amount) : '—'} sub={summary.gp_au !== null ? `${(summary.gp_au * 100).toFixed(1)}% of ex-GST RRP` : '—'} positive />
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          {[
+            { name: 'New Zealand', cur: 'NZD', sym: '$',  rrp: product.rrp,                   gp: summary.gp_nz, gpAmt: summary.gp_nz_amount, cost: summary.nz_grand_total, cos: summary.cos_nz },
+            { name: 'Australia',   cur: 'AUD', sym: 'A$', rrp: product.rrp_au ?? product.rrp, gp: summary.gp_au, gpAmt: summary.gp_au_amount, cost: summary.au_grand_total, cos: summary.cos_au },
+          ].map((m) => (
+            <div key={m.name} className="border border-gray-300 rounded overflow-hidden">
+              <div className="px-2 py-1 text-[10px] font-semibold" style={{ background: ODI_GREEN_DARK, color: '#fff' }}>{m.name} · {m.cur}</div>
+              <div className="px-2 py-1.5 text-[11px] space-y-1">
+                <div className="flex justify-between"><span className="text-gray-500">RRP (inc GST)</span><span className="font-semibold tabular-nums">{m.rrp != null && m.rrp > 0 ? `${m.sym}${Number(m.rrp).toFixed(2)}` : '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">GP</span><span className="tabular-nums font-semibold">{m.gp !== null ? `${Math.round(m.gp * 100)}% · ${m.sym}${Number(m.gpAmt ?? 0).toFixed(2)}` : '—'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Cost</span><span className="tabular-nums">{`${m.sym}${Number(m.cost).toFixed(2)}`}{m.cos !== null ? ` · ${Math.round(m.cos * 100)}%` : ''}</span></div>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* BOM table */}
@@ -288,32 +297,40 @@ export default async function ProductPrintPage({ params }: PageProps) {
             )}
           </div>
 
-          {/* Other costs — own section with its own subtotal */}
-          <div className="mt-3 pt-2 border-t border-gray-200">
-            <div className="text-[9px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Other</div>
-            <LineItem label="Toll"         value={product.toll} />
-            <LineItem label="Margin"       value={product.margin} />
-            <LineItem label="Task / other" value={product.other} />
-            <LineItem label="Freight (NZ)" value={product.freight_nz ?? product.freight} />
-            <div className="flex justify-between pt-1 mt-0.5 border-t border-gray-200">
-              <span className="text-gray-700 font-medium">Other subtotal</span>
-              <span className="tabular-nums font-semibold">{formatCurrency(
-                (Number(product.toll)    || 0) +
-                (Number(product.margin)  || 0) +
-                (Number(product.other)   || 0) +
-                (Number(product.freight_nz ?? product.freight) || 0)
-              )}</span>
-            </div>
-          </div>
+          {/* Other costs — each input converted to NZD for the NZ subtotal. */}
+          {(() => {
+            const fx = Number(settings.fx_rates.AUD) || 1
+            const toNzd = (v: number, cur?: string | null) => (cur === 'AUD' ? v * fx : v)
+            const cur   = (c?: string | null) => (c === 'AUD' ? 'AUD' : 'NZD')
+            const tollNzd      = toNzd(Number(product.toll)   || 0, product.toll_currency)
+            const marginNzd    = toNzd(Number(product.margin) || 0, product.margin_currency)
+            const otherNzd     = toNzd(Number(product.other)  || 0, product.other_currency)
+            const freightNzNzd = toNzd(Number(product.freight_nz ?? product.freight) || 0, product.freight_nz_currency)
+            return (
+              <>
+                <div className="mt-3 pt-2 border-t border-gray-200">
+                  <div className="text-[9px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Other · converted to NZD</div>
+                  <LineItem label={`Toll (${cur(product.toll_currency)})`}             value={tollNzd} />
+                  <LineItem label={`Margin (${cur(product.margin_currency)})`}          value={marginNzd} />
+                  <LineItem label={`Task / other (${cur(product.other_currency)})`}     value={otherNzd} />
+                  <LineItem label={`Freight — NZ (${cur(product.freight_nz_currency)})`} value={freightNzNzd} />
+                  <div className="flex justify-between pt-1 mt-0.5 border-t border-gray-200">
+                    <span className="text-gray-700 font-medium">Other subtotal</span>
+                    <span className="tabular-nums font-semibold">{formatCurrency(tollNzd + marginNzd + otherNzd + freightNzNzd)}</span>
+                  </div>
+                </div>
 
-          <div className="flex justify-between pt-2 mt-2 border-t border-gray-300 text-[15px] font-bold">
-            <span>Base cost (NZ total)</span>
-            <span className="tabular-nums">{formatCurrency(summary.nz_grand_total)}</span>
-          </div>
-          <div className="flex justify-between pt-1 text-[12px]" style={{ color: '#6b7280' }}>
-            <span>AU freight {formatCurrency(product.freight_au ?? product.freight ?? 0)} · ÷ FX {Number(settings.fx_rates.AUD).toFixed(4)} → AU total</span>
-            <span className="tabular-nums">{formatCurrency(summary.au_grand_total)}</span>
-          </div>
+                <div className="flex justify-between pt-2 mt-2 border-t border-gray-300 text-[15px] font-bold">
+                  <span>Base cost (NZ total)</span>
+                  <span className="tabular-nums">{formatCurrency(summary.nz_grand_total)}</span>
+                </div>
+                <div className="flex justify-between pt-1 text-[12px]" style={{ color: '#6b7280' }}>
+                  <span>AU total · each line → AUD, AU freight (FX {fx.toFixed(4)})</span>
+                  <span className="tabular-nums">A{formatCurrency(summary.au_grand_total)}</span>
+                </div>
+              </>
+            )
+          })()}
         </div>
 
         <div className="mt-10 pt-3 border-t border-gray-200 text-[9px] text-gray-500 leading-snug">

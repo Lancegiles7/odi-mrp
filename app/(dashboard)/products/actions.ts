@@ -33,6 +33,7 @@ export interface ProductFormData {
   back_of_pack?: string
   serving_size?: string
   rrp?: string
+  rrp_au?: string
   unit_of_measure?: string
   description?: string
   packaging?: string
@@ -41,6 +42,11 @@ export interface ProductFormData {
   other?: string
   freight_nz?: string
   freight_au?: string
+  toll_currency?: string
+  margin_currency?: string
+  other_currency?: string
+  freight_nz_currency?: string
+  freight_au_currency?: string
   apply_fx?: string
   wastage_pct_input?: string
   manufacturer?: string
@@ -110,6 +116,11 @@ function parseNum(val: string | undefined | null): number | null {
   return isNaN(n) ? null : n
 }
 
+// Normalise a currency form value to 'AUD' | 'NZD', falling back to `def`.
+function parseCurrency(val: string | undefined | null, def: 'AUD' | 'NZD'): 'AUD' | 'NZD' {
+  return val === 'AUD' || val === 'NZD' ? val : def
+}
+
 function buildProductPayload(data: ProductFormData) {
   const rawType = data.product_type?.trim() || null
   const productType = rawType && VALID_GROUPS.has(rawType) ? rawType : null
@@ -129,6 +140,7 @@ function buildProductPayload(data: ProductFormData) {
     back_of_pack:    data.back_of_pack?.trim() || null,
     serving_size:    parseNum(data.serving_size),
     rrp:             parseNum(data.rrp),
+    rrp_au:          parseNum(data.rrp_au),
     unit_of_measure: data.unit_of_measure?.trim() || 'each',
     description:     data.description?.trim() || null,
     packaging:       parseNum(data.packaging),
@@ -137,6 +149,11 @@ function buildProductPayload(data: ProductFormData) {
     other:           parseNum(data.other),
     freight_nz:      parseNum(data.freight_nz),
     freight_au:      parseNum(data.freight_au),
+    toll_currency:       parseCurrency(data.toll_currency,       'AUD'),
+    margin_currency:     parseCurrency(data.margin_currency,     'AUD'),
+    other_currency:      parseCurrency(data.other_currency,      'AUD'),
+    freight_nz_currency: parseCurrency(data.freight_nz_currency, 'NZD'),
+    freight_au_currency: parseCurrency(data.freight_au_currency, 'NZD'),
     apply_fx:        data.apply_fx === 'true',
     wastage_pct:     wastagePct,
     manufacturer:    data.manufacturer?.trim() || null,
@@ -160,6 +177,7 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     back_of_pack:      formData.get('back_of_pack') as string,
     serving_size:      formData.get('serving_size') as string,
     rrp:               formData.get('rrp') as string,
+    rrp_au:            formData.get('rrp_au') as string,
     unit_of_measure:   formData.get('unit_of_measure') as string,
     description:       formData.get('description') as string,
     packaging:         formData.get('packaging') as string,
@@ -168,6 +186,11 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     other:             formData.get('other') as string,
     freight_nz:        formData.get('freight_nz') as string,
     freight_au:        formData.get('freight_au') as string,
+    toll_currency:       formData.get('toll_currency') as string,
+    margin_currency:     formData.get('margin_currency') as string,
+    other_currency:      formData.get('other_currency') as string,
+    freight_nz_currency: formData.get('freight_nz_currency') as string,
+    freight_au_currency: formData.get('freight_au_currency') as string,
     apply_fx:          formData.get('apply_fx') as string,
     wastage_pct_input: formData.get('wastage_pct_input') as string,
     manufacturer:      formData.get('manufacturer') as string,
@@ -407,6 +430,7 @@ export async function importProductsAndBoms(
             back_of_pack:      prod.back_of_pack ?? null,
             serving_size:      prod.serving_size ?? null,
             rrp:               prod.rrp ?? null,
+            rrp_au:            prod.rrp ?? null,
             packaging:         prod.packaging ?? null,
             toll:              prod.toll ?? null,
             margin:            prod.margin ?? null,
@@ -415,6 +439,11 @@ export async function importProductsAndBoms(
             freight:           prod.freight ?? null,
             freight_nz:        prod.freight ?? null,
             freight_au:        prod.freight ?? null,
+            toll_currency:       'AUD',
+            margin_currency:     'AUD',
+            other_currency:      'AUD',
+            freight_nz_currency: 'NZD',
+            freight_au_currency: 'NZD',
             unit_of_measure:   'each',
             is_active:         true,
           })
@@ -434,6 +463,7 @@ export async function importProductsAndBoms(
             back_of_pack:      prod.back_of_pack ?? null,
             serving_size:      prod.serving_size ?? null,
             rrp:               prod.rrp ?? null,
+            rrp_au:            prod.rrp ?? null,
             packaging:         prod.packaging ?? null,
             toll:              prod.toll ?? null,
             margin:            prod.margin ?? null,
@@ -442,6 +472,11 @@ export async function importProductsAndBoms(
             freight:           prod.freight ?? null,
             freight_nz:        prod.freight ?? null,
             freight_au:        prod.freight ?? null,
+            toll_currency:       'AUD',
+            margin_currency:     'AUD',
+            other_currency:      'AUD',
+            freight_nz_currency: 'NZD',
+            freight_au_currency: 'NZD',
             unit_of_measure:   'each',
             is_active:         true,
             created_by:        createdBy,

@@ -2,18 +2,23 @@
  * Cost calculation utilities for the Product + BOM module.
  * All calculations happen here in TypeScript — nothing is stored.
  *
- * Costing model (per spec, 2026-05 — NZD-base):
+ * Costing model (per spec, 2026-06 — per-line currency):
  *   ingredient_subtotal = Σ (quantity_g / 1000) × price_per_kg     (NZD; ingredients are loaded to NZD via FX)
- *   ingredient_total    = ingredient_subtotal × (1 + wastage_pct)
- *   base_cost           = ingredient_total + packaging + toll + margin + other + freight   (NZD)
- *   nz_grand_total      = base_cost                                                        (base IS NZD)
- *   au_grand_total      = base_cost ÷ fx_rate                                              (NZD → AUD)
- *   cos_nz              = nz_grand_total / (rrp / (1 + gst_nz_pct))
- *   cos_au              = au_grand_total / (rrp / (1 + gst_au_pct))
+ *   ingredient_total    = ingredient_subtotal × (1 + wastage_pct) × serving_multiplier
  *
- *  fx_rate is "AUD → NZD" (i.e. NZD per 1 AUD, e.g. 1.20). Dividing
- *  NZD by it gives AUD. The per-product `apply_fx` flag is no longer
- *  read by costing — AU is now always derived alongside NZ.
+ *   Each cost input carries its own currency. Ingredients & packaging are
+ *   already loaded to NZD on their own records; toll / margin / task / freight
+ *   carry an explicit AUD|NZD flag on the product. Totals are built per market:
+ *     nz_grand_total = Σ each line converted → NZD   (uses freight_nz)
+ *     au_grand_total = Σ each line converted → AUD   (uses freight_au)
+ *   computed independently — au is NOT nz ÷ fx, because each line's native
+ *   currency differs. base_cost mirrors nz_grand_total (NZD).
+ *
+ *   cos_nz = nz_grand_total / (rrp / (1 + gst_nz_pct))
+ *   cos_au = au_grand_total / (rrp / (1 + gst_au_pct))
+ *
+ *  fx_rate is "AUD → NZD" (i.e. NZD per 1 AUD, e.g. 1.20): AUD×fx → NZD,
+ *  NZD÷fx → AUD. The per-product `apply_fx` flag is no longer read.
  */
 
 import type {
@@ -68,6 +73,7 @@ export function calcProductCostSummary(
   product: Pick<
     Product,
     | 'rrp'
+    | 'rrp_au'
     | 'size_g'
     | 'serving_size'
     | 'packaging'
@@ -77,6 +83,11 @@ export function calcProductCostSummary(
     | 'freight'
     | 'freight_nz'
     | 'freight_au'
+    | 'toll_currency'
+    | 'margin_currency'
+    | 'other_currency'
+    | 'freight_nz_currency'
+    | 'freight_au_currency'
     | 'apply_fx'
     | 'wastage_pct'
   >,
@@ -101,41 +112,64 @@ export function calcProductCostSummary(
     sizeG > 0 && servingSize > sizeG ? servingSize / sizeG : 1
   const ingredientTotal   = round2(ingredientTotalPerPack * servingMultiplier)
 
-  // Costs shared by both markets (everything except freight).
-  const sharedCost = round2(
+  // FX: NZD per 1 AUD (e.g. 1.20). Used to convert each cost input between
+  // markets. Single source of truth: settings.fx_rates.AUD. apply_fx is kept
+  // on the row for back-compat but no longer read.
+  const fxRate = Number(settings.fx_rates?.AUD) || 1
+  const toNzd = (v: number, cur?: string | null) => (cur === 'AUD' ? v * fxRate : v)
+  const toAud = (v: number, cur?: string | null) => (cur === 'AUD' ? v : (fxRate > 0 ? v / fxRate : v))
+
+  // Each product-level input carries its own currency (toll/margin/task are
+  // typically AUD; freight typically NZD). Ingredients and packaging are
+  // already loaded to NZD on their own records, so they're NZD here.
+  const packaging = Number(product.packaging ?? 0)
+  const toll      = Number(product.toll   ?? 0)
+  const margin    = Number(product.margin ?? 0)
+  const other     = Number(product.other  ?? 0)
+  const tollCur   = product.toll_currency   ?? 'AUD'
+  const marginCur = product.margin_currency ?? 'AUD'
+  const otherCur  = product.other_currency  ?? 'AUD'
+
+  // Freight is country-specific. Fall back to the legacy single `freight`
+  // value on rows not yet migrated to freight_nz / freight_au.
+  const freightNz    = Number(product.freight_nz ?? product.freight ?? 0)
+  const freightAu    = Number(product.freight_au ?? product.freight ?? 0)
+  const freightNzCur = product.freight_nz_currency ?? 'NZD'
+  const freightAuCur = product.freight_au_currency ?? 'NZD'
+
+  // NZ total — every line expressed in NZD (uses NZ freight).
+  const nzGrandTotal = round2(
     ingredientTotal +
-    (product.packaging ?? 0) +
-    (product.toll      ?? 0) +
-    (product.margin    ?? 0) +
-    (product.other     ?? 0),
+    packaging +
+    toNzd(toll,      tollCur) +
+    toNzd(margin,    marginCur) +
+    toNzd(other,     otherCur) +
+    toNzd(freightNz, freightNzCur),
   )
 
-  // Freight is country-specific: a product made in one country and shipped to
-  // the other carries real freight to the destination market and almost none
-  // domestically. Fall back to the legacy single `freight` value so costs stay
-  // correct on rows not yet migrated to freight_nz / freight_au.
-  const freightNz = Number(product.freight_nz ?? product.freight ?? 0)
-  const freightAu = Number(product.freight_au ?? product.freight ?? 0)
+  // AU total — every line expressed in AUD (uses AU freight). Computed
+  // independently (not nz ÷ fx) because each line has its own native currency.
+  const auGrandTotal = round2(
+    toAud(ingredientTotal, 'NZD') +
+    toAud(packaging,       'NZD') +
+    toAud(toll,      tollCur) +
+    toAud(margin,    marginCur) +
+    toAud(other,     otherCur) +
+    toAud(freightAu, freightAuCur),
+  )
 
-  // NZ base uses NZ freight; AU base uses AU freight. Both are NZD; the AU
-  // total is then converted to AUD via the AUD→NZD rate. base_cost mirrors the
-  // NZ base (it has always been the NZD figure, same as nz_grand_total).
-  // apply_fx is kept on the row for back-compat but no longer read.
-  //
-  // Single source of truth: settings.fx_rates.AUD (same rate the loaded-cost
-  // converters use). The legacy settings.fx_rate column is no longer read.
-  const baseCost     = round2(sharedCost + freightNz)
-  const auBaseCost   = round2(sharedCost + freightAu)
-  const fxRate       = Number(settings.fx_rates?.AUD) || 1
-  const nzGrandTotal = baseCost
-  const auGrandTotal = fxRate > 0 ? round2(auBaseCost / fxRate) : auBaseCost
+  // base_cost mirrors the NZ figure (NZD), as it always has.
+  const baseCost = nzGrandTotal
 
-  const rrp     = product.rrp ?? 0
+  // NZ retail price (NZD) and AU retail price (AUD). rrp_au falls back to the
+  // NZ rrp on rows not yet given a separate AU price.
+  const rrpNz   = product.rrp ?? 0
+  const rrpAu   = product.rrp_au ?? product.rrp ?? 0
   const gstNz   = Number(settings.gst_nz_pct) || 0
   const gstAu   = Number(settings.gst_au_pct) || 0
 
-  const rrpExNz = rrp > 0 ? round2(rrp / (1 + gstNz)) : 0
-  const rrpExAu = rrp > 0 ? round2(rrp / (1 + gstAu)) : 0
+  const rrpExNz = rrpNz > 0 ? round2(rrpNz / (1 + gstNz)) : 0
+  const rrpExAu = rrpAu > 0 ? round2(rrpAu / (1 + gstAu)) : 0
 
   const cosNz       = rrpExNz > 0 ? round4(nzGrandTotal / rrpExNz) : null
   const cosAu       = rrpExAu > 0 ? round4(auGrandTotal / rrpExAu) : null

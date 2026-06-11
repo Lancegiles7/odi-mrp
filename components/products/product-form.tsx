@@ -56,6 +56,42 @@ function NumberInput({
   )
 }
 
+// Money input paired with an AUD/NZD currency selector. Submits two fields:
+// `name` (the amount) and `currencyName` (AUD|NZD).
+function MoneyInput({
+  id, name, currencyName, defaultValue, defaultCurrency = 'AUD', allowNegative = false,
+}: {
+  id?: string; name: string; currencyName: string
+  defaultValue?: number | null; defaultCurrency?: string | null; allowNegative?: boolean
+}) {
+  return (
+    <div className="flex gap-2">
+      <div className="relative flex-1">
+        <span className="absolute left-3 top-2 text-sm text-gray-400 pointer-events-none">$</span>
+        <input
+          id={id}
+          name={name}
+          type="number"
+          step="any"
+          {...(allowNegative ? {} : { min: '0' })}
+          defaultValue={defaultValue ?? ''}
+          placeholder="0.00"
+          className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+        />
+      </div>
+      <select
+        name={currencyName}
+        defaultValue={defaultCurrency ?? 'AUD'}
+        aria-label={`${name} currency`}
+        className="w-[4.5rem] px-2 py-2 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
+      >
+        <option value="AUD">AUD</option>
+        <option value="NZD">NZD</option>
+      </select>
+    </div>
+  )
+}
+
 export function ProductForm({ product, action, errorMessage, fxRate }: ProductFormProps) {
   const isEdit = !!product
   // apply_fx is retained on the row but no longer affects costing — the
@@ -125,8 +161,11 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
             <Field id="serving_size" label="Serving size (g)">
               <NumberInput id="serving_size" name="serving_size" defaultValue={product?.serving_size} placeholder="30" />
             </Field>
-            <Field id="rrp" label="RRP (inc GST)">
+            <Field id="rrp" label="RRP — NZ (inc GST)">
               <NumberInput id="rrp" name="rrp" defaultValue={product?.rrp} prefix="$" placeholder="14.99" />
+            </Field>
+            <Field id="rrp_au" label="RRP — AU (inc GST)">
+              <NumberInput id="rrp_au" name="rrp_au" defaultValue={product?.rrp_au ?? product?.rrp} prefix="A$" placeholder="14.99" />
             </Field>
 
             <Field id="hero_call_out" label="Hero callout" className="col-span-2">
@@ -197,20 +236,20 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
             <Field id="packaging" label="Packaging ($)">
               <NumberInput id="packaging" name="packaging" defaultValue={product?.packaging} prefix="$" />
             </Field>
-            <Field id="toll" label="Toll ($)">
-              <NumberInput id="toll" name="toll" defaultValue={product?.toll} prefix="$" />
+            <Field id="toll" label="Toll">
+              <MoneyInput id="toll" name="toll" currencyName="toll_currency" defaultValue={product?.toll} defaultCurrency={product?.toll_currency ?? 'AUD'} />
             </Field>
-            <Field id="margin" label="Margin ($)">
-              <NumberInput id="margin" name="margin" defaultValue={product?.margin} prefix="$" />
+            <Field id="margin" label="Margin">
+              <MoneyInput id="margin" name="margin" currencyName="margin_currency" defaultValue={product?.margin} defaultCurrency={product?.margin_currency ?? 'AUD'} />
             </Field>
-            <Field id="other" label="Task / other ($)">
-              <NumberInput id="other" name="other" defaultValue={product?.other} prefix="$" allowNegative />
+            <Field id="other" label="Task / other">
+              <MoneyInput id="other" name="other" currencyName="other_currency" defaultValue={product?.other} defaultCurrency={product?.other_currency ?? 'AUD'} allowNegative />
             </Field>
-            <Field id="freight_nz" label="Freight — NZ ($)">
-              <NumberInput id="freight_nz" name="freight_nz" defaultValue={product?.freight_nz ?? product?.freight} prefix="$" />
+            <Field id="freight_nz" label="Freight — NZ">
+              <MoneyInput id="freight_nz" name="freight_nz" currencyName="freight_nz_currency" defaultValue={product?.freight_nz ?? product?.freight} defaultCurrency={product?.freight_nz_currency ?? 'NZD'} />
             </Field>
-            <Field id="freight_au" label="Freight — AU ($)">
-              <NumberInput id="freight_au" name="freight_au" defaultValue={product?.freight_au ?? product?.freight} prefix="$" />
+            <Field id="freight_au" label="Freight — AU">
+              <MoneyInput id="freight_au" name="freight_au" currencyName="freight_au_currency" defaultValue={product?.freight_au ?? product?.freight} defaultCurrency={product?.freight_au_currency ?? 'NZD'} />
             </Field>
             <Field id="wastage_pct_input" label="Contingency / wastage (%)">
               <NumberInput
