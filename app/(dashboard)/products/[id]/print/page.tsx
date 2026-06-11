@@ -179,7 +179,7 @@ export default async function ProductPrintPage({ params }: PageProps) {
               ? `pack ${formatCurrency(summary.ingredient_total_per_pack)} × ${summary.serving_multiplier.toFixed(2)}`
               : product.wastage_pct > 0 ? `+${(product.wastage_pct * 100).toFixed(1)}% wastage` : 'From BOM lines'}
           />
-          <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="Ing + pkg + toll + margin + task + freight" />
+          <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="Ing + pkg + toll + margin + task + NZ freight" />
           <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub="Base — always NZD" dark />
           <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`÷ ${Number(settings.fx_rates.AUD).toFixed(4)} FX → AUD`} />
         </div>
@@ -294,14 +294,14 @@ export default async function ProductPrintPage({ params }: PageProps) {
             <LineItem label="Toll"         value={product.toll} />
             <LineItem label="Margin"       value={product.margin} />
             <LineItem label="Task / other" value={product.other} />
-            <LineItem label="Freight"      value={product.freight} />
+            <LineItem label="Freight (NZ)" value={product.freight_nz ?? product.freight} />
             <div className="flex justify-between pt-1 mt-0.5 border-t border-gray-200">
               <span className="text-gray-700 font-medium">Other subtotal</span>
               <span className="tabular-nums font-semibold">{formatCurrency(
                 (Number(product.toll)    || 0) +
                 (Number(product.margin)  || 0) +
                 (Number(product.other)   || 0) +
-                (Number(product.freight) || 0)
+                (Number(product.freight_nz ?? product.freight) || 0)
               )}</span>
             </div>
           </div>
@@ -311,7 +311,7 @@ export default async function ProductPrintPage({ params }: PageProps) {
             <span className="tabular-nums">{formatCurrency(summary.nz_grand_total)}</span>
           </div>
           <div className="flex justify-between pt-1 text-[12px]" style={{ color: '#6b7280' }}>
-            <span>÷ FX {Number(settings.fx_rates.AUD).toFixed(4)} → AU total</span>
+            <span>AU freight {formatCurrency(product.freight_au ?? product.freight ?? 0)} · ÷ FX {Number(settings.fx_rates.AUD).toFixed(4)} → AU total</span>
             <span className="tabular-nums">{formatCurrency(summary.au_grand_total)}</span>
           </div>
         </div>

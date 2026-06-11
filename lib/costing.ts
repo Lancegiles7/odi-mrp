@@ -75,6 +75,8 @@ export function calcProductCostSummary(
     | 'margin'
     | 'other'
     | 'freight'
+    | 'freight_nz'
+    | 'freight_au'
     | 'apply_fx'
     | 'wastage_pct'
   >,
@@ -99,27 +101,34 @@ export function calcProductCostSummary(
     sizeG > 0 && servingSize > sizeG ? servingSize / sizeG : 1
   const ingredientTotal   = round2(ingredientTotalPerPack * servingMultiplier)
 
-  const baseCost = round2(
+  // Costs shared by both markets (everything except freight).
+  const sharedCost = round2(
     ingredientTotal +
     (product.packaging ?? 0) +
     (product.toll      ?? 0) +
     (product.margin    ?? 0) +
-    (product.other     ?? 0) +
-    (product.freight   ?? 0),
+    (product.other     ?? 0),
   )
 
-  // NZD-base: base_cost is already in NZD (ingredients & packaging are
-  // loaded to NZD via FX in lib/packaging-cost.ts and the ingredient
-  // form). NZ grand total == base. AU is derived by dividing by the
-  // AUD→NZD rate. apply_fx is kept on the row for back-compat but no
-  // longer affects the calculation — AU is always shown.
+  // Freight is country-specific: a product made in one country and shipped to
+  // the other carries real freight to the destination market and almost none
+  // domestically. Fall back to the legacy single `freight` value so costs stay
+  // correct on rows not yet migrated to freight_nz / freight_au.
+  const freightNz = Number(product.freight_nz ?? product.freight ?? 0)
+  const freightAu = Number(product.freight_au ?? product.freight ?? 0)
+
+  // NZ base uses NZ freight; AU base uses AU freight. Both are NZD; the AU
+  // total is then converted to AUD via the AUD→NZD rate. base_cost mirrors the
+  // NZ base (it has always been the NZD figure, same as nz_grand_total).
+  // apply_fx is kept on the row for back-compat but no longer read.
   //
-  // Single source of truth: settings.fx_rates.AUD (same rate the
-  // loaded-cost converters use, so a round-trip on an AUD input is
-  // exact). The legacy settings.fx_rate column is no longer read.
+  // Single source of truth: settings.fx_rates.AUD (same rate the loaded-cost
+  // converters use). The legacy settings.fx_rate column is no longer read.
+  const baseCost     = round2(sharedCost + freightNz)
+  const auBaseCost   = round2(sharedCost + freightAu)
   const fxRate       = Number(settings.fx_rates?.AUD) || 1
   const nzGrandTotal = baseCost
-  const auGrandTotal = fxRate > 0 ? round2(baseCost / fxRate) : baseCost
+  const auGrandTotal = fxRate > 0 ? round2(auBaseCost / fxRate) : auBaseCost
 
   const rrp     = product.rrp ?? 0
   const gstNz   = Number(settings.gst_nz_pct) || 0

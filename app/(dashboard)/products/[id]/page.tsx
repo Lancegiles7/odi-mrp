@@ -145,7 +145,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
           <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Cost summary</h3>
           <div className="text-xs text-gray-500">
             FX rate (AUD → NZD) <span className="font-mono font-semibold">{Number(settings.fx_rates.AUD).toFixed(4)}</span>
-            <span className="ml-1 text-gray-400">· base is NZD; AU = base ÷ FX</span>
+            <span className="ml-1 text-gray-400">· NZ &amp; AU each use their own freight; AU = AU base ÷ FX</span>
             {product.rrp != null && product.rrp > 0 && (
               <>
                 <span className="mx-2 text-gray-300">·</span>
@@ -170,9 +170,9 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                   : 'From BOM lines'
             }
           />
-          <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="Ing + pkg + toll + margin + task + freight" />
-          <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub="Base — always NZD" dark />
-          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`÷ ${Number(settings.fx_rates.AUD).toFixed(4)} FX → AUD`} />
+          <Tile label="Base cost"      value={formatCurrency(summary.base_cost)}      sub="Ing + pkg + toll + margin + task + NZ freight" />
+          <Tile label="NZ grand total" value={formatCurrency(summary.nz_grand_total)} sub={`incl. NZ freight ${formatCurrency(product.freight_nz ?? product.freight ?? 0)}`} dark />
+          <Tile label="AU grand total" value={formatCurrency(summary.au_grand_total)} sub={`incl. AU freight ${formatCurrency(product.freight_au ?? product.freight ?? 0)} · ÷ ${Number(settings.fx_rates.AUD).toFixed(4)} FX`} />
         </div>
 
         {/* Row 2 — COS + GP split across NZ / AU */}

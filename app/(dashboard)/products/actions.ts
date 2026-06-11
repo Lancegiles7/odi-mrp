@@ -39,7 +39,8 @@ export interface ProductFormData {
   toll?: string
   margin?: string
   other?: string
-  freight?: string
+  freight_nz?: string
+  freight_au?: string
   apply_fx?: string
   wastage_pct_input?: string
   manufacturer?: string
@@ -134,7 +135,8 @@ function buildProductPayload(data: ProductFormData) {
     toll:            parseNum(data.toll),
     margin:          parseNum(data.margin),
     other:           parseNum(data.other),
-    freight:         parseNum(data.freight),
+    freight_nz:      parseNum(data.freight_nz),
+    freight_au:      parseNum(data.freight_au),
     apply_fx:        data.apply_fx === 'true',
     wastage_pct:     wastagePct,
     manufacturer:    data.manufacturer?.trim() || null,
@@ -164,7 +166,8 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     toll:              formData.get('toll') as string,
     margin:            formData.get('margin') as string,
     other:             formData.get('other') as string,
-    freight:           formData.get('freight') as string,
+    freight_nz:        formData.get('freight_nz') as string,
+    freight_au:        formData.get('freight_au') as string,
     apply_fx:          formData.get('apply_fx') as string,
     wastage_pct_input: formData.get('wastage_pct_input') as string,
     manufacturer:      formData.get('manufacturer') as string,
@@ -409,6 +412,8 @@ export async function importProductsAndBoms(
             other:             prod.other ?? null,
             currency_exchange: prod.currency_exchange ?? null,
             freight:           prod.freight ?? null,
+            freight_nz:        prod.freight ?? null,
+            freight_au:        prod.freight ?? null,
             unit_of_measure:   'each',
             is_active:         true,
           })
@@ -434,6 +439,8 @@ export async function importProductsAndBoms(
             other:             prod.other ?? null,
             currency_exchange: prod.currency_exchange ?? null,
             freight:           prod.freight ?? null,
+            freight_nz:        prod.freight ?? null,
+            freight_au:        prod.freight ?? null,
             unit_of_measure:   'each',
             is_active:         true,
             created_by:        createdBy,

@@ -116,7 +116,9 @@ export type Database = {
           margin: number | null
           other: number | null
           currency_exchange: number | null        // legacy; kept for one release
-          freight: number | null
+          freight: number | null                   // legacy single value; superseded by freight_nz/au
+          freight_nz: number | null
+          freight_au: number | null
           apply_fx: boolean
           wastage_pct: number
           manufacturer: string | null
@@ -146,6 +148,8 @@ export type Database = {
           other?: number | null
           currency_exchange?: number | null
           freight?: number | null
+          freight_nz?: number | null
+          freight_au?: number | null
           apply_fx?: boolean
           wastage_pct?: number
           manufacturer?: string | null
@@ -175,6 +179,8 @@ export type Database = {
           other?: number | null
           currency_exchange?: number | null
           freight?: number | null
+          freight_nz?: number | null
+          freight_au?: number | null
           apply_fx?: boolean
           wastage_pct?: number
           manufacturer?: string | null
@@ -896,7 +902,7 @@ export interface ProductCostSummary {
   ingredient_total_per_pack: number   // per-pack, after wastage
   serving_multiplier: number          // serving_size / size_g (1 if unset)
   ingredient_total: number            // per-serving, after wastage × serving multiplier
-  base_cost: number                   // ingredient_total + packaging + toll + margin + other + freight
+  base_cost: number                   // ingredient_total + packaging + toll + margin + other + NZ freight
   nz_grand_total: number              // base_cost × fx_rate when apply_fx, else base_cost
   au_grand_total: number              // base_cost always
   rrp_ex_gst_nz: number               // rrp / (1 + gst_nz_pct)   — 0 when rrp not set

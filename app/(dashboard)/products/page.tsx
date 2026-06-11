@@ -25,6 +25,8 @@ type ProductRow = {
   margin: number | null
   other: number | null
   freight: number | null
+  freight_nz: number | null
+  freight_au: number | null
   apply_fx: boolean
   wastage_pct: number
   is_active: boolean
@@ -58,7 +60,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
       .from('products')
       .select(`
         id, sku_code, name, product_type, size_g, rrp,
-        packaging, toll, margin, other, freight, apply_fx, wastage_pct, is_active,
+        packaging, toll, margin, other, freight, freight_nz, freight_au, apply_fx, wastage_pct, is_active,
         boms (
           id, is_active,
           bom_items (

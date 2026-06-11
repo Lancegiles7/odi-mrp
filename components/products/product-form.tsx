@@ -206,8 +206,11 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
             <Field id="other" label="Task / other ($)">
               <NumberInput id="other" name="other" defaultValue={product?.other} prefix="$" allowNegative />
             </Field>
-            <Field id="freight" label="Freight ($)">
-              <NumberInput id="freight" name="freight" defaultValue={product?.freight} prefix="$" />
+            <Field id="freight_nz" label="Freight — NZ ($)">
+              <NumberInput id="freight_nz" name="freight_nz" defaultValue={product?.freight_nz ?? product?.freight} prefix="$" />
+            </Field>
+            <Field id="freight_au" label="Freight — AU ($)">
+              <NumberInput id="freight_au" name="freight_au" defaultValue={product?.freight_au ?? product?.freight} prefix="$" />
             </Field>
             <Field id="wastage_pct_input" label="Contingency / wastage (%)">
               <NumberInput
