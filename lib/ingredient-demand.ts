@@ -270,11 +270,26 @@ export function monthShortfalls(
 
 /**
  * Three-state shortfall classification per month.
- *   - 'red'   = demand > opening-carried balance + this month's arrival (still short).
- *   - 'amber' = demand fits with this month's arrival, but WOULD have been short
- *               without it (the PO landing this month is what saved it).
- *   - 'ok'    = demand fits within the opening-carried balance alone.
- *               No demand → also 'ok'.
+ *
+ * The distinction that matters to the business: is a month covered by stock
+ * we ACTUALLY HAVE, or only by a Purchase Order we've placed but not yet
+ * received?
+ *
+ *   - 'red'   = short even after counting placed POs (demand can't be met).
+ *   - 'amber' = demand is covered, but only because a placed (not-yet-received)
+ *               PO makes up the difference — real on-hand stock alone wouldn't
+ *               cover it. This is the "covered by a PO" state.
+ *   - 'ok'    = demand is covered by real on-hand stock alone (carried opening
+ *               balance), no PO needed. No demand → also 'ok'.
+ *
+ * Two balances are tracked independently:
+ *   • realBalance — opening stock drawn down by demand only. POs never top this
+ *     up, because an unreceived PO isn't stock we actually hold yet.
+ *   • fullBalance — opening stock PLUS placed-PO arrivals, drawn down by demand.
+ *
+ * A month is green only while realBalance covers it; once we lean on a PO to
+ * stay out of shortfall it goes amber, until a PO that's actually been received
+ * lifts the opening balance.
  */
 export type ShortfallState = 'ok' | 'amber' | 'red'
 
@@ -284,23 +299,21 @@ export function monthShortfallStates(
   months: string[],
 ): Map<string, ShortfallState> {
   const out = new Map<string, ShortfallState>()
-  let balance = opening
+  let realBalance = opening   // actual on-hand stock, never replenished by POs
+  let fullBalance = opening   // on-hand stock + placed POs
   for (const m of months) {
     const demand   = row.demandByMonth.get(m)   ?? 0
     const arriving = row.arrivingByMonth.get(m) ?? 0
-    const carriedAvailable = Math.max(0, balance)
-    const fullAvailable    = carriedAvailable + arriving
-    const balanceAfter     = balance + arriving - demand
-    // 'amber' = the PO arriving this month is what avoided a shortfall
-    // AND the resulting buffer is thin (less than one month's demand).
-    // A huge PO that lands with comfortable surplus stays neutral.
+    const realAvailable = Math.max(0, realBalance)
+    const fullAvailable = Math.max(0, fullBalance) + arriving
     let state: ShortfallState = 'ok'
     if (demand > 0) {
-      if (demand > fullAvailable) state = 'red'
-      else if (demand > carriedAvailable && balanceAfter < demand) state = 'amber'
+      if (demand > fullAvailable)      state = 'red'    // short even with POs
+      else if (demand > realAvailable) state = 'amber'  // only covered by a PO
     }
     out.set(m, state)
-    balance = balanceAfter
+    realBalance = realBalance - demand
+    fullBalance = fullBalance + arriving - demand
   }
   return out
 }

@@ -102,10 +102,11 @@ export function IngredientDemandRow({ row, months, commentedCells, openingHistor
           const cellHasComment = commentedCells.has(`${ingredientId}|${m.slice(0, 10)}`)
 
           // Cell background:
-          //  red    = shortfall (today)
-          //  amber  = would be short but an open PO covers it (today)
-          //  green  = NEW — demand fully covered by opening stock alone, no
-          //           PO needed. Flips from amber → green on receipt.
+          //  red    = shortfall — short even after counting placed POs
+          //  amber  = covered, but only because a placed (not-yet-received) PO
+          //           makes up the difference — real on-hand stock alone wouldn't.
+          //           Flips amber → green once the PO is received (lifts opening).
+          //  green  = demand fully covered by real on-hand stock alone, no PO.
           //  blank  = no demand this month
           const cellBg =
             state === 'red'   ? 'bg-red-50'
@@ -122,7 +123,11 @@ export function IngredientDemandRow({ row, months, commentedCells, openingHistor
             if (state === 'red') {
               sub = { text: `${fmt(short)} short`, cls: 'text-red-600' }
             } else if (state === 'amber') {
-              sub = { text: `+${fmt(arriving)} PO`, cls: 'text-amber-700', title: poTitle }
+              // A PO landing this month shows its inbound qty; a month living off
+              // a PO that arrived earlier just notes that it's PO-covered.
+              sub = arriving > 0
+                ? { text: `+${fmt(arriving)} PO`, cls: 'text-amber-700', title: poTitle }
+                : { text: 'covered by PO', cls: 'text-amber-700' }
             } else if (bal > v) {
               sub = { text: `+${Math.round((bal / v) * 100)}%`, cls: 'text-emerald-700' }
             }
@@ -157,7 +162,9 @@ export function IngredientDemandRow({ row, months, commentedCells, openingHistor
                     hasComment={cellHasComment}
                     status={state === 'red'
                       ? `Demand ${fmt(v)} ${unit} — short ${arriving > 0 ? `even with +${fmt(arriving)} PO` : '(no PO arriving)'}.`
-                      : `Demand ${fmt(v)} ${unit} — covered by +${fmt(arriving)} PO this month.`}
+                      : arriving > 0
+                        ? `Demand ${fmt(v)} ${unit} — covered by +${fmt(arriving)} PO arriving this month (not yet received).`
+                        : `Demand ${fmt(v)} ${unit} — covered by a placed PO (not yet received).`}
                   />
                 </span>
               )}
