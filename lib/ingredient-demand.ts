@@ -76,6 +76,7 @@ export interface IngredientRow {
     name: string
     unit_of_measure: string | null
     opening_stock_override: number | null
+    supplier_id: string | null
   }
   /** month → demand in the ingredient's display UOM */
   demandByMonth: Map<string, number>
@@ -150,6 +151,7 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
         name: ing.name,
         unit_of_measure: ing.unit_of_measure,
         opening_stock_override: ing.opening_stock_override,
+        supplier_id: ing.supplier_id,
       },
       demandByMonth: new Map(months.map((m) => [m, 0])),
       totalDemand: 0,

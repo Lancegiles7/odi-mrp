@@ -188,6 +188,9 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
   const pageShorts = new Map<string, number>(months.map((m) => [m, 0]))
   for (const g of groups) {
     for (const row of g.ingredients) {
+      // Exclude "Supplier not set" ingredients — consistent with the headline
+      // shortfall count, which only tallies ingredients that have a supplier.
+      if (!row.ingredient.supplier_id) continue
       const opening = row.ingredient.opening_stock_override ?? 0
       const states  = monthShortfallStates(row, opening, months)
       for (const m of months) {
