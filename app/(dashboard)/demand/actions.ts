@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { DemandChannel } from '@/lib/types/database.types'
 
-const VALID_CHANNELS: DemandChannel[] = ['ecomm_nz', 'retail_nz', 'ecomm_au', 'retail_au', 'pipefill']
+const VALID_CHANNELS: DemandChannel[] = ['ecomm_nz', 'retail_nz', 'ecomm_au', 'retail_au', 'pipefill_nz', 'pipefill_au']
 
 /**
  * Upsert a single demand cell. Sets is_edited = true when the user
@@ -29,7 +29,7 @@ export async function updateDemandCell(
     .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
 
   // Upsert: on conflict replace. Mark as edited (unless this is a pipefill entry from scratch).
-  const source = channel === 'pipefill' ? 'pipefill' : 'manual'
+  const source = channel.startsWith('pipefill') ? 'pipefill' : 'manual'
   const { error } = await supabase
     .from('demand_forecasts')
     .upsert(
