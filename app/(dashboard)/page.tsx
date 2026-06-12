@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { rollingMonths, monthLabel } from '@/lib/demand'
-import { getPlanningAnchor } from '@/lib/settings'
+import { rollingMonths } from '@/lib/demand'
+import { getPlanningAnchor, getAppSettings } from '@/lib/settings'
+import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
+import { loadProductionStrip, loadIngredientStrip, loadPackagingStrip, loadGpByGroup } from '@/lib/dashboard-strips'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 
@@ -117,24 +119,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
 
   const L = new Lookup(items)
 
-  // ── Live MRP snapshot data
+  // ── Operational MRP data: shortfall strips + GP overview (rolling 12 mo)
   const planningAnchor = await getPlanningAnchor()
   const months = rollingMonths(undefined, planningAnchor)
   const firstMonth = months[0]
-  const [{ count: openPoCount }, { data: openPoLines }, { count: productCount }] = await Promise.all([
-    supabase.from('purchase_orders')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ['draft', 'submitted', 'partially_received']),
-    supabase.from('purchase_order_lines')
-      .select('quantity_ordered, quantity_received, unit_cost, purchase_order_id, purchase_orders(status)') as { data: Array<{ quantity_ordered: number; quantity_received: number; unit_cost: number | null; purchase_order_id: string; purchase_orders: { status: string } | null }> | null },
-    supabase.from('products')
-      .select('id', { count: 'exact', head: true })
-      .is('deleted_at', null)
-      .eq('is_active', true),
+  const lastMonth  = months[months.length - 1]
+  const settings   = await getAppSettings()
+  const [productionStrip, ingredientStrip, packagingStrip, gpGroups] = await Promise.all([
+    loadProductionStrip(supabase, months, firstMonth, lastMonth),
+    loadIngredientStrip(supabase, months, firstMonth, lastMonth),
+    loadPackagingStrip(supabase, months, firstMonth, lastMonth),
+    loadGpByGroup(supabase, settings),
   ])
-  const openPoValue = (openPoLines ?? [])
-    .filter((l) => l.purchase_orders?.status && ['draft', 'submitted', 'partially_received'].includes(l.purchase_orders.status))
-    .reduce((s, l) => s + (Number(l.unit_cost ?? 0) * Math.max(0, Number(l.quantity_ordered) - Number(l.quantity_received))), 0)
 
   return (
     <div className="space-y-6">
@@ -185,49 +181,44 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         </div>
       )}
 
-      {/* TOP TILES */}
-      {snap && (
-        <div className="grid grid-cols-5 gap-3">
-          <Tile label="Gross revenue FY27"
-                value={fmtMoney(L.fy('pnl', 'gross_revenue_total', 'total', 27))}
-                sub={`D2C ${fmtMoney(L.fy('pnl', 'gross_revenue_d2c', 'total', 27))} · B2B ${fmtMoney(L.fy('pnl', 'gross_revenue_b2b', 'total', 27))}`} />
-          <Tile label="Net revenue FY27"
-                value={fmtMoney(L.fy('pnl', 'net_revenue_total', 'total', 27))}
-                sub={(() => {
-                  const fy27 = L.fy('pnl', 'net_revenue_total', 'total', 27) ?? 0
-                  const fy29 = L.fy('pnl', 'net_revenue_total', 'total', 29) ?? 0
-                  if (!fy27) return ''
-                  return `→ FY29 ${fmtMoney(fy29)} (${(fy29 / fy27).toFixed(1)}x)`
-                })()} />
-          <Tile label="Gross profit %"
-                value={fmtPct(L.fy('pnl', 'gp_pct', 'total', 27))}
-                sub={`→ ${fmtPct(L.fy('pnl', 'gp_pct', 'total', 29))} by FY29`} />
-          <Tile label="Marketing %"
-                value={(() => {
-                  const m = L.fy('pnl', 'marketing', 'total', 27) ?? 0
-                  const r = L.fy('pnl', 'net_revenue_total', 'total', 27) ?? 1
-                  return fmtPct(m / r)
-                })()}
-                sub={`${fmtMoney(L.fy('pnl', 'marketing', 'total', 27))} FY27`} />
-          <Tile label="EBITDA FY27"
-                value={fmtMoney(L.fy('pnl', 'ebitda', 'total', 27))}
-                sub={(() => {
-                  const fy29 = L.fy('pnl', 'ebitda', 'total', 29)
-                  return `FY29 ${fmtMoney(fy29)}`
-                })()}
-                accent={(L.fy('pnl', 'ebitda', 'total', 27) ?? 0) < 0 ? 'red' : undefined} />
-        </div>
-      )}
+      {/* SHORTFALL STRIPS — operational, always shown */}
+      <ShortfallSection title="Production · shortfalls by month" href="/production"
+        months={months} totals={productionStrip.totals} shorts={productionStrip.shorts} />
+      <ShortfallSection title="Ingredient demand · shortfalls by month" href="/ingredients/demand"
+        months={months} totals={ingredientStrip.totals} shorts={ingredientStrip.shorts} />
+      <ShortfallSection title="Packaging · shortfalls by month" href="/packaging/demand"
+        months={months} totals={packagingStrip.totals} shorts={packagingStrip.shorts} />
 
-      {/* SECTION 1 — P&L BREAKDOWN */}
-      {snap && monthsForFy.length > 0 && (
-        <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold">1 · P&amp;L breakdown</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Total Business · monthly · NZ + AU consolidated</p>
-            </div>
+      {/* GP OVERVIEW — by product group, NZ + AU */}
+      <section className="bg-white border border-gray-200 rounded-lg p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">GP overview · by product group</h2>
+          <Link href="/products" className="text-xs text-gray-500 hover:text-gray-900">Products →</Link>
+        </div>
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-[140px_1fr_1fr] gap-4 text-[10px] uppercase tracking-wider text-gray-400">
+            <span>Group</span><span>GP NZ</span><span>GP AU</span>
           </div>
+          {gpGroups.map((g) => (
+            <div key={g.key} className="grid grid-cols-[140px_1fr_1fr] gap-4 items-center text-sm">
+              <span className="text-gray-700">{g.label}{g.count === 0 && <span className="text-gray-300 text-xs"> · —</span>}</span>
+              <GpBar value={g.gpNz} />
+              <GpBar value={g.gpAu} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* P&L OVERVIEW — collapsible */}
+      {snap && monthsForFy.length > 0 && (
+        <details className="bg-white border border-gray-200 rounded-lg overflow-hidden group/pnl">
+          <summary className="list-none cursor-pointer px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold">P&amp;L overview</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Total Business · monthly · NZ + AU consolidated · click to expand</p>
+            </div>
+            <span className="text-gray-400 text-sm transition-transform group-open/pnl:rotate-180">▾</span>
+          </summary>
           <div className="overflow-x-auto">
             <table className="w-full text-xs" style={{ minWidth: 1500 }}>
               <thead>
@@ -255,14 +246,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
               </tbody>
             </table>
           </div>
-        </section>
+        </details>
       )}
 
-      {/* SECTION 2 — ORDERS BREAKDOWN */}
+      {/* ORDERS BREAKDOWN */}
       {snap && monthsForFy.length > 0 && (
         <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100">
-            <h2 className="text-base font-semibold">2 · Orders breakdown</h2>
+            <h2 className="text-base font-semibold">Orders breakdown</h2>
             <p className="text-xs text-gray-500 mt-0.5">Monthly · D2C + retail · NZ + AU split · grand total. Forecasting view.</p>
           </div>
 
@@ -306,20 +297,38 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
           </div>
         </section>
       )}
+    </div>
+  )
+}
 
-      {/* SECTION 3 — LIVE MRP SNAPSHOT */}
-      <section className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100">
-          <h2 className="text-base font-semibold">3 · Live MRP snapshot</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Operational reality — pulled from current MRP data</p>
-        </div>
-        <div className="grid grid-cols-4 gap-0">
-          <MrpTile label="Active products" value={fmtCount(productCount ?? 0)} sub="in catalogue" href="/products" />
-          <MrpTile label="Open POs" value={(openPoCount ?? 0).toString()} sub={fmtMoneyExact(openPoValue)} href="/purchase-orders" />
-          <MrpTile label="Planning anchor" value={monthLabel(firstMonth)} sub="rolling 12-mo view starts here" href="/production" />
-          <MrpTile label="Ingredient demand" value="Open" sub="forecast & arrivals tracked" href="/ingredients/demand" />
-        </div>
-      </section>
+// ============================================================
+// Dashboard-specific components
+// ============================================================
+function ShortfallSection({ title, href, months, totals, shorts }: {
+  title: string; href: string; months: string[]
+  totals: Map<string, number>; shorts: Map<string, number>
+}) {
+  return (
+    <section className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-2.5">
+        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">{title}</h2>
+        <Link href={href} className="text-xs text-gray-500 hover:text-gray-900">View →</Link>
+      </div>
+      <MonthlyShortfallStrip months={months} totalsByMonth={totals} shortByMonth={shorts} />
+    </section>
+  )
+}
+
+function GpBar({ value }: { value: number | null }) {
+  if (value == null) return <span className="text-xs text-gray-300">—</span>
+  const pct = Math.round(value * 100)
+  const colour = pct >= 50 ? '#27500a' : pct >= 40 ? '#854f0b' : '#b91c1c'
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 bg-gray-100 rounded h-3 overflow-hidden">
+        <div style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: colour, height: '100%' }} />
+      </div>
+      <span className="w-10 text-right font-semibold tabular-nums" style={{ color: colour }}>{pct}%</span>
     </div>
   )
 }
