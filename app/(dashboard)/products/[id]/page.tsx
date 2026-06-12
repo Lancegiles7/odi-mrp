@@ -83,9 +83,13 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
     (s, i) => s + (Number(i.quantity_g || 0) / 1000) * Number(i.price_override ?? i.ingredients.price ?? 0),
     0,
   )
-  const nativePerPack    = Math.round(nativeRaw * (1 + Number(product.wastage_pct ?? 0)) * 100) / 100
+  // Freeze-dried: scale the wet input (cost is on the wet weight, not dry pack).
+  const nativePerPack    = Math.round(nativeRaw * summary.freeze_dry_scale * (1 + Number(product.wastage_pct ?? 0)) * 100) / 100
   const nativePerServing = Math.round(nativePerPack * summary.serving_multiplier * 100) / 100
   const fSym = curSym(uniformForeign)
+  const dryWeight = Number(product.size_g) || 0
+  const wetWeight = Number(product.wet_weight_g) || 0
+  const isFreezeDried = summary.freeze_dry_scale > 1
 
   return (
     <div className="space-y-6">
@@ -139,8 +143,11 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
           <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Overview</h3>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <Meta label="Product type" value={typeLabel} />
-            <Meta label="Size" value={product.size_g != null ? `${product.size_g} g` : null} />
+            <Meta label={isFreezeDried ? 'Size (dry)' : 'Size'} value={product.size_g != null ? `${product.size_g} g` : null} />
             <Meta label="Serving size" value={product.serving_size != null ? `${product.serving_size} g` : null} />
+            {isFreezeDried && (
+              <Meta label="Wet weight (freeze-dried)" value={`${wetWeight} g → ${dryWeight} g dry · ${(summary.freeze_dry_scale > 0 ? (1 / summary.freeze_dry_scale * 100) : 0).toFixed(0)}% yield`} />
+            )}
             <Meta label="RRP — NZ (inc GST)" value={product.rrp != null ? formatCurrency(product.rrp) : null} />
             <Meta label="RRP — AU (inc GST)" value={(product.rrp_au ?? product.rrp) != null ? `A${formatCurrency(product.rrp_au ?? product.rrp ?? 0)}` : null} />
             <Meta label="Hero callout" value={product.hero_call_out} colSpan />
@@ -267,14 +274,25 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                 })}
               </tbody>
               <tfoot className="bg-gray-50 text-sm">
+                {/* Freeze-dry scale — dry BOM → wet input (cost is on the wet weight) */}
+                {isFreezeDried && (
+                  <tr className="border-t border-gray-200">
+                    <td colSpan={7} className="px-5 py-2 text-xs text-blue-700">
+                      × Freeze-dry yield ({summary.freeze_dry_scale.toFixed(2)}× — wet {wetWeight} g ÷ dry {dryWeight} g)
+                    </td>
+                    <td className="px-5 py-2 text-right text-xs tabular-nums text-blue-700">
+                      {formatCurrency(summary.ingredient_subtotal_wet - summary.ingredient_subtotal)}
+                    </td>
+                  </tr>
+                )}
                 {/* Wastage line — sits between the last ingredient and the subtotal */}
                 {product.wastage_pct > 0 && (
-                  <tr className="border-t border-gray-200">
+                  <tr className={isFreezeDried ? '' : 'border-t border-gray-200'}>
                     <td colSpan={7} className="px-5 py-2 text-xs text-gray-600">
                       + Contingency / wastage ({(product.wastage_pct * 100).toFixed(1)}%)
                     </td>
                     <td className="px-5 py-2 text-right text-xs tabular-nums text-gray-600">
-                      {formatCurrency(summary.ingredient_total_per_pack - summary.ingredient_subtotal)}
+                      {formatCurrency(summary.ingredient_total_per_pack - summary.ingredient_subtotal_wet)}
                     </td>
                   </tr>
                 )}

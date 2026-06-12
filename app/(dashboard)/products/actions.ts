@@ -32,6 +32,7 @@ export interface ProductFormData {
   hero_call_out?: string
   back_of_pack?: string
   serving_size?: string
+  wet_weight_g?: string
   rrp?: string
   rrp_au?: string
   unit_of_measure?: string
@@ -139,6 +140,7 @@ function buildProductPayload(data: ProductFormData) {
     hero_call_out:   data.hero_call_out?.trim() || null,
     back_of_pack:    data.back_of_pack?.trim() || null,
     serving_size:    parseNum(data.serving_size),
+    wet_weight_g:    parseNum(data.wet_weight_g),
     rrp:             parseNum(data.rrp),
     rrp_au:          parseNum(data.rrp_au),
     unit_of_measure: data.unit_of_measure?.trim() || 'each',
@@ -176,6 +178,7 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     hero_call_out:     formData.get('hero_call_out') as string,
     back_of_pack:      formData.get('back_of_pack') as string,
     serving_size:      formData.get('serving_size') as string,
+    wet_weight_g:      formData.get('wet_weight_g') as string,
     rrp:               formData.get('rrp') as string,
     rrp_au:            formData.get('rrp_au') as string,
     unit_of_measure:   formData.get('unit_of_measure') as string,

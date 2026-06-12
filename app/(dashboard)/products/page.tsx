@@ -20,6 +20,7 @@ type ProductRow = {
   product_type: ProductGroup | null
   size_g: number | null
   serving_size: number | null
+  wet_weight_g: number | null
   rrp: number | null
   rrp_au: number | null
   packaging: number | null
@@ -66,7 +67,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     supabase
       .from('products')
       .select(`
-        id, sku_code, name, product_type, size_g, serving_size, rrp, rrp_au,
+        id, sku_code, name, product_type, size_g, serving_size, wet_weight_g, rrp, rrp_au,
         packaging, toll, margin, other, freight, freight_nz, freight_au,
         toll_currency, margin_currency, other_currency, freight_nz_currency, freight_au_currency,
         apply_fx, wastage_pct, is_active,

@@ -110,6 +110,7 @@ export type Database = {
           hero_call_out: string | null
           back_of_pack: string | null
           serving_size: number | null
+          wet_weight_g: number | null
           rrp: number | null
           rrp_au: number | null
           packaging: number | null
@@ -147,6 +148,7 @@ export type Database = {
           hero_call_out?: string | null
           back_of_pack?: string | null
           serving_size?: number | null
+          wet_weight_g?: number | null
           rrp?: number | null
           rrp_au?: number | null
           packaging?: number | null
@@ -184,6 +186,7 @@ export type Database = {
           hero_call_out?: string | null
           back_of_pack?: string | null
           serving_size?: number | null
+          wet_weight_g?: number | null
           rrp?: number | null
           rrp_au?: number | null
           packaging?: number | null
@@ -919,8 +922,10 @@ export type IngredientWithSupplier = Ingredient & {
 // `grand_total` is retained as an alias for `nz_grand_total` for
 // backward compatibility with older callers.
 export interface ProductCostSummary {
-  ingredient_subtotal: number         // per-pack, before wastage
-  ingredient_total_per_pack: number   // per-pack, after wastage
+  ingredient_subtotal: number         // per-pack, dry (BOM as entered), before wastage/yield
+  freeze_dry_scale: number            // wet_weight_g / size_g (1 if not freeze-dried)
+  ingredient_subtotal_wet: number     // ingredient_subtotal × freeze_dry_scale (wet input cost)
+  ingredient_total_per_pack: number   // per-pack, after yield + wastage
   serving_multiplier: number          // serving_size / size_g (1 if unset)
   ingredient_total: number            // per-serving, after wastage × serving multiplier
   base_cost: number                   // ingredient_total + packaging + toll + margin + other + NZ freight

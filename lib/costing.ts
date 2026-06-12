@@ -88,19 +88,31 @@ export function calcProductCostSummary(
     | 'other_currency'
     | 'freight_nz_currency'
     | 'freight_au_currency'
+    | 'wet_weight_g'
     | 'apply_fx'
     | 'wastage_pct'
   >,
   bomItems: BomItemWithIngredient[],
   settings: Pick<SettingsSnapshot, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct' | 'fx_rates'>,
 ): ProductCostSummary {
+  // Dry ingredient cost — the BOM as entered (the dry composition).
   const ingredientSubtotal = bomItems.reduce(
     (sum, item) => sum + calcLinePrice(item),
     0,
   )
 
+  // Freeze-dried products: the BOM is the DRY pack but the ingredients used (and
+  // bought) are the WET input. Scale the ingredient cost up by wet ÷ dry when a
+  // wet weight is set and larger than the dry pack. 1 = not freeze-dried.
+  const wetWeight     = Number(product.wet_weight_g) || 0
+  const dryWeight     = Number(product.size_g) || 0
+  const freezeDryScale = wetWeight > 0 && dryWeight > 0 && wetWeight > dryWeight
+    ? wetWeight / dryWeight
+    : 1
+  const ingredientSubtotalWet = round2(ingredientSubtotal * freezeDryScale)
+
   const wastagePct            = Number(product.wastage_pct ?? 0)
-  const ingredientTotalPerPack = round2(ingredientSubtotal * (1 + wastagePct))
+  const ingredientTotalPerPack = round2(ingredientSubtotalWet * (1 + wastagePct))
 
   // Serving-size scaling only applies when a serving is LARGER than the pack
   // (e.g. a 30g snack pack whose nutritional serving is 120g = 4 packs).
@@ -180,6 +192,8 @@ export function calcProductCostSummary(
 
   return {
     ingredient_subtotal:     round2(ingredientSubtotal),
+    freeze_dry_scale:        freezeDryScale,
+    ingredient_subtotal_wet: ingredientSubtotalWet,
     ingredient_total_per_pack: ingredientTotalPerPack,
     serving_multiplier:      servingMultiplier,
     ingredient_total:        ingredientTotal,

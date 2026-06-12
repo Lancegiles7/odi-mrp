@@ -161,6 +161,13 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
             <Field id="serving_size" label="Serving size (g)">
               <NumberInput id="serving_size" name="serving_size" defaultValue={product?.serving_size} placeholder="30" />
             </Field>
+            <Field id="wet_weight_g" label="Wet weight (g) — freeze-dried" className="col-span-2">
+              <NumberInput id="wet_weight_g" name="wet_weight_g" defaultValue={product?.wet_weight_g} placeholder="leave blank unless freeze-dried" />
+              <p className="text-xs text-gray-400 mt-1">
+                For melts/puffs: the wet input weight per pack (before freeze-drying). Cost &amp; ingredient demand
+                scale by wet ÷ size. Leave blank for normal products.
+              </p>
+            </Field>
             <Field id="rrp" label="RRP — NZ (inc GST)">
               <NumberInput id="rrp" name="rrp" defaultValue={product?.rrp} prefix="$" placeholder="14.99" />
             </Field>
