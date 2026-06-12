@@ -17,6 +17,10 @@ export interface POLineInput {
   unit_cost: number | null
   unit_of_measure: string
   notes: string | null
+  // Line-level supplier code + pack size. Used by product / "other" lines that
+  // have no item master to save back to. Persisted on the PO line itself.
+  supplier_code?: string | null
+  supplier_pack_size?: number | null
   // Supplier reference data — only sent when the user has clicked
   // "save updated value to ingredient" on the line. When non-null, the
   // PO save also writes these back to the ingredient row.
@@ -406,6 +410,10 @@ function sanitiseLine(l: POLineInput, poId: string) {
     unit_cost:         l.unit_cost != null && Number.isFinite(Number(l.unit_cost)) ? Number(l.unit_cost) : null,
     unit_of_measure:   l.unit_of_measure?.trim() || 'each',
     notes:             l.notes?.trim() || null,
+    // Line-level supplier code/pack size — carried by product & "other" lines
+    // (ingredient/packaging use their master, leaving these null).
+    supplier_code:      (t === 'product' || t === 'other') ? (l.supplier_code?.trim() || null) : null,
+    supplier_pack_size: (t === 'product' || t === 'other') && l.supplier_pack_size != null && Number.isFinite(Number(l.supplier_pack_size)) ? Number(l.supplier_pack_size) : null,
   }
 }
 

@@ -26,12 +26,12 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         notes: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
-      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes')
+      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes, supplier_code, supplier_pack_size')
       .eq('purchase_order_id', params.id)
       .order('created_at') as unknown as Promise<{ data: Array<{
         id: string; ingredient_id: string | null; product_id: string | null; packaging_id: string | null;
         description: string | null; quantity_ordered: number; unit_cost: number | null;
-        unit_of_measure: string; notes: string | null;
+        unit_of_measure: string; notes: string | null; supplier_code: string | null; supplier_pack_size: number | null;
       }> | null }>,
     supabase.from('suppliers')
       .select('id, name, payment_terms, email, phone, currency')
@@ -78,6 +78,8 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
     unit_cost: l.unit_cost != null ? Number(l.unit_cost) : null,
     unit_of_measure: l.unit_of_measure,
     notes: l.notes,
+    supplier_code: l.supplier_code,
+    supplier_pack_size: l.supplier_pack_size != null ? Number(l.supplier_pack_size) : null,
   }))
 
   return (

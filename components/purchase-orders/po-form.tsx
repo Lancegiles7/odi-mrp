@@ -626,7 +626,7 @@ function LineRow({
   const ref = ing ?? pk
   const selectedId = line.ingredient_id ?? line.packaging_id ?? null
 
-  // Effective values shown on this line (after any user edits)
+  // Effective values from the item master (ingredient/packaging), after edits.
   const lineSupSku   = line.save_back_supplier_data?.supplier_sku_code  ?? ref?.supplier_sku_code  ?? ''
   const linePackSize = line.save_back_supplier_data?.supplier_pack_size ?? ref?.supplier_pack_size ?? null
   const linePackUom  = line.save_back_supplier_data?.supplier_pack_unit ?? ref?.supplier_pack_unit ?? line.unit_of_measure
@@ -637,10 +637,20 @@ function LineRow({
   // managed on the packaging page so a PO edit can't leave it stale).
   const savedPrice    = ing?.price              ?? null
 
+  // Unified supplier code + pack size for the row. Ingredient/packaging route
+  // to (and save back to) the item master; product / "other" lines store the
+  // value on the PO line itself.
+  const supCodeValue  = isPurchased ? lineSupSku   : (line.supplier_code ?? '')
+  const packSizeValue = isPurchased ? linePackSize : (line.supplier_pack_size ?? null)
+  const setSupCode  = (v: string)        => isPurchased ? patchSaveBack({ supplier_sku_code: v || null }) : onChange({ supplier_code: v || null })
+  const setPackSize = (v: number | null) => isPurchased ? patchSaveBack({ supplier_pack_size: v })        : onChange({ supplier_pack_size: v })
+  // Ingredient/packaging need an item selected first; product/"other" are free-text.
+  const codeDisabled = readOnly || (isPurchased && !selectedId)
+
   // Pack-size compliance — soft warning + suggested round-up
   const qty = Number(line.quantity_ordered) || 0
-  const packSize = Number(linePackSize) || 0
-  const packMismatch = isPurchased && packSize > 0 && qty > 0 && qty % packSize !== 0
+  const packSize = Number(packSizeValue) || 0
+  const packMismatch = packSize > 0 && qty > 0 && qty % packSize !== 0
   const suggestedQty = packMismatch ? Math.ceil(qty / packSize) * packSize : null
 
   // Price drift — soft warning when entered price differs from saved
@@ -725,20 +735,16 @@ function LineRow({
 
       {/* SUPPLIER CODE */}
       <td className="px-3 py-2">
-        {isPurchased ? (
-          <>
-            <input
-              disabled={readOnly || !selectedId}
-              value={lineSupSku}
-              onChange={(e) => patchSaveBack({ supplier_sku_code: e.target.value || null })}
-              placeholder={savedSupSku ? '' : '—'}
-              className={`w-full text-xs border rounded px-1.5 py-1 ${savedSupSku ? 'border-gray-200' : 'border-dashed border-gray-300 placeholder-gray-300'} disabled:bg-gray-50`}
-            />
-            {!readOnly && selectedId && lineSupSku !== (savedSupSku ?? '') && (
-              <p className="text-[10px] text-blue-700 mt-0.5">will save to {isPackaging ? 'packaging' : 'ingredient'} on PO save</p>
-            )}
-          </>
-        ) : <span className="text-gray-300">—</span>}
+        <input
+          disabled={codeDisabled}
+          value={supCodeValue}
+          onChange={(e) => setSupCode(e.target.value)}
+          placeholder={isPurchased && !savedSupSku ? '—' : ''}
+          className={`w-full text-xs border rounded px-1.5 py-1 ${isPurchased && !savedSupSku ? 'border-dashed border-gray-300 placeholder-gray-300' : 'border-gray-200'} disabled:bg-gray-50`}
+        />
+        {isPurchased && !readOnly && selectedId && supCodeValue !== (savedSupSku ?? '') && (
+          <p className="text-[10px] text-blue-700 mt-0.5">will save to {isPackaging ? 'packaging' : 'ingredient'} on PO save</p>
+        )}
       </td>
 
       {/* QTY */}
@@ -772,23 +778,19 @@ function LineRow({
 
       {/* PACK SIZE */}
       <td className="px-3 py-2">
-        {isPurchased ? (
-          <>
-            <input
-              disabled={readOnly || !selectedId}
-              type="number"
-              step="any"
-              min={0}
-              value={linePackSize ?? ''}
-              onChange={(e) => patchSaveBack({ supplier_pack_size: e.target.value === '' ? null : Number(e.target.value) })}
-              placeholder={savedPackSize == null ? '—' : ''}
-              className={`w-full text-right text-xs border rounded px-1.5 py-1 tabular-nums ${savedPackSize == null ? 'border-dashed border-gray-300 placeholder-gray-300' : 'border-gray-200'} disabled:bg-gray-50`}
-            />
-            {!readOnly && selectedId && (linePackSize ?? null) !== (savedPackSize ?? null) && (
-              <p className="text-[10px] text-blue-700 mt-0.5">will save</p>
-            )}
-          </>
-        ) : <span className="text-gray-300">—</span>}
+        <input
+          disabled={codeDisabled}
+          type="number"
+          step="any"
+          min={0}
+          value={packSizeValue ?? ''}
+          onChange={(e) => setPackSize(e.target.value === '' ? null : Number(e.target.value))}
+          placeholder={isPurchased && savedPackSize == null ? '—' : ''}
+          className={`w-full text-right text-xs border rounded px-1.5 py-1 tabular-nums ${isPurchased && savedPackSize == null ? 'border-dashed border-gray-300 placeholder-gray-300' : 'border-gray-200'} disabled:bg-gray-50`}
+        />
+        {isPurchased && !readOnly && selectedId && (packSizeValue ?? null) !== (savedPackSize ?? null) && (
+          <p className="text-[10px] text-blue-700 mt-0.5">will save</p>
+        )}
       </td>
 
       {/* UNIT PRICE */}

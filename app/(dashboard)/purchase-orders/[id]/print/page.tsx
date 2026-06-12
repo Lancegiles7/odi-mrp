@@ -52,12 +52,12 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
         company_id: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
-      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes')
+      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes, supplier_code')
       .eq('purchase_order_id', params.id)
       .order('created_at') as unknown as Promise<{ data: Array<{
         id: string; ingredient_id: string | null; product_id: string | null; packaging_id: string | null;
         description: string | null; quantity_ordered: number; unit_cost: number | null;
-        unit_of_measure: string; notes: string | null;
+        unit_of_measure: string; notes: string | null; supplier_code: string | null;
       }> | null }>,
     getAppSettings(),
   ])
@@ -292,7 +292,7 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
               const pkg  = l.packaging_id  ? pkgMap.get(l.packaging_id)  : null
               const name = ing?.name ?? prod?.name ?? pkg?.name ?? l.description ?? '—'
               const sku  = ing?.sku_code ?? prod?.sku_code ?? pkg?.sku_code ?? null
-              const supplierSku = ing?.supplier_sku_code ?? pkg?.supplier_sku_code ?? null
+              const supplierSku = ing?.supplier_sku_code ?? pkg?.supplier_sku_code ?? l.supplier_code ?? null
               const total = (Number(l.unit_cost) || 0) * Number(l.quantity_ordered)
               return (
                 <tr key={l.id} className="border-b border-gray-100">
