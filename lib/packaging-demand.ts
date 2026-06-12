@@ -181,24 +181,26 @@ export function monthShortfallStates(
   opening: number,
   months: string[],
 ): Map<string, ShortfallState> {
+  // Mirrors lib/ingredient-demand.ts: green only while real on-hand stock
+  // covers the month; amber once it leans on a placed (not-yet-received) PO;
+  // red if short even with the PO. Two balances tracked independently —
+  // realBalance is never topped up by POs.
   const out = new Map<string, ShortfallState>()
-  let balance = opening
+  let realBalance = opening
+  let fullBalance = opening
   for (const m of months) {
     const demand   = row.demandByMonth.get(m)   ?? 0
     const arriving = row.arrivingByMonth.get(m) ?? 0
-    const carriedAvailable = Math.max(0, balance)
-    const fullAvailable    = carriedAvailable + arriving
-    const balanceAfter     = balance + arriving - demand
-    // 'amber' = the PO arriving this month is what avoided a shortfall
-    // AND the resulting buffer is thin (less than one month's demand).
-    // A huge PO that lands with comfortable surplus stays neutral.
+    const realAvailable = Math.max(0, realBalance)
+    const fullAvailable = Math.max(0, fullBalance) + arriving
     let state: ShortfallState = 'ok'
     if (demand > 0) {
-      if (demand > fullAvailable) state = 'red'
-      else if (demand > carriedAvailable && balanceAfter < demand) state = 'amber'
+      if (demand > fullAvailable)      state = 'red'    // short even with POs
+      else if (demand > realAvailable) state = 'amber'  // only covered by a PO
     }
     out.set(m, state)
-    balance = balanceAfter
+    realBalance = realBalance - demand
+    fullBalance = fullBalance + arriving - demand
   }
   return out
 }

@@ -112,7 +112,11 @@ export function PackagingDemandRow({ row, months, commentedCells, openingHistory
             if (state === 'red') {
               sub = { text: `${fmt(short)} short`, cls: 'text-red-600' }
             } else if (state === 'amber') {
-              sub = { text: `+${fmt(arriving)} PO`, cls: 'text-amber-700', title: poTitle }
+              // A PO landing this month shows its inbound qty; a month living off
+              // a PO that arrived earlier just notes that it's PO-covered.
+              sub = arriving > 0
+                ? { text: `+${fmt(arriving)} PO`, cls: 'text-amber-700', title: poTitle }
+                : { text: 'covered by PO', cls: 'text-amber-700' }
             } else if (bal > v) {
               sub = { text: `+${Math.round((bal / v) * 100)}%`, cls: 'text-emerald-700' }
             }
@@ -143,7 +147,9 @@ export function PackagingDemandRow({ row, months, commentedCells, openingHistory
                     hasComment={cellHasComment}
                     status={state === 'red'
                       ? `Demand ${fmt(v)} ${unit} — short ${arriving > 0 ? `even with +${fmt(arriving)} PO` : '(no PO arriving)'}.`
-                      : `Demand ${fmt(v)} ${unit} — covered by +${fmt(arriving)} PO this month.`}
+                      : arriving > 0
+                        ? `Demand ${fmt(v)} ${unit} — covered by +${fmt(arriving)} PO arriving this month (not yet received).`
+                        : `Demand ${fmt(v)} ${unit} — covered by a placed PO (not yet received).`}
                   />
                 </span>
               )}
