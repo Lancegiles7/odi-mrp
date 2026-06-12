@@ -59,7 +59,7 @@ export default async function EnhancementsPage({ searchParams }: PageProps) {
     .select(`
       id, title, description, category, priority, status, status_note, built_url,
       submitted_at, updated_at, submitted_by,
-      user_profiles ( full_name )
+      user_profiles!enhancements_submitted_by_fkey ( full_name )
     `)
   if (statusFilter)   query = query.eq('status',   statusFilter)
   if (categoryFilter) query = query.eq('category', categoryFilter)
