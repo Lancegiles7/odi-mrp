@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
-import { rollingMonths, indexProduction, getProductionCell, indexDemand, getGrandTotal, monthLabel } from '@/lib/demand'
+import { rollingMonths, indexProduction, getProductionCell, indexDemand, getGrandTotal, getCountryTotal, monthLabel } from '@/lib/demand'
 import { getPlanningAnchor } from '@/lib/settings'
 import { aggregatePackagingDemand, hasAnyShortfall, monthShortfallStates, type PackagingRow } from '@/lib/packaging-demand'
 import { PackagingDemandRow } from '@/components/packaging/packaging-demand-row'
@@ -38,7 +38,7 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     supabase.from('products').select('id, sku_code, name, product_type').is('deleted_at', null) as { data: Array<{ id: string; sku_code: string; name: string; product_type: string | null }> | null },
     supabase.from('packaging').select('id, sku_code, name, type, unit_of_measure, supplier_id, opening_stock_override').eq('is_active', true).order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string; supplier_id: string | null; opening_stock_override: number | null }> | null },
     supabase.from('suppliers').select('id, name') as { data: Array<{ id: string; name: string }> | null },
-    supabase.from('product_packaging').select('product_id, packaging_id, quantity_per_unit') as { data: Array<{ product_id: string; packaging_id: string; quantity_per_unit: number }> | null },
+    supabase.from('product_packaging').select('product_id, packaging_id, quantity_per_unit, market') as { data: Array<{ product_id: string; packaging_id: string; quantity_per_unit: number; market: string | null }> | null },
     supabase.from('production_plans')
       .select('product_id, year_month, units_planned')
       .gte('year_month', firstMonth).lte('year_month', lastMonth) as { data: Array<{ product_id: string; year_month: string; units_planned: number }> | null },
@@ -57,24 +57,49 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
       .not('packaging_id', 'is', null) as { data: Array<{ purchase_order_id: string; packaging_id: string | null; quantity_ordered: number; quantity_received: number }> | null },
   ])
 
-  // Build units map per product / month from the chosen source
-  const unitsByMonthByProduct = new Map<string, Map<string, number>>()
-  for (const m of months) unitsByMonthByProduct.set(m, new Map())
+  // Which products have an AU build? Their AU-market packaging explodes through
+  // AU-market demand; everything else stays on the NZ units (unchanged).
+  const { data: pBoms } = await supabase
+    .from('boms').select('product_id, market').eq('is_active', true) as
+    { data: Array<{ product_id: string; market: string | null }> | null }
+  const dualProducts = new Set((pBoms ?? []).filter((b) => b.market === 'AU').map((b) => b.product_id))
 
-  if (source === 'forecast') {
-    const demandIdx = indexDemand((demand ?? []) as never[])
-    for (const p of products ?? []) {
-      for (const m of months) {
-        const u = getGrandTotal(demandIdx, p.id, m)
-        if (u) unitsByMonthByProduct.get(m)!.set(p.id, u)
-      }
-    }
-  } else {
-    const prodIdx = indexProduction((production ?? []) as never[])
-    for (const p of products ?? []) {
-      for (const m of months) {
-        const u = getProductionCell(prodIdx, p.id, m)
-        if (u) unitsByMonthByProduct.get(m)!.set(p.id, u)
+  // Build units maps per product / month from the chosen source, split by market
+  // for dual products (NZ-channel → NZ packaging, AU-channel → AU packaging).
+  const unitsByMonthByProduct   = new Map<string, Map<string, number>>()
+  const unitsAuByMonthByProduct = new Map<string, Map<string, number>>()
+  for (const m of months) { unitsByMonthByProduct.set(m, new Map()); unitsAuByMonthByProduct.set(m, new Map()) }
+
+  const demandIdx = indexDemand((demand ?? []) as never[])
+  const prodIdx   = indexProduction((production ?? []) as never[])
+
+  for (const p of products ?? []) {
+    const isDual = dualProducts.has(p.id)
+    for (const m of months) {
+      if (source === 'forecast') {
+        if (isDual) {
+          const nz = getCountryTotal(demandIdx, p.id, m, 'NZ')
+          const au = getCountryTotal(demandIdx, p.id, m, 'AUS')
+          if (nz) unitsByMonthByProduct.get(m)!.set(p.id, nz)
+          if (au) unitsAuByMonthByProduct.get(m)!.set(p.id, au)
+        } else {
+          const u = getGrandTotal(demandIdx, p.id, m)
+          if (u) unitsByMonthByProduct.get(m)!.set(p.id, u)
+        }
+      } else {
+        const total = getProductionCell(prodIdx, p.id, m)
+        if (!total) continue
+        if (isDual) {
+          const nzF = getCountryTotal(demandIdx, p.id, m, 'NZ')
+          const auF = getCountryTotal(demandIdx, p.id, m, 'AUS')
+          const denom = nzF + auF
+          const au = denom > 0 ? total * (auF / denom) : 0
+          const nz = total - au
+          if (nz) unitsByMonthByProduct.get(m)!.set(p.id, nz)
+          if (au) unitsAuByMonthByProduct.get(m)!.set(p.id, au)
+        } else {
+          unitsByMonthByProduct.get(m)!.set(p.id, total)
+        }
       }
     }
   }
@@ -110,6 +135,7 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     productPackaging: pp ?? [],
     products:         products ?? [],
     unitsByMonthByProduct,
+    unitsAuByMonthByProduct,
     months,
     arrivalsByPackaging,
   })

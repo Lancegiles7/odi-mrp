@@ -114,6 +114,7 @@ export type Database = {
           rrp: number | null
           rrp_au: number | null
           packaging: number | null
+          packaging_au: number | null
           toll: number | null
           margin: number | null
           other: number | null
@@ -154,6 +155,7 @@ export type Database = {
           rrp?: number | null
           rrp_au?: number | null
           packaging?: number | null
+          packaging_au?: number | null
           toll?: number | null
           margin?: number | null
           other?: number | null
@@ -194,6 +196,7 @@ export type Database = {
           rrp?: number | null
           rrp_au?: number | null
           packaging?: number | null
+          packaging_au?: number | null
           toll?: number | null
           margin?: number | null
           other?: number | null
@@ -458,6 +461,7 @@ export type Database = {
           product_id: string
           version: number
           is_active: boolean
+          market: string
           notes: string | null
           created_at: string
           updated_at: string
@@ -468,6 +472,7 @@ export type Database = {
           product_id: string
           version?: number
           is_active?: boolean
+          market?: string
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -478,6 +483,7 @@ export type Database = {
           product_id?: string
           version?: number
           is_active?: boolean
+          market?: string
           notes?: string | null
           created_at?: string
           updated_at?: string

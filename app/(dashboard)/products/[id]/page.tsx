@@ -30,7 +30,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
       .select(`
         *,
         boms (
-          id, version, is_active, notes,
+          id, version, is_active, notes, market,
           bom_items (
             id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
             ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
@@ -55,19 +55,26 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
 
   if (!product) notFound()
 
-  const activeBom = (product.boms as Array<{
+  const allBoms = (product.boms as Array<{
     id: string
     version: number
     is_active: boolean
     notes: string | null
+    market: string | null
     bom_items: BomItemWithIngredient[]
-  }>)?.find((b) => b.is_active)
+  }>) ?? []
+  // NZ build = the default recipe (untagged rows count as NZ); AU build optional.
+  const activeBom = allBoms.find((b) => b.is_active && (b.market ?? 'NZ') === 'NZ')
+  const auBom     = allBoms.find((b) => b.is_active && b.market === 'AU')
 
   const bomItems: BomItemWithIngredient[] = (activeBom?.bom_items ?? [])
     .slice()
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  const auBomItems: BomItemWithIngredient[] = (auBom?.bom_items ?? [])
+    .slice()
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
-  const summary   = calcProductCostSummary(product, bomItems, settings)
+  const summary   = calcProductCostSummary(product, bomItems, settings, auBomItems)
   const typeLabel = product.product_type ? PRODUCT_GROUP_LABELS[product.product_type] ?? product.product_type : null
 
   // BOM ingredient lines are shown in their supplier currency; the totals are
@@ -102,6 +109,11 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
           <h1 className="mt-2 text-2xl font-semibold text-gray-900">{product.name}</h1>
           <div className="mt-1 flex items-center gap-2 text-xs">
             {typeLabel && <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">{typeLabel}</span>}
+            {summary.is_dual_manufacture && (
+              <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700">
+                Dual build · {product.manufacturer ?? 'NZ'} + {product.manufacturer_au ?? 'VMC'}
+              </span>
+            )}
             {product.is_active
               ? <span className="px-2 py-0.5 rounded bg-green-50 text-green-700">Active</span>
               : <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-500">Inactive</span>}

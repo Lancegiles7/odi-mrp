@@ -50,9 +50,13 @@ export interface AggregateInput {
     opening_stock_override: number | null
   }>
   suppliers: Array<{ id: string; name: string }>
-  productPackaging: Array<{ product_id: string; packaging_id: string; quantity_per_unit: number }>
+  /** market tags which build a link belongs to; 'AU' rows explode through the
+   *  AU units, everything else through the NZ units. */
+  productPackaging: Array<{ product_id: string; packaging_id: string; quantity_per_unit: number; market?: string | null }>
   products: Array<{ id: string; sku_code: string; name: string }>
   unitsByMonthByProduct: Map<string, Map<string, number>>
+  /** AU-market units for dual builds (omit when no product has an AU build). */
+  unitsAuByMonthByProduct?: Map<string, Map<string, number>>
   months: string[]
   arrivalsByPackaging?: Map<string, Array<{ po_id: string; po_number: string; month: string; qty: number }>>
 }
@@ -60,7 +64,7 @@ export interface AggregateInput {
 export function aggregatePackagingDemand(input: AggregateInput): SupplierGroup[] {
   const {
     packaging, suppliers, productPackaging, products,
-    unitsByMonthByProduct, months, arrivalsByPackaging,
+    unitsByMonthByProduct, unitsAuByMonthByProduct, months, arrivalsByPackaging,
   } = input
 
   const productById = new Map(products.map((p) => [p.id, p]))
@@ -90,17 +94,20 @@ export function aggregatePackagingDemand(input: AggregateInput): SupplierGroup[]
     if (!prod) continue
     linkedPackaging.add(pp.packaging_id)
 
+    const isAu = (pp.market ?? 'NZ') === 'AU'
+    const unitsMap = isAu ? unitsAuByMonthByProduct : unitsByMonthByProduct
+
     const perProduct = {
       id: prod.id,
       sku_code: prod.sku_code,
-      name: prod.name,
+      name: isAu ? `${prod.name} (AU)` : prod.name,
       quantityPerUnit: Number(pp.quantity_per_unit) || 0,
       demandByMonth: new Map<string, number>(months.map((m) => [m, 0])),
       totalDemand: 0,
     }
 
     for (const m of months) {
-      const units = unitsByMonthByProduct.get(m)?.get(prod.id) ?? 0
+      const units = unitsMap?.get(m)?.get(prod.id) ?? 0
       if (!units) continue
       const qty = units * perProduct.quantityPerUnit
       perProduct.demandByMonth.set(m, qty)

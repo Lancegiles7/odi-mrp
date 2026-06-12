@@ -10,7 +10,7 @@ import type {
   DemandForecast,
   ProductionPlan,
 } from './types/database.types'
-import { PLANNING_MONTHS } from './constants'
+import { PLANNING_MONTHS, NZ_CHANNEL_SET, AUS_CHANNEL_SET } from './constants'
 
 // ============================================================
 // Month utilities
@@ -87,6 +87,23 @@ export function getGrandTotal(
   if (!byCh) return 0
   let s = 0
   for (const v of byCh.values()) s += v.units
+  return s
+}
+
+/** Sum of one country's channels for a given (product, month). Used to route a
+ *  dual-build product's demand into the right recipe (NZ → Brand Nation, AU →
+ *  VMC). `country` is 'NZ' or 'AUS' (matching ChannelCountry). */
+export function getCountryTotal(
+  idx: ReturnType<typeof indexDemand>,
+  productId: string,
+  month: string,
+  country: 'NZ' | 'AUS',
+): number {
+  const byCh = idx.get(productId)?.get(month)
+  if (!byCh) return 0
+  const set = country === 'AUS' ? AUS_CHANNEL_SET : NZ_CHANNEL_SET
+  let s = 0
+  byCh.forEach((v, ch) => { if (set.has(ch as string)) s += v.units })
   return s
 }
 

@@ -98,6 +98,7 @@ export function calcProductCostSummary(
     | 'size_g'
     | 'serving_size'
     | 'packaging'
+    | 'packaging_au'
     | 'toll'
     | 'margin'
     | 'other'
@@ -116,6 +117,9 @@ export function calcProductCostSummary(
   >,
   bomItems: BomItemWithIngredient[],
   settings: Pick<SettingsSnapshot, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct' | 'fx_rates'>,
+  // The AU build's own recipe (market = 'AU' BOM). When omitted, a dual product
+  // falls back to the NZ recipe priced at AU ingredient costs (Phase 1 behaviour).
+  auBomItems?: BomItemWithIngredient[],
 ): ProductCostSummary {
   // Ingredient cost — each line costed on its WET grams (the input that's
   // bought), via calcLinePrice. Freeze-dried lines carry a wet_quantity_g;
@@ -170,16 +174,26 @@ export function calcProductCostSummary(
   // collapses to "NZ converted at FX" — i.e. exactly the previous behaviour.
   const isDual = !!(product.manufacturer_au && String(product.manufacturer_au).trim())
 
-  // AU ingredient total (AUD). Dual: cost each line on its AU landed cost
+  // AU build's recipe: its own market='AU' BOM when present, else the NZ recipe
+  // priced at AU ingredient costs (Phase 1 fallback).
+  const auItems = auBomItems && auBomItems.length > 0 ? auBomItems : bomItems
+
+  // AU ingredient total (AUD). Dual: cost each AU line on its AU landed cost
   // (ingredient.total_loaded_cost_au, else NZ ÷ FX), then apply the same
   // wastage + serving scaling. Non-dual: the NZ total simply converted.
   const auIngredientTotal = isDual
     ? round2(
-        bomItems.reduce((sum, item) => sum + calcLinePriceAu(item, fxRate), 0) *
+        auItems.reduce((sum, item) => sum + calcLinePriceAu(item, fxRate), 0) *
           (1 + wastagePct) *
           servingMultiplier,
       )
     : round2(toAud(ingredientTotal, 'NZD'))
+
+  // AU packaging cost (NZD rollup, converted to AUD below). Dual: the AU build's
+  // own packaging where it has any, else the NZ packaging. Non-dual: NZ.
+  const auPackaging = isDual
+    ? Number(product.packaging_au ?? product.packaging ?? 0)
+    : packaging
 
   // AU toll (AUD). Dual: VMC's own toll where entered, else the NZ toll
   // converted (sensible auto-fill). Non-dual: the NZ toll converted.
@@ -204,7 +218,7 @@ export function calcProductCostSummary(
   // input carries its own native currency.
   const auGrandTotal = round2(
     auIngredientTotal +
-    toAud(packaging,       'NZD') +
+    toAud(auPackaging,     'NZD') +
     auTollAmount +
     toAud(margin,    marginCur) +
     toAud(other,     otherCur) +

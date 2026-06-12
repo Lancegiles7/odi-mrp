@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import {
   rollingMonths, indexDemand, indexProduction,
-  getGrandTotal, getProductionCell, monthLabel,
+  getGrandTotal, getCountryTotal, getProductionCell, monthLabel,
 } from '@/lib/demand'
 import { getPlanningAnchor } from '@/lib/settings'
 import {
@@ -51,8 +51,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     supabase.from('suppliers')
       .select('id, name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
     supabase.from('boms')
-      .select('id, product_id, is_active')
-      .eq('is_active', true) as unknown as Promise<{ data: Array<{ id: string; product_id: string; is_active: boolean }> | null }>,
+      .select('id, product_id, is_active, market')
+      .eq('is_active', true) as unknown as Promise<{ data: Array<{ id: string; product_id: string; is_active: boolean; market: string | null }> | null }>,
     supabase.from('bom_items')
       .select('bom_id, ingredient_id, quantity_g, wet_quantity_g') as unknown as Promise<{ data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null }> | null }>,
     fetchAllRows<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }>((from, to) =>
@@ -73,36 +73,63 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       .not('ingredient_id', 'is', null) as unknown as Promise<{ data: Array<{ purchase_order_id: string; ingredient_id: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string }> | null }>,
   ])
 
-  // ── Build source data: month → product → units ─────────────
-  const unitsByMonthByProduct = new Map<string, Map<string, number>>()
-  for (const m of months) unitsByMonthByProduct.set(m, new Map())
-
-  if (source === 'forecast') {
-    const demandIdx = indexDemand((demand ?? []) as never[])
-    for (const p of products ?? []) {
-      for (const m of months) {
-        const units = getGrandTotal(demandIdx, p.id, m)
-        if (units) unitsByMonthByProduct.get(m)!.set(p.id, units)
-      }
-    }
-  } else {
-    const prodIdx = indexProduction((production ?? []) as never[])
-    for (const p of products ?? []) {
-      for (const m of months) {
-        const units = getProductionCell(prodIdx, p.id, m)
-        if (units) unitsByMonthByProduct.get(m)!.set(p.id, units)
-      }
-    }
+  // ── BOM lookups (per market) ───────────────────────────────
+  // NZ / default build vs the optional AU (VMC) build. Products with an AU BOM
+  // are "dual" and have their demand routed per market below.
+  const activeBomByProduct   = new Map<string, string>()
+  const activeBomByProductAu = new Map<string, string>()
+  for (const b of boms ?? []) {
+    if ((b.market ?? 'NZ') === 'AU') activeBomByProductAu.set(b.product_id, b.id)
+    else activeBomByProduct.set(b.product_id, b.id)
   }
-
-  // ── BOM lookups ────────────────────────────────────────────
-  const activeBomByProduct = new Map<string, string>()
-  for (const b of boms ?? []) activeBomByProduct.set(b.product_id, b.id)
 
   const bomItemsByBom = new Map<string, Array<{ ingredient_id: string; quantity_g: number; wet_quantity_g: number | null }>>()
   for (const it of bomItems ?? []) {
     if (!bomItemsByBom.has(it.bom_id)) bomItemsByBom.set(it.bom_id, [])
     bomItemsByBom.get(it.bom_id)!.push({ ingredient_id: it.ingredient_id, quantity_g: it.quantity_g, wet_quantity_g: it.wet_quantity_g })
+  }
+
+  // ── Source units, split by market for dual builds ──────────
+  // month → product → units. For a dual product the NZ map holds only NZ-channel
+  // units and the AU map holds AU-channel units, each exploding through its own
+  // recipe. Non-dual products keep their full units in the NZ map (unchanged).
+  const unitsByMonthByProduct   = new Map<string, Map<string, number>>()
+  const unitsAuByMonthByProduct = new Map<string, Map<string, number>>()
+  for (const m of months) { unitsByMonthByProduct.set(m, new Map()); unitsAuByMonthByProduct.set(m, new Map()) }
+
+  const demandIdx = indexDemand((demand ?? []) as never[])
+  const prodIdx   = indexProduction((production ?? []) as never[])
+
+  for (const p of products ?? []) {
+    const isDual = activeBomByProductAu.has(p.id)
+    for (const m of months) {
+      if (source === 'forecast') {
+        if (isDual) {
+          const nz = getCountryTotal(demandIdx, p.id, m, 'NZ')
+          const au = getCountryTotal(demandIdx, p.id, m, 'AUS')
+          if (nz) unitsByMonthByProduct.get(m)!.set(p.id, nz)
+          if (au) unitsAuByMonthByProduct.get(m)!.set(p.id, au)
+        } else {
+          const units = getGrandTotal(demandIdx, p.id, m)
+          if (units) unitsByMonthByProduct.get(m)!.set(p.id, units)
+        }
+      } else {
+        const total = getProductionCell(prodIdx, p.id, m)
+        if (!total) continue
+        if (isDual) {
+          // Split planned production by the forecast NZ:AU mix (all NZ if none).
+          const nzF = getCountryTotal(demandIdx, p.id, m, 'NZ')
+          const auF = getCountryTotal(demandIdx, p.id, m, 'AUS')
+          const denom = nzF + auF
+          const au = denom > 0 ? total * (auF / denom) : 0
+          const nz = total - au
+          if (nz) unitsByMonthByProduct.get(m)!.set(p.id, nz)
+          if (au) unitsAuByMonthByProduct.get(m)!.set(p.id, au)
+        } else {
+          unitsByMonthByProduct.get(m)!.set(p.id, total)
+        }
+      }
+    }
   }
 
   // ── Build arrivals map: ingredient_id → [{ po, month, qty }] ──
@@ -151,9 +178,11 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     ingredients: ingredients ?? [],
     suppliers: suppliers ?? [],
     activeBomByProduct,
+    activeBomByProductAu,
     bomItemsByBom,
     products: products ?? [],
     unitsByMonthByProduct,
+    unitsAuByMonthByProduct,
     months,
     arrivalsByIngredient,
   })

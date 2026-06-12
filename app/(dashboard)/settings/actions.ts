@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ROLES } from '@/lib/constants'
 import { computeLoadedNzd, type FxRates } from '@/lib/packaging-cost'
-import { recomputeProductPackagingCost } from '@/app/(dashboard)/packaging/actions'
+import { recomputeAllMarketsPackagingCost } from '@/app/(dashboard)/packaging/actions'
 
 function parseRate(raw: unknown): number | null {
   if (raw === null || raw === undefined || raw === '') return null
@@ -136,7 +136,7 @@ async function refreshAllLoadedCosts(
       .in('packaging_id', changedPackagingIds) as { data: Array<{ product_id: string }> | null }
     const productIds = Array.from(new Set((affectedLinks ?? []).map((r) => r.product_id)))
     for (const pid of productIds) {
-      await recomputeProductPackagingCost(supabase, pid)
+      await recomputeAllMarketsPackagingCost(supabase, pid)
     }
   }
 

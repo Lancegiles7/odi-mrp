@@ -149,7 +149,7 @@ export async function updatePackaging(formData: FormData) {
     .from('product_packaging').select('product_id').eq('packaging_id', id!) as
     { data: Array<{ product_id: string }> | null }
   for (const row of linked ?? []) {
-    await recomputeProductPackagingCost(supabase, row.product_id)
+    await recomputeAllMarketsPackagingCost(supabase, row.product_id)
     revalidatePath(`/products/${row.product_id}`)
     revalidatePath(`/products/${row.product_id}/edit`)
   }
@@ -204,7 +204,7 @@ export async function deletePackaging(id: string): Promise<{ ok: boolean; error?
 
   // Recompute affected products' packaging cost
   for (const pid of productIds) {
-    await recomputeProductPackagingCost(supabase, pid)
+    await recomputeAllMarketsPackagingCost(supabase, pid)
     revalidatePath(`/products/${pid}`)
     revalidatePath(`/products/${pid}/edit`)
   }
@@ -321,6 +321,8 @@ export async function batchCreatePackagingForProduct(input: {
 // ============================================================
 export async function setProductPackagingBom(input: {
   product_id: string
+  /** Which build's packaging this set is for. Defaults to the NZ build. */
+  market?: 'NZ' | 'AU'
   rows: Array<{
     packaging_id: string
     entry_mode?: EntryMode
@@ -335,9 +337,11 @@ export async function setProductPackagingBom(input: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
 
-  // Replace the whole set wholesale (simplest correct approach)
+  const market = input.market === 'AU' ? 'AU' : 'NZ'
+
+  // Replace this build's packaging set wholesale (leaves the other build alone).
   const { error: delErr } = await supabase
-    .from('product_packaging').delete().eq('product_id', input.product_id)
+    .from('product_packaging').delete().eq('product_id', input.product_id).eq('market', market)
   if (delErr) return { ok: false, error: delErr.message }
 
   const inserts = input.rows
@@ -351,6 +355,7 @@ export async function setProductPackagingBom(input: {
     .map((x) => ({
       product_id:        input.product_id,
       packaging_id:      x.row.packaging_id,
+      market,
       quantity_per_unit: x.qty,
       entry_mode:        x.mode,
       entry_value:       x.value,
@@ -363,9 +368,8 @@ export async function setProductPackagingBom(input: {
     if (insErr) return { ok: false, error: insErr.message }
   }
 
-  // Recompute the product's per-pack packaging cost from the In-cost rows so
-  // the existing product cost summary picks it up automatically.
-  await recomputeProductPackagingCost(supabase, input.product_id)
+  // Recompute this build's per-pack packaging cost so the cost summary updates.
+  await recomputeProductPackagingCost(supabase, input.product_id, market)
 
   revalidatePath(`/products/${input.product_id}`)
   revalidatePath(`/products/${input.product_id}/edit`)
@@ -377,11 +381,13 @@ export async function setProductPackagingBom(input: {
 export async function recomputeProductPackagingCost(
   supabase: ReturnType<typeof createClient>,
   productId: string,
+  market: 'NZ' | 'AU' = 'NZ',
 ): Promise<void> {
   const { data: links } = await supabase
     .from('product_packaging')
     .select('quantity_per_unit, include_in_cost, packaging:packaging_id ( total_loaded_cost_nzd )')
-    .eq('product_id', productId) as {
+    .eq('product_id', productId)
+    .eq('market', market) as {
       data: Array<{
         quantity_per_unit: number
         include_in_cost: boolean
@@ -397,10 +403,22 @@ export async function recomputeProductPackagingCost(
     total += cost * qty
   }
 
-  // Round to 4 dp (matches numeric(12,4) on products.packaging)
+  // Round to 4 dp (matches numeric(12,4) on the products column)
   const rounded = Math.round(total * 10000) / 10000
 
-  await supabase.from('products').update({ packaging: rounded }).eq('id', productId)
+  // NZ build rolls up to products.packaging; AU build to products.packaging_au.
+  const col = market === 'AU' ? 'packaging_au' : 'packaging'
+  await supabase.from('products').update({ [col]: rounded }).eq('id', productId)
+}
+
+// Recompute both builds — used when a packaging master cost changes, which can
+// affect either build's rollup.
+export async function recomputeAllMarketsPackagingCost(
+  supabase: ReturnType<typeof createClient>,
+  productId: string,
+): Promise<void> {
+  await recomputeProductPackagingCost(supabase, productId, 'NZ')
+  await recomputeProductPackagingCost(supabase, productId, 'AU')
 }
 
 // ============================================================

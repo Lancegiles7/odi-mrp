@@ -29,6 +29,8 @@ interface Props {
   productName: string
   initialRows: BomRow[]
   packaging: PackagingOption[]
+  /** Which build's packaging this set belongs to. Defaults to NZ. */
+  market?: 'NZ' | 'AU'
 }
 
 function resolveQty(mode: EntryMode, value: number): number {
@@ -36,7 +38,7 @@ function resolveQty(mode: EntryMode, value: number): number {
   return mode === 'per_group' ? 1 / value : value
 }
 
-export function ProductPackagingBom({ productId, productName, initialRows, packaging }: Props) {
+export function ProductPackagingBom({ productId, productName, initialRows, packaging, market = 'NZ' }: Props) {
   const router = useRouter()
   const [rows, setRows] = useState<BomRow[]>(initialRows)
   const [pending, start] = useTransition()
@@ -63,6 +65,7 @@ export function ProductPackagingBom({ productId, productName, initialRows, packa
       const filtered = rows.filter((r) => r.packaging_id && r.entry_value > 0)
       const res = await setProductPackagingBom({
         product_id: productId,
+        market,
         rows: filtered.map((r) => ({
           packaging_id:    r.packaging_id,
           entry_mode:      r.entry_mode,

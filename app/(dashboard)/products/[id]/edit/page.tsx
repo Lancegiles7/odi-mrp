@@ -6,6 +6,7 @@ import { updateProduct } from '../../actions'
 import { ProductForm } from '@/components/products/product-form'
 import { BomEditor } from '@/components/products/bom-editor'
 import { ProductPackagingBom } from '@/components/packaging/product-packaging-bom'
+import { AuBuildButton } from '@/components/products/au-build-button'
 import { getAppSettings } from '@/lib/settings'
 import type {
   BomItemWithIngredient,
@@ -35,15 +36,15 @@ export default async function EditProductPage({ params, searchParams }: PageProp
       .select(`
         *,
         boms (
-          id, version, is_active,
+          id, version, is_active, market,
           bom_items (
             id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
-            ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, is_organic, currency, price )
+            ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
           )
         )
       `)
       .eq('id', params.id)
-      .single() as unknown as Promise<{ data: (Product & { boms: Array<{ id: string; version: number; is_active: boolean; bom_items: BomItemWithIngredient[] }> }) | null }>,
+      .single() as unknown as Promise<{ data: (Product & { boms: Array<{ id: string; version: number; is_active: boolean; market: string; bom_items: BomItemWithIngredient[] }> }) | null }>,
     supabase
       .from('ingredients')
       .select('id, name, sku_code, unit_of_measure, total_loaded_cost, is_organic')
@@ -58,8 +59,8 @@ export default async function EditProductPage({ params, searchParams }: PageProp
       .order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string; total_loaded_cost_nzd: number | null }> | null },
     supabase
       .from('product_packaging')
-      .select('packaging_id, quantity_per_unit, entry_mode, entry_value, include_in_cost, notes')
-      .eq('product_id', params.id) as { data: Array<{ packaging_id: string; quantity_per_unit: number; entry_mode: string | null; entry_value: number | null; include_in_cost: boolean; notes: string | null }> | null },
+      .select('packaging_id, quantity_per_unit, entry_mode, entry_value, include_in_cost, notes, market')
+      .eq('product_id', params.id) as { data: Array<{ packaging_id: string; quantity_per_unit: number; entry_mode: string | null; entry_value: number | null; include_in_cost: boolean; notes: string | null; market: string | null }> | null },
   ])
 
   if (!product) notFound()
@@ -67,15 +68,35 @@ export default async function EditProductPage({ params, searchParams }: PageProp
   const errorMessage = searchParams.error ? (ERROR_MESSAGES[searchParams.error] ?? null) : null
   const action = updateProduct.bind(null, params.id)
 
-  const activeBom = product.boms?.find((b) => b.is_active)
-  const bomItems: BomItemWithIngredient[] = (activeBom?.bom_items ?? [])
-    .slice()
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  const sortItems = (items: BomItemWithIngredient[]) =>
+    items.slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+
+  // The NZ build is the default (rows with no market tag count as NZ); the AU
+  // build is optional and only present once "Add AU build" has been run.
+  const nzBom = product.boms?.find((b) => b.is_active && (b.market ?? 'NZ') === 'NZ')
+  const auBom = product.boms?.find((b) => b.is_active && b.market === 'AU')
+  const nzItems = sortItems(nzBom?.bom_items ?? [])
+  const auItems = sortItems(auBom?.bom_items ?? [])
+
+  const packRows = (m: 'NZ' | 'AU') =>
+    (productPackaging ?? [])
+      .filter((r) => (r.market ?? 'NZ') === m)
+      .map((r) => ({
+        packaging_id: r.packaging_id,
+        entry_mode: (r.entry_mode === 'per_group' ? 'per_group' : 'per_pack') as 'per_pack' | 'per_group',
+        entry_value: r.entry_value != null ? Number(r.entry_value) : Number(r.quantity_per_unit),
+        include_in_cost: r.include_in_cost ?? true,
+        notes: r.notes,
+      }))
 
   const allIngredients = (ingredients ?? []) as Pick<
     Ingredient,
     'id' | 'name' | 'sku_code' | 'unit_of_measure' | 'total_loaded_cost' | 'is_organic'
   >[]
+
+  const hasAuBuild = !!auBom
+  const makerNz = product.manufacturer ?? 'NZ build'
+  const makerAu = product.manufacturer_au ?? 'VMC'
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -93,14 +114,17 @@ export default async function EditProductPage({ params, searchParams }: PageProp
         fxRate={Number(settings.fx_rates.AUD)}
       />
 
-      {/* BOM editor — shown below the main form */}
+      {/* ── NZ build ─────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 pt-2">
+        <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
+        <h2 className="text-base font-semibold text-gray-900">NZ build · {makerNz}</h2>
+      </div>
+
       <div className="bg-white border border-gray-200 rounded-lg p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">Ingredients / BOM</h2>
-            {activeBom && (
-              <p className="text-xs text-gray-400 mt-0.5">Version {activeBom.version} (active)</p>
-            )}
+            <h3 className="text-sm font-semibold text-gray-900">Ingredients / BOM</h3>
+            {nzBom && <p className="text-xs text-gray-400 mt-0.5">Version {nzBom.version} (active)</p>}
           </div>
           <Link
             href={`/ingredients/new?return_to=${encodeURIComponent(`/products/${params.id}/edit`)}`}
@@ -110,10 +134,10 @@ export default async function EditProductPage({ params, searchParams }: PageProp
           </Link>
         </div>
 
-        {activeBom ? (
+        {nzBom ? (
           <BomEditor
-            bomId={activeBom.id}
-            initialItems={bomItems}
+            bomId={nzBom.id}
+            initialItems={nzItems}
             ingredients={allIngredients}
             sizeG={product.size_g ?? 0}
             servingSize={product.serving_size ?? 0}
@@ -127,14 +151,56 @@ export default async function EditProductPage({ params, searchParams }: PageProp
         productId={params.id}
         productName={product.name}
         packaging={packaging ?? []}
-        initialRows={(productPackaging ?? []).map((r) => ({
-          packaging_id: r.packaging_id,
-          entry_mode: (r.entry_mode === 'per_group' ? 'per_group' : 'per_pack') as 'per_pack' | 'per_group',
-          entry_value: r.entry_value != null ? Number(r.entry_value) : Number(r.quantity_per_unit),
-          include_in_cost: r.include_in_cost ?? true,
-          notes: r.notes,
-        }))}
+        market="NZ"
+        initialRows={packRows('NZ')}
       />
+
+      {/* ── AU build ─────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-2 pt-4 border-t border-gray-200">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+          <h2 className="text-base font-semibold text-gray-900">
+            AU build{hasAuBuild ? ` · ${makerAu}` : ''}
+          </h2>
+          {!hasAuBuild && <span className="text-xs text-gray-400">— made in Australia (e.g. VMC)</span>}
+        </div>
+        <AuBuildButton productId={params.id} exists={hasAuBuild} />
+      </div>
+
+      {hasAuBuild ? (
+        <>
+          <div className="bg-white border border-amber-200 rounded-lg p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Ingredients / BOM — AU</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Seeded from NZ · edit only what VMC sources differently</p>
+              </div>
+            </div>
+            {auBom && (
+              <BomEditor
+                bomId={auBom.id}
+                initialItems={auItems}
+                ingredients={allIngredients}
+                sizeG={product.size_g ?? 0}
+                servingSize={product.serving_size ?? 0}
+              />
+            )}
+          </div>
+
+          <ProductPackagingBom
+            productId={params.id}
+            productName={product.name}
+            packaging={packaging ?? []}
+            market="AU"
+            initialRows={packRows('AU')}
+          />
+        </>
+      ) : (
+        <p className="text-sm text-gray-500 -mt-2">
+          This product is made only in NZ. Add an AU build if {makerAu} (or another Australian maker)
+          produces it separately — the recipe and packaging start as a copy of NZ, then you change what differs.
+        </p>
+      )}
     </div>
   )
 }

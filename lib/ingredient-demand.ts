@@ -45,8 +45,18 @@ export interface IngredientDemandInput {
    *  wet input, not the dry pack. */
   products: Array<{ id: string; sku_code: string; name: string; size_g?: number | null; wet_weight_g?: number | null }>
 
-  /** month → product_id → units (from forecast grand total or production plan) */
+  /** month → product_id → units (from forecast grand total or production plan).
+   *  For a dual-build product this carries only the NZ-market units; the AU
+   *  units live in unitsAuByMonthByProduct and explode through the AU BOM. */
   unitsByMonthByProduct: Map<string, Map<string, number>>
+
+  /** Dual builds only — the AU (VMC) recipe per product: product_id → AU bom_id.
+   *  Omitted/empty when no product has an AU build (then nothing changes). */
+  activeBomByProductAu?: Map<string, string>
+
+  /** Dual builds only — month → product_id → AU-market units, exploded through
+   *  the AU BOM above. */
+  unitsAuByMonthByProduct?: Map<string, Map<string, number>>
 
   /** rolling month keys in display order (e.g. '2026-04-01') */
   months: string[]
@@ -177,12 +187,18 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
   // Walk: for each product with an active BOM, multiply each bom line's
   // quantity_g by that product's monthly units, convert to ingredient UOM,
   // and accumulate into the ingredient row (plus its per-product breakdown).
-  for (const [productId, bomId] of activeBomByProduct.entries()) {
+  // A dual-build product explodes twice — its NZ units through the NZ BOM and
+  // its AU units through the AU BOM — labelled so the breakdown stays clear.
+  const explode = (
+    productId: string,
+    bomId: string,
+    unitsMap: Map<string, Map<string, number>>,
+    label: string,
+  ) => {
     const product = productById.get(productId)
-    if (!product) continue
-
+    if (!product) return
     const items = bomItemsByBom.get(bomId)
-    if (!items || items.length === 0) continue
+    if (!items || items.length === 0) return
 
     for (const item of items) {
       const row = rowsByIngredient.get(item.ingredient_id)
@@ -191,7 +207,7 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
       const perProduct = {
         id: product.id,
         sku_code: product.sku_code,
-        name: product.name,
+        name: label ? `${product.name} ${label}` : product.name,
         // Order the WET input where set (freeze-dried), else the dry quantity.
         gramsPerUnit: Number(item.wet_quantity_g ?? item.quantity_g) || 0,
         demandByMonth: new Map<string, number>(months.map((m) => [m, 0])),
@@ -200,7 +216,7 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
 
       let productAny = false
       for (const m of months) {
-        const units = unitsByMonthByProduct.get(m)?.get(productId) ?? 0
+        const units = unitsMap.get(m)?.get(productId) ?? 0
         if (!units) continue
         const grams = units * perProduct.gramsPerUnit
         const qty = convertGramsToIngredientUom(grams, row.ingredient.unit_of_measure)
@@ -212,6 +228,17 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
       }
 
       if (productAny) row.products.push(perProduct)
+    }
+  }
+
+  // NZ / default build.
+  for (const [productId, bomId] of activeBomByProduct.entries()) {
+    explode(productId, bomId, unitsByMonthByProduct, '')
+  }
+  // AU (VMC) build — only present for dual products.
+  if (input.activeBomByProductAu && input.unitsAuByMonthByProduct) {
+    for (const [productId, bomId] of input.activeBomByProductAu.entries()) {
+      explode(productId, bomId, input.unitsAuByMonthByProduct, '(AU)')
     }
   }
 

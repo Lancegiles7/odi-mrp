@@ -43,6 +43,7 @@ type ProductRow = {
   boms: Array<{
     id: string
     is_active: boolean
+    market: string | null
     bom_items: BomItemWithIngredient[]
   }>
 }
@@ -74,7 +75,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         toll_currency, margin_currency, other_currency, freight_nz_currency, freight_au_currency,
         apply_fx, wastage_pct, manufacturer_au, is_active,
         boms (
-          id, is_active,
+          id, is_active, market,
           bom_items (
             id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
             ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
@@ -156,8 +157,9 @@ export default async function ProductsPage({ searchParams }: PageProps) {
           {orderedGroups.map((group) => {
             const items = group.items
             const summaries = items.map((p) => {
-              const activeBom = p.boms?.find((b) => b.is_active)
-              return calcProductCostSummary(p, activeBom?.bom_items ?? [], settings)
+              const nzBom = p.boms?.find((b) => b.is_active && (b.market ?? 'NZ') === 'NZ')
+              const auBom = p.boms?.find((b) => b.is_active && b.market === 'AU')
+              return calcProductCostSummary(p, nzBom?.bom_items ?? [], settings, auBom?.bom_items ?? [])
             })
             const gpValues = summaries
               .map((s) => s.gp_nz)

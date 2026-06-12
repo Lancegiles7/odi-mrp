@@ -89,7 +89,7 @@ export async function loadIngredientStrip(sb: SB, months: string[], first: strin
     all<Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_id: string | null; opening_stock_override: number | null; is_active: boolean }>>(
       sb.from('ingredients').select('id, sku_code, name, unit_of_measure, supplier_id, opening_stock_override, is_active').eq('is_active', true)),
     all<Array<{ id: string; name: string }>>(sb.from('suppliers').select('id, name')),
-    all<Array<{ id: string; product_id: string; is_active: boolean }>>(sb.from('boms').select('id, product_id, is_active').eq('is_active', true)),
+    all<Array<{ id: string; product_id: string; is_active: boolean; market: string | null }>>(sb.from('boms').select('id, product_id, is_active, market').eq('is_active', true)),
     all<Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null }>>(
       sb.from('bom_items').select('bom_id, ingredient_id, quantity_g, wet_quantity_g')),
     all<Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null }>>(
@@ -100,8 +100,10 @@ export async function loadIngredientStrip(sb: SB, months: string[], first: strin
 
   const unitsByMonthByProduct = await productionUnitsByMonth(sb, (products ?? []).map((p) => p.id), months, first, last)
 
+  // Dashboard rollup uses the NZ build for every product (the AU build's detail
+  // lives on the demand pages). Picking NZ avoids an AU BOM winning last-write.
   const activeBomByProduct = new Map<string, string>()
-  for (const b of boms ?? []) activeBomByProduct.set(b.product_id, b.id)
+  for (const b of boms ?? []) if ((b.market ?? 'NZ') !== 'AU') activeBomByProduct.set(b.product_id, b.id)
   const bomItemsByBom = new Map<string, Array<{ ingredient_id: string; quantity_g: number; wet_quantity_g: number | null }>>()
   for (const it of bomItems ?? []) {
     if (!bomItemsByBom.has(it.bom_id)) bomItemsByBom.set(it.bom_id, [])
@@ -155,8 +157,8 @@ export async function loadPackagingStrip(sb: SB, months: string[], first: string
     all<Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string; supplier_id: string | null; opening_stock_override: number | null }>>(
       sb.from('packaging').select('id, sku_code, name, type, unit_of_measure, supplier_id, opening_stock_override').eq('is_active', true)),
     all<Array<{ id: string; name: string }>>(sb.from('suppliers').select('id, name')),
-    all<Array<{ product_id: string; packaging_id: string; quantity_per_unit: number }>>(
-      sb.from('product_packaging').select('product_id, packaging_id, quantity_per_unit')),
+    all<Array<{ product_id: string; packaging_id: string; quantity_per_unit: number; market: string | null }>>(
+      sb.from('product_packaging').select('product_id, packaging_id, quantity_per_unit, market')),
     all<Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null }>>(
       sb.from('purchase_orders').select('id, po_number, status, expected_delivery_date').in('status', ['submitted', 'partially_received']).not('expected_delivery_date', 'is', null)),
     all<Array<{ purchase_order_id: string; packaging_id: string | null; quantity_ordered: number; quantity_received: number }>>(
@@ -179,9 +181,12 @@ export async function loadPackagingStrip(sb: SB, months: string[], first: string
     arrivalsByPackaging.get(ln.packaging_id)!.push({ po_id: ln.purchase_order_id, po_number: po.po_number, month: monthKey, qty: remaining })
   }
 
+  // Dashboard rollup uses NZ-build packaging only (total production through the
+  // NZ packaging); the AU build's detail lives on the packaging demand page.
+  const nzLinks = (links ?? []).filter((l) => (l.market ?? 'NZ') !== 'AU')
   const groups = aggregatePackagingDemand({
     packaging: packaging ?? [], suppliers: suppliers ?? [],
-    productPackaging: links ?? [], products: products ?? [],
+    productPackaging: nzLinks, products: products ?? [],
     unitsByMonthByProduct, months, arrivalsByPackaging,
   })
 
@@ -205,13 +210,13 @@ export async function loadPackagingStrip(sb: SB, months: string[], first: string
 export interface GroupGp { key: string; label: string; gpNz: number | null; gpAu: number | null; count: number }
 
 export async function loadGpByGroup(sb: SB, settings: SettingsSnapshot): Promise<GroupGp[]> {
-  const { data: products } = await all<Array<Record<string, unknown> & { product_type: string | null; boms?: Array<{ is_active: boolean; bom_items: BomItemWithIngredient[] }> }>>(
+  const { data: products } = await all<Array<Record<string, unknown> & { product_type: string | null; boms?: Array<{ is_active: boolean; market?: string | null; bom_items: BomItemWithIngredient[] }> }>>(
     sb.from('products').select(`
       id, product_type, size_g, serving_size, wet_weight_g, rrp, rrp_au,
       packaging, toll, toll_au, margin, other, freight, freight_nz, freight_au,
       toll_currency, margin_currency, other_currency, freight_nz_currency, freight_au_currency,
       apply_fx, wastage_pct, manufacturer_au,
-      boms ( is_active, bom_items (
+      boms ( is_active, market, bom_items (
         id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
         ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
       ))
@@ -219,9 +224,10 @@ export async function loadGpByGroup(sb: SB, settings: SettingsSnapshot): Promise
 
   const byGroup = new Map<string, { nz: number[]; au: number[] }>()
   for (const p of products ?? []) {
-    const activeBom = p.boms?.find((b) => b.is_active)
+    const nzBom = p.boms?.find((b) => b.is_active && (b.market ?? 'NZ') === 'NZ')
+    const auBom = p.boms?.find((b) => b.is_active && b.market === 'AU')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const summary = calcProductCostSummary(p as any, activeBom?.bom_items ?? [], settings)
+    const summary = calcProductCostSummary(p as any, nzBom?.bom_items ?? [], settings, auBom?.bom_items ?? [])
     const key = p.product_type ?? '_none'
     if (!byGroup.has(key)) byGroup.set(key, { nz: [], au: [] })
     const g = byGroup.get(key)!

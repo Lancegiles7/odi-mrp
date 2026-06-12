@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { recomputeProductPackagingCost } from '@/app/(dashboard)/packaging/actions'
 import { ROLES, SOFT_DELETE_WINDOW_DAYS } from '@/lib/constants'
 
 async function requireAdmin() {
@@ -325,6 +326,97 @@ export async function saveBomItems(
 
   revalidatePath('/products')
   return { success: true }
+}
+
+// ============================================================
+// addAuBuild — turn a product into a dual build.
+// Creates an AU (VMC) recipe + packaging seeded as a copy of the NZ build, so
+// the user only edits what VMC does differently. Idempotent: if an AU build
+// already exists it's a no-op.
+// ============================================================
+export async function addAuBuild(productId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  // Already has an active AU build? Nothing to do.
+  const { data: existingAu } = await supabase
+    .from('boms').select('id').eq('product_id', productId).eq('market', 'AU').eq('is_active', true).maybeSingle() as
+    { data: { id: string } | null }
+  if (existingAu) return { ok: true }
+
+  // Source = the active NZ build.
+  const { data: nzBom } = await supabase
+    .from('boms').select('id').eq('product_id', productId).eq('market', 'NZ').eq('is_active', true).maybeSingle() as
+    { data: { id: string } | null }
+
+  // Create the AU BOM shell.
+  const { data: auBom, error: bomErr } = await supabase
+    .from('boms').insert({ product_id: productId, market: 'AU', version: 1, is_active: true, created_by: user.id })
+    .select('id').single() as { data: { id: string } | null; error: { message: string } | null }
+  if (bomErr || !auBom) return { ok: false, error: bomErr?.message ?? 'Could not create AU build' }
+
+  // Copy the NZ recipe lines into the AU BOM.
+  if (nzBom) {
+    const { data: srcItems } = await supabase
+      .from('bom_items')
+      .select('ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order')
+      .eq('bom_id', nzBom.id) as { data: Array<Record<string, unknown>> | null }
+    if (srcItems && srcItems.length > 0) {
+      const { error: copyErr } = await supabase
+        .from('bom_items')
+        .insert(srcItems.map((it) => ({ ...it, bom_id: auBom.id })))
+      if (copyErr) return { ok: false, error: copyErr.message }
+    }
+  }
+
+  // Copy the NZ packaging links into the AU market.
+  const { data: nzPack } = await supabase
+    .from('product_packaging')
+    .select('packaging_id, quantity_per_unit, entry_mode, entry_value, include_in_cost, notes')
+    .eq('product_id', productId).eq('market', 'NZ') as { data: Array<Record<string, unknown>> | null }
+  if (nzPack && nzPack.length > 0) {
+    await supabase.from('product_packaging').insert(nzPack.map((p) => ({ ...p, product_id: productId, market: 'AU' })))
+  }
+
+  // Seed the dual-build switches: name VMC + copy toll + AU packaging rollup.
+  const { data: prod } = await supabase
+    .from('products').select('manufacturer_au, toll, toll_au').eq('id', productId).maybeSingle() as
+    { data: { manufacturer_au: string | null; toll: number | null; toll_au: number | null } | null }
+  await supabase.from('products').update({
+    manufacturer_au: prod?.manufacturer_au?.trim() || 'VMC',
+    toll_au:         prod?.toll_au ?? prod?.toll ?? null,
+  }).eq('id', productId)
+  await recomputeProductPackagingCost(supabase, productId, 'AU')
+
+  revalidatePath(`/products/${productId}`)
+  revalidatePath(`/products/${productId}/edit`)
+  return { ok: true }
+}
+
+// ============================================================
+// removeAuBuild — drop the AU build entirely (back to NZ-only).
+// ============================================================
+export async function removeAuBuild(productId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  const { data: auBoms } = await supabase
+    .from('boms').select('id').eq('product_id', productId).eq('market', 'AU') as
+    { data: Array<{ id: string }> | null }
+  for (const b of auBoms ?? []) {
+    await supabase.from('bom_items').delete().eq('bom_id', b.id)
+  }
+  await supabase.from('boms').delete().eq('product_id', productId).eq('market', 'AU')
+  await supabase.from('product_packaging').delete().eq('product_id', productId).eq('market', 'AU')
+  await supabase.from('products')
+    .update({ packaging_au: null, manufacturer_au: null, toll_au: null })
+    .eq('id', productId)
+
+  revalidatePath(`/products/${productId}`)
+  revalidatePath(`/products/${productId}/edit`)
+  return { ok: true }
 }
 
 // ============================================================

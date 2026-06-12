@@ -28,7 +28,7 @@ export default async function ProductPrintPage({ params }: PageProps) {
       .select(`
         *,
         boms (
-          id, version, is_active, notes,
+          id, version, is_active, notes, market,
           bom_items (
             id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
             ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
@@ -61,19 +61,25 @@ export default async function ProductPrintPage({ params }: PageProps) {
 
   if (!product) notFound()
 
-  const activeBom = (product.boms as Array<{
+  const allBoms = (product.boms as Array<{
     id: string
     version: number
     is_active: boolean
     notes: string | null
+    market: string | null
     bom_items: BomItemWithIngredient[]
-  }>)?.find((b) => b.is_active)
+  }>) ?? []
+  const activeBom = allBoms.find((b) => b.is_active && (b.market ?? 'NZ') === 'NZ')
+  const auBom     = allBoms.find((b) => b.is_active && b.market === 'AU')
 
   const bomItems: BomItemWithIngredient[] = (activeBom?.bom_items ?? [])
     .slice()
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+  const auBomItems: BomItemWithIngredient[] = (auBom?.bom_items ?? [])
+    .slice()
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
-  const summary   = calcProductCostSummary(product, bomItems, settings)
+  const summary   = calcProductCostSummary(product, bomItems, settings, auBomItems)
   const typeLabel = product.product_type ? PRODUCT_GROUP_LABELS[product.product_type] ?? product.product_type : null
   const totalWeight = bomItems.reduce((s, i) => s + Number(i.quantity_g || 0), 0)
 
