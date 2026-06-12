@@ -43,7 +43,7 @@ export interface IngredientDemandInput {
   /** products keyed by id (non-deleted only). size_g / wet_weight_g drive the
    *  freeze-dry scale (wet ÷ dry) for melts/puffs — ingredient demand is on the
    *  wet input, not the dry pack. */
-  products: Array<{ id: string; sku_code: string; name: string; size_g?: number | null; wet_weight_g?: number | null }>
+  products: Array<{ id: string; sku_code: string; name: string; size_g?: number | null; wet_weight_g?: number | null; wastage_pct?: number | null }>
 
   /** month → product_id → units (from forecast grand total or production plan).
    *  For a dual-build product this carries only the NZ-market units; the AU
@@ -200,6 +200,10 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
     const items = bomItemsByBom.get(bomId)
     if (!items || items.length === 0) return
 
+    // Contingency / wastage lifts the grams ordered per unit, so procurement
+    // covers what's lost in manufacturing (matches the costing).
+    const wastage = 1 + (Number(product.wastage_pct ?? 0) || 0)
+
     for (const item of items) {
       const row = rowsByIngredient.get(item.ingredient_id)
       if (!row) continue  // ingredient deleted / not loaded
@@ -208,8 +212,9 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
         id: product.id,
         sku_code: product.sku_code,
         name: label ? `${product.name} ${label}` : product.name,
-        // Order the WET input where set (freeze-dried), else the dry quantity.
-        gramsPerUnit: Number(item.wet_quantity_g ?? item.quantity_g) || 0,
+        // Order the WET input where set (freeze-dried), else the dry quantity,
+        // lifted by the product's contingency %.
+        gramsPerUnit: (Number(item.wet_quantity_g ?? item.quantity_g) || 0) * wastage,
         demandByMonth: new Map<string, number>(months.map((m) => [m, 0])),
         totalDemand: 0,
       }

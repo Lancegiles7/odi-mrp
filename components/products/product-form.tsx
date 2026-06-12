@@ -280,6 +280,9 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
                 step="0.01"
                 placeholder="0.00"
               />
+              <p className="mt-1 text-[11px] text-gray-400">
+                Applied to every ingredient — lifts each $/unit and the quantity ordered (procurement demand). Not a separate cost line.
+              </p>
             </Field>
 
             {/* Currency model — informational. Base cost is NZD; AU is always derived. */}

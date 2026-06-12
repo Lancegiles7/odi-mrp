@@ -220,7 +220,7 @@ export default async function ProductPrintPage({ params }: PageProps) {
               <th className="text-right px-2 py-1.5 font-semibold">% of wt</th>
               <th className="text-right px-2 py-1.5 font-semibold">Serve (g)</th>
               <th className="text-right px-2 py-1.5 font-semibold">$/kg</th>
-              <th className="text-right px-2 py-1.5 font-semibold">$/unit</th>
+              <th className="text-right px-2 py-1.5 font-semibold">$/unit{product.wastage_pct > 0 ? ` · +${(product.wastage_pct * 100).toFixed(1)}%` : ''}</th>
             </tr>
           </thead>
           <tbody>
@@ -240,7 +240,7 @@ export default async function ProductPrintPage({ params }: PageProps) {
                   <td className="px-2 py-1.5 text-right tabular-nums align-top">{(calc.percentage * 100).toFixed(1)}%</td>
                   <td className="px-2 py-1.5 text-right tabular-nums align-top">{calc.serve_amount.toFixed(2)}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums align-top">{formatCurrency(calc.price_per_kg)}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums font-medium align-top">{formatCurrency(calc.price_per_unit)}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums font-medium align-top">{formatCurrency(calc.price_per_unit * (1 + Number(product.wastage_pct ?? 0)))}</td>
                 </tr>
               )
             })}
@@ -249,14 +249,12 @@ export default async function ProductPrintPage({ params }: PageProps) {
 
         {/* Cost build-up */}
         <div className="mt-4 pt-3 border-t border-gray-200 text-[11px]">
-          {product.wastage_pct > 0 && (
-            <div className="flex justify-between py-0.5 text-gray-600">
-              <span>+ Contingency / wastage ({(product.wastage_pct * 100).toFixed(1)}%)</span>
-              <span className="tabular-nums">{formatCurrency(summary.ingredient_total_per_pack - summary.ingredient_subtotal)}</span>
-            </div>
-          )}
+          {/* Contingency is baked into each $/unit above — no separate line. */}
           <div className="flex justify-between py-1 font-semibold border-t border-gray-100 mt-1">
-            <span>Ingredients subtotal (per pack) · {totalWeight.toFixed(2)} g</span>
+            <span>
+              Ingredients subtotal (per pack) · {totalWeight.toFixed(2)} g
+              {product.wastage_pct > 0 && <span className="ml-1 text-[9px] text-gray-400 font-normal">incl. {(product.wastage_pct * 100).toFixed(1)}% contingency</span>}
+            </span>
             <span className="tabular-nums">{formatCurrency(summary.ingredient_total_per_pack)}</span>
           </div>
 

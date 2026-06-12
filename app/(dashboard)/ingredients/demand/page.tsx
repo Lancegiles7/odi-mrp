@@ -40,8 +40,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     { data: openPos }, { data: openPoLines },
   ] = await Promise.all([
     supabase.from('products')
-      .select('id, sku_code, name, size_g, wet_weight_g')
-      .is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; size_g: number | null; wet_weight_g: number | null }> | null }>,
+      .select('id, sku_code, name, size_g, wet_weight_g, wastage_pct')
+      .is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; size_g: number | null; wet_weight_g: number | null; wastage_pct: number | null }> | null }>,
     supabase.from('ingredients')
       .select('id, sku_code, name, unit_of_measure, supplier_id, opening_stock_override, is_active')
       .eq('is_active', true) as unknown as Promise<{ data: Array<{

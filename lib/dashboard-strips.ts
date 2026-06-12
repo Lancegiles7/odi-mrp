@@ -93,7 +93,7 @@ async function productionUnitsByMonth(sb: SB, productIds: string[], months: stri
 export async function loadIngredientStrip(sb: SB, months: string[], first: string, last: string): Promise<StripData> {
   const [{ data: products }, { data: ingredients }, { data: suppliers }, { data: boms }, { data: bomItems }, { data: openPos }, { data: openPoLines }] = await Promise.all([
     all<Array<{ id: string; sku_code: string; name: string; size_g: number | null; wet_weight_g: number | null }>>(
-      sb.from('products').select('id, sku_code, name, size_g, wet_weight_g').is('deleted_at', null)),
+      sb.from('products').select('id, sku_code, name, size_g, wet_weight_g, wastage_pct').is('deleted_at', null)),
     all<Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_id: string | null; opening_stock_override: number | null; is_active: boolean }>>(
       sb.from('ingredients').select('id, sku_code, name, unit_of_measure, supplier_id, opening_stock_override, is_active').eq('is_active', true)),
     all<Array<{ id: string; name: string }>>(sb.from('suppliers').select('id, name')),

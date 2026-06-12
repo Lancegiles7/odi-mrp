@@ -261,7 +261,9 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                   <th className="text-right font-medium px-5 py-2">% of wt</th>
                   <th className="text-right font-medium px-5 py-2">Serve (g)</th>
                   <th className="text-right font-medium px-5 py-2">$/kg <span className="text-gray-400 normal-case">(supplier)</span></th>
-                  <th className="text-right font-medium px-5 py-2">$/unit <span className="text-gray-400 normal-case">(supplier)</span></th>
+                  <th className="text-right font-medium px-5 py-2">
+                    $/unit <span className="text-gray-400 normal-case">(supplier{product.wastage_pct > 0 ? ` · incl. ${(product.wastage_pct * 100).toFixed(1)}%` : ''})</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -271,7 +273,9 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                   const cur        = item.ingredients.currency ?? 'NZD'
                   const sym        = curSym(cur)
                   const nativePerKg   = item.price_override ?? item.ingredients.price ?? 0
-                  const nativePerUnit = calc.unit_in_kg * nativePerKg
+                  // $/unit includes the product's contingency, so the lines sum
+                  // straight to the subtotal (no separate wastage line).
+                  const nativePerUnit = calc.unit_in_kg * nativePerKg * (1 + Number(product.wastage_pct ?? 0))
                   return (
                     <tr key={item.id}>
                       <td className="px-5 py-2.5">
@@ -294,21 +298,13 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                 })}
               </tbody>
               <tfoot className="bg-gray-50 text-sm">
-                {/* Wastage line — sits between the last ingredient and the subtotal */}
-                {product.wastage_pct > 0 && (
-                  <tr className="border-t border-gray-200">
-                    <td colSpan={7} className="px-5 py-2 text-xs text-gray-600">
-                      + Contingency / wastage ({(product.wastage_pct * 100).toFixed(1)}%)
-                    </td>
-                    <td className="px-5 py-2 text-right text-xs tabular-nums text-gray-600">
-                      {formatCurrency(summary.ingredient_total_per_pack - summary.ingredient_subtotal)}
-                    </td>
-                  </tr>
-                )}
-
-                {/* Subtotal per pack — includes wastage */}
-                <tr className={product.wastage_pct > 0 ? '' : 'border-t border-gray-200'}>
-                  <td colSpan={2} className="px-5 py-2 font-medium">Ingredients subtotal (per pack)</td>
+                {/* Subtotal per pack — the contingency is baked into each $/unit
+                    above, so there's no separate wastage line. */}
+                <tr className="border-t border-gray-200">
+                  <td colSpan={2} className="px-5 py-2 font-medium">
+                    Ingredients subtotal (per pack)
+                    {product.wastage_pct > 0 && <span className="ml-1 text-[10px] text-gray-400 font-normal">incl. {(product.wastage_pct * 100).toFixed(1)}% contingency</span>}
+                  </td>
                   <td className="px-5 py-2 text-right tabular-nums">
                     {bomItems.reduce((s, i) => s + Number(i.quantity_g || 0), 0).toFixed(2)}
                   </td>
