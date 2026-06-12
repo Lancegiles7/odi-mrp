@@ -298,7 +298,11 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
                 <tr key={l.id} className="border-b border-gray-100">
                   <td className="px-2 py-2 align-top">
                     <div className="font-medium">{name}</div>
-                    {sku && <div className="text-gray-500 text-[10px]">Internal SKU: {sku}{supplierSku ? `  ·  Supplier code: ${supplierSku}` : ''}</div>}
+                    {(sku || supplierSku) && (
+                      <div className="text-gray-500 text-[10px]">
+                        {sku ? `Internal SKU: ${sku}` : ''}{sku && supplierSku ? '  ·  ' : ''}{supplierSku ? `Supplier code: ${supplierSku}` : ''}
+                      </div>
+                    )}
                     {l.notes && <div className="text-gray-500 text-[10px]">{l.notes}</div>}
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums align-top">{Number(l.quantity_ordered).toLocaleString()}</td>
