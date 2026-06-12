@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { Ingredient, Supplier } from '@/lib/types/database.types'
-import { UNITS_OF_MEASURE, SUPPORTED_CURRENCIES, INGREDIENT_CERTIFICATIONS, type CurrencyCode } from '@/lib/constants'
+import { UNITS_OF_MEASURE, SUPPORTED_CURRENCIES, INGREDIENT_CERTIFICATIONS, INGREDIENT_CATEGORIES, type CurrencyCode } from '@/lib/constants'
 import { SupplierPicker } from './supplier-picker'
 import { OriginalOrderSection } from '@/components/shared/original-order-section'
 import type { FxRatesJson } from '@/lib/settings'
@@ -54,6 +54,9 @@ export function IngredientForm({
   const [freight, setFreight] = useState(ingredient?.freight?.toString() ?? '')
   const [currency, setCurrency] = useState<CurrencyCode>(
     (((ingredient as unknown as { currency?: string })?.currency as CurrencyCode) ?? 'NZD'),
+  )
+  const [category, setCategory] = useState<string>(
+    (ingredient as unknown as { category?: string })?.category ?? 'purchased',
   )
   const [fxOverride, setFxOverride] = useState<string>(
     (ingredient as unknown as { fx_rate_override?: number | null })?.fx_rate_override?.toString() ?? '',
@@ -119,6 +122,29 @@ export function IngredientForm({
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
+            <select
+              id="category"
+              name="category"
+              value={category}
+              onChange={(e) => {
+                const next = e.target.value
+                setCategory(next)
+                // Snack ingredients are supplied by the manufacturer in AUD.
+                if (next === 'snack') setCurrency('AUD')
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+            >
+              {INGREDIENT_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            {category === 'snack' && (
+              <p className="text-xs text-gray-400 mt-1">Supplied by the snack manufacturer · priced in AUD.</p>
+            )}
           </div>
 
           <div className="sm:col-span-2">

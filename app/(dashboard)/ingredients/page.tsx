@@ -14,6 +14,7 @@ interface PageProps {
     q?:      string
     status?: string
     group?:  string
+    category?: string
     deleted?: string
   }
 }
@@ -28,6 +29,7 @@ interface IngredientRow {
   freight: number | null
   total_loaded_cost: number | null
   is_organic: boolean
+  category: string
   origin: string | null
   certification: IngredientCertification | null
   supplier_id: string | null
@@ -41,13 +43,14 @@ export default async function IngredientsPage({ searchParams }: PageProps) {
   const search   = searchParams.q?.trim() ?? ''
   const status   = searchParams.status?.trim() ?? ''
   const group    = searchParams.group?.trim()  ?? ''
+  const category = searchParams.category?.trim() ?? ''
 
   // ── Base query ───────────────────────────────────────────────
   let query = supabase
     .from('ingredients')
     .select(`
       id, sku_code, name, lead_time, status, price, freight, total_loaded_cost,
-      is_organic, origin, certification, supplier_id,
+      is_organic, category, origin, certification, supplier_id,
       suppliers ( name )
     `)
     .eq('is_active', true)
@@ -68,6 +71,7 @@ export default async function IngredientsPage({ searchParams }: PageProps) {
   }
 
   if (status) query = query.eq('status', status)
+  if (category) query = query.eq('category', category)
 
   const { data: ingredients, error } = await query as unknown as { data: IngredientRow[] | null; error: { message: string } | null }
 
@@ -154,6 +158,7 @@ export default async function IngredientsPage({ searchParams }: PageProps) {
           defaultSearch={search}
           defaultStatus={status}
           defaultGroup={group}
+          defaultCategory={category}
         />
       </div>
 
@@ -212,6 +217,9 @@ export default async function IngredientsPage({ searchParams }: PageProps) {
                       </td>
                       <td className="px-4 py-2.5 font-medium text-gray-900">
                         <Link href={`/ingredients/${ing.id}`} className="hover:underline">{ing.name}</Link>
+                        {ing.category === 'snack' && (
+                          <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800">Snack</span>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">
                         {supplierName ?? <span className="text-gray-300">—</span>}

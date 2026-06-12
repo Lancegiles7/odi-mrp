@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useCallback } from 'react'
-import { PRODUCT_GROUPS } from '@/lib/constants'
+import { PRODUCT_GROUPS, INGREDIENT_CATEGORIES } from '@/lib/constants'
 
 const STATUS_OPTIONS = [
   { value: '',          label: 'All statuses' },
@@ -24,9 +24,10 @@ interface IngredientsSearchProps {
   defaultSearch: string
   defaultStatus: string
   defaultGroup:  string
+  defaultCategory: string
 }
 
-export function IngredientsSearch({ defaultSearch, defaultStatus, defaultGroup }: IngredientsSearchProps) {
+export function IngredientsSearch({ defaultSearch, defaultStatus, defaultGroup, defaultCategory }: IngredientsSearchProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -67,6 +68,20 @@ export function IngredientsSearch({ defaultSearch, defaultStatus, defaultGroup }
         >
           {STATUS_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-[10px] uppercase tracking-wider text-gray-500 mb-1 font-semibold">Category</label>
+        <select
+          defaultValue={defaultCategory}
+          onChange={(e) => updateParams('category', e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+        >
+          <option value="">All categories</option>
+          {INGREDIENT_CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>{c.label}</option>
           ))}
         </select>
       </div>

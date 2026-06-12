@@ -233,6 +233,7 @@ export type Database = {
           freight: number | null
           total_loaded_cost: number | null
           is_organic: boolean
+          category: string
           is_active: boolean
           opening_stock_override: number | null
           created_at: string
@@ -255,6 +256,7 @@ export type Database = {
           freight?: number | null
           total_loaded_cost?: number | null
           is_organic?: boolean
+          category?: string
           is_active?: boolean
           opening_stock_override?: number | null
           created_at?: string
@@ -277,6 +279,7 @@ export type Database = {
           freight?: number | null
           total_loaded_cost?: number | null
           is_organic?: boolean
+          category?: string
           is_active?: boolean
           opening_stock_override?: number | null
           created_at?: string

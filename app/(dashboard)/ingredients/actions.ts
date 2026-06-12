@@ -138,6 +138,7 @@ interface IngredientPayload {
   unit_of_measure: string | null
   description: string | null
   is_organic: boolean
+  category: string
   is_active: boolean
   // Supplier's own SKU/code for this ingredient (migration 016)
   supplier_sku_code: string | null
@@ -202,6 +203,7 @@ async function buildPayloadFromForm(
     unit_of_measure:    str(formData.get('unit_of_measure')),
     description:        str(formData.get('description')),
     is_organic:         (formData.get('is_organic') as string) !== 'false',
+    category:           ((formData.get('category') as string) === 'snack' ? 'snack' : 'purchased'),
     is_active:          true,
     supplier_sku_code:  str(formData.get('supplier_sku_code')),
     currency,

@@ -333,6 +333,17 @@ export const INGREDIENT_STATUSES = [
   { value: 'inactive',  label: 'Inactive',  chip: 'bg-gray-200 text-gray-500'       },
 ] as const
 
+// Ingredient category — directly purchased vs supplied by a contract
+// manufacturer. Snack ingredients are priced in AUD. Add new buckets here
+// (and to the DB CHECK in migration 039) as other manufacturer groups appear.
+export const INGREDIENT_CATEGORIES = [
+  { value: 'purchased', label: 'Purchased', chip: 'bg-gray-100 text-gray-600'  },
+  { value: 'snack',     label: 'Snack',     chip: 'bg-amber-100 text-amber-800' },
+] as const
+
+export const INGREDIENT_CATEGORY_LABELS: Record<string, string> =
+  Object.fromEntries(INGREDIENT_CATEGORIES.map((c) => [c.value, c.label]))
+
 
 // ============================================================
 // ENHANCEMENT LOG — categories, priorities, statuses
