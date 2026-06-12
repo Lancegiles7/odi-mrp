@@ -11,7 +11,8 @@ interface EditorRow {
   ingredient_id: string
   ingredient_name: string
   ingredient_sku: string
-  quantity_g: number | ''
+  quantity_g: number | ''          // dry g (pack composition)
+  wet_quantity_g: number | ''      // wet input g (freeze-dried); blank = same as dry
   price_override: number | '' | null
   notes: string
   sort_order: number
@@ -38,6 +39,7 @@ function makeRow(item?: BomItemWithIngredient, idx?: number): EditorRow {
       ingredient_name: item.ingredients.name,
       ingredient_sku: item.ingredients.sku_code,
       quantity_g: item.quantity_g,
+      wet_quantity_g: item.wet_quantity_g ?? '',
       price_override: item.price_override ?? '',
       notes: item.notes ?? '',
       sort_order: item.sort_order,
@@ -51,6 +53,7 @@ function makeRow(item?: BomItemWithIngredient, idx?: number): EditorRow {
     ingredient_name: '',
     ingredient_sku: '',
     quantity_g: '',
+    wet_quantity_g: '',
     price_override: '',
     notes: '',
     sort_order: idx ?? 0,
@@ -69,6 +72,7 @@ function calcRow(row: EditorRow, sizeG: number, servingSize: number) {
     {
       ingredient_id: row.ingredient_id,
       quantity_g: qty,
+      wet_quantity_g: row.wet_quantity_g === '' ? null : Number(row.wet_quantity_g),
       price_override: (row.price_override !== '' && row.price_override !== null) ? Number(row.price_override) : null,
       ingredients: {
         id: row.ingredient_id,
@@ -133,6 +137,7 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
         .map((r, i) => ({
           ingredient_id: r.ingredient_id,
           quantity_g: Number(r.quantity_g),
+          wet_quantity_g: r.wet_quantity_g === '' ? null : Number(r.wet_quantity_g),
           price_override: (r.price_override !== '' && r.price_override !== null) ? Number(r.price_override) : null,
           notes: r.notes || null,
           sort_order: i,
@@ -156,6 +161,12 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
     return sum + (row.quantity_g === '' ? 0 : Number(row.quantity_g))
   }, 0)
 
+  const totalWetG = rows.reduce((sum, row) => {
+    const wet = row.wet_quantity_g !== '' ? Number(row.wet_quantity_g)
+              : row.quantity_g !== '' ? Number(row.quantity_g) : 0
+    return sum + wet
+  }, 0)
+
   const totalPct = sizeG > 0 ? totalQtyG / sizeG : 0
 
   return (
@@ -165,7 +176,8 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-xs">
               <th className="text-left px-3 py-2 font-medium text-gray-600 w-[260px]">Ingredient</th>
-              <th className="text-right px-3 py-2 font-medium text-gray-600 w-24">Qty (g)</th>
+              <th className="text-right px-3 py-2 font-medium text-gray-600 w-24">Dry g</th>
+              <th className="text-right px-3 py-2 font-medium text-blue-600 w-24">Wet g</th>
               <th className="text-right px-3 py-2 font-medium text-gray-600 w-20">%</th>
               <th className="text-right px-3 py-2 font-medium text-gray-600 w-24">$/kg</th>
               <th className="text-right px-3 py-2 font-medium text-gray-600 w-24">Override</th>
@@ -195,7 +207,7 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
                     </select>
                   </td>
 
-                  {/* Qty (g) */}
+                  {/* Dry g (pack composition) */}
                   <td className="px-2 py-1.5">
                     <input
                       type="number"
@@ -205,6 +217,19 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
                       onChange={(e) => updateRow(row.key, { quantity_g: e.target.value === '' ? '' : Number(e.target.value) })}
                       placeholder="0"
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-gray-900"
+                    />
+                  </td>
+
+                  {/* Wet g (input — drives cost & procurement; blank = same as dry) */}
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={row.wet_quantity_g}
+                      onChange={(e) => updateRow(row.key, { wet_quantity_g: e.target.value === '' ? '' : Number(e.target.value) })}
+                      placeholder={row.quantity_g === '' ? '—' : '= dry'}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </td>
 
@@ -275,6 +300,9 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
               <td className="px-3 py-2 text-right font-semibold text-gray-900 tabular-nums text-sm">
                 {totalQtyG > 0 ? totalQtyG.toFixed(2) : '—'}
               </td>
+              <td className="px-3 py-2 text-right font-semibold text-blue-700 tabular-nums text-sm">
+                {totalWetG > 0 ? totalWetG.toFixed(2) : '—'}
+              </td>
               <td className="px-3 py-2 text-right font-semibold text-gray-900 tabular-nums text-sm">
                 {sizeG > 0 ? `${(totalPct * 100).toFixed(1)}%` : '—'}
               </td>
@@ -286,8 +314,8 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
             </tr>
             {sizeG > 0 && Math.abs(totalQtyG - sizeG) > 0.01 && (
               <tr>
-                <td colSpan={8} className="px-3 py-1 text-[11px] text-amber-700 bg-amber-50">
-                  Total weight {totalQtyG.toFixed(2)} g doesn&apos;t match product size {sizeG} g
+                <td colSpan={9} className="px-3 py-1 text-[11px] text-amber-700 bg-amber-50">
+                  Dry weight {totalQtyG.toFixed(2)} g doesn&apos;t match product size {sizeG} g
                   {totalQtyG < sizeG ? ` (${(sizeG - totalQtyG).toFixed(2)} g under)` : ` (${(totalQtyG - sizeG).toFixed(2)} g over)`}
                 </td>
               </tr>

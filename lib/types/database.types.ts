@@ -483,6 +483,7 @@ export type Database = {
           bom_id: string
           ingredient_id: string
           quantity_g: number
+          wet_quantity_g: number | null
           uom: string
           price_override: number | null
           notes: string | null
@@ -495,6 +496,7 @@ export type Database = {
           bom_id: string
           ingredient_id: string
           quantity_g: number
+          wet_quantity_g?: number | null
           uom?: string
           price_override?: number | null
           notes?: string | null
@@ -507,6 +509,7 @@ export type Database = {
           bom_id?: string
           ingredient_id?: string
           quantity_g?: number
+          wet_quantity_g?: number | null
           uom?: string
           price_override?: number | null
           notes?: string | null
@@ -922,10 +925,8 @@ export type IngredientWithSupplier = Ingredient & {
 // `grand_total` is retained as an alias for `nz_grand_total` for
 // backward compatibility with older callers.
 export interface ProductCostSummary {
-  ingredient_subtotal: number         // per-pack, dry (BOM as entered), before wastage/yield
-  freeze_dry_scale: number            // wet_weight_g / size_g (1 if not freeze-dried)
-  ingredient_subtotal_wet: number     // ingredient_subtotal × freeze_dry_scale (wet input cost)
-  ingredient_total_per_pack: number   // per-pack, after yield + wastage
+  ingredient_subtotal: number         // per-pack, on wet grams, before wastage
+  ingredient_total_per_pack: number   // per-pack, after wastage
   serving_multiplier: number          // serving_size / size_g (1 if unset)
   ingredient_total: number            // per-serving, after wastage × serving multiplier
   base_cost: number                   // ingredient_total + packaging + toll + margin + other + NZ freight

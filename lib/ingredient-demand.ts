@@ -32,10 +32,12 @@ export interface IngredientDemandInput {
   /** active BOM rows: one per product → bom_id */
   activeBomByProduct: Map<string, string>
 
-  /** BOM line items grouped by bom_id */
+  /** BOM line items grouped by bom_id. wet_quantity_g (freeze-dried input)
+   *  drives ingredient ordering where set; else quantity_g (dry). */
   bomItemsByBom: Map<string, Array<{
     ingredient_id: string
     quantity_g: number
+    wet_quantity_g?: number | null
   }>>
 
   /** products keyed by id (non-deleted only). size_g / wet_weight_g drive the
@@ -180,12 +182,6 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
     const items = bomItemsByBom.get(bomId)
     if (!items || items.length === 0) continue
 
-    // Freeze-dried (melts/puffs): ingredient demand is on the WET input, so scale
-    // the dry BOM grams up by wet ÷ dry. 1 = normal product.
-    const wet = Number(product.wet_weight_g) || 0
-    const dry = Number(product.size_g) || 0
-    const freezeDryScale = wet > 0 && dry > 0 && wet > dry ? wet / dry : 1
-
     for (const item of items) {
       const row = rowsByIngredient.get(item.ingredient_id)
       if (!row) continue  // ingredient deleted / not loaded
@@ -194,7 +190,8 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
         id: product.id,
         sku_code: product.sku_code,
         name: product.name,
-        gramsPerUnit: (Number(item.quantity_g) || 0) * freezeDryScale,
+        // Order the WET input where set (freeze-dried), else the dry quantity.
+        gramsPerUnit: Number(item.wet_quantity_g ?? item.quantity_g) || 0,
         demandByMonth: new Map<string, number>(months.map((m) => [m, 0])),
         totalDemand: 0,
       }

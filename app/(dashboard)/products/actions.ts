@@ -67,6 +67,7 @@ const VALID_GROUPS = new Set([
 export interface BomItemInput {
   ingredient_id: string
   quantity_g: number
+  wet_quantity_g?: number | null
   price_override?: number | null
   notes?: string | null
   sort_order: number
@@ -306,6 +307,7 @@ export async function saveBomItems(
         bom_id:         bomId,
         ingredient_id:  item.ingredient_id,
         quantity_g:     item.quantity_g,
+        wet_quantity_g: item.wet_quantity_g ?? null,
         uom:            'g',
         price_override: item.price_override ?? null,
         notes:          item.notes ?? null,

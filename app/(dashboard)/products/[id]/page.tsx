@@ -32,7 +32,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         boms (
           id, version, is_active, notes,
           bom_items (
-            id, ingredient_id, quantity_g, uom, price_override, notes, sort_order,
+            id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
             ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, is_organic, currency, price )
           )
         )
@@ -78,18 +78,18 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
   const curSym = (c: string | null | undefined) => (c === 'AUD' ? 'A$' : c && c !== 'NZD' ? `${c} ` : '$')
 
   // Native (supplier-currency) ingredient totals — the true AUD figures, summed
-  // straight from the per-line prices, parallel to the NZD loaded totals.
+  // straight from the per-line WET grams × price, parallel to the NZD loaded totals.
   const nativeRaw = bomItems.reduce(
-    (s, i) => s + (Number(i.quantity_g || 0) / 1000) * Number(i.price_override ?? i.ingredients.price ?? 0),
+    (s, i) => s + (Number(i.wet_quantity_g ?? i.quantity_g ?? 0) / 1000) * Number(i.price_override ?? i.ingredients.price ?? 0),
     0,
   )
-  // Freeze-dried: scale the wet input (cost is on the wet weight, not dry pack).
-  const nativePerPack    = Math.round(nativeRaw * summary.freeze_dry_scale * (1 + Number(product.wastage_pct ?? 0)) * 100) / 100
+  const nativePerPack    = Math.round(nativeRaw * (1 + Number(product.wastage_pct ?? 0)) * 100) / 100
   const nativePerServing = Math.round(nativePerPack * summary.serving_multiplier * 100) / 100
   const fSym = curSym(uniformForeign)
-  const dryWeight = Number(product.size_g) || 0
-  const wetWeight = Number(product.wet_weight_g) || 0
-  const isFreezeDried = summary.freeze_dry_scale > 1
+  // Freeze-dried = any line whose wet input differs from its dry amount.
+  const isFreezeDried = bomItems.some((i) => i.wet_quantity_g != null && Number(i.wet_quantity_g) !== Number(i.quantity_g))
+  const totalDryG = bomItems.reduce((s, i) => s + Number(i.quantity_g || 0), 0)
+  const totalWetG = bomItems.reduce((s, i) => s + Number(i.wet_quantity_g ?? i.quantity_g ?? 0), 0)
 
   return (
     <div className="space-y-6">
@@ -143,10 +143,10 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
           <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Overview</h3>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <Meta label="Product type" value={typeLabel} />
-            <Meta label={isFreezeDried ? 'Size (dry)' : 'Size'} value={product.size_g != null ? `${product.size_g} g` : null} />
+            <Meta label={isFreezeDried ? 'Size (dry pack)' : 'Size'} value={product.size_g != null ? `${product.size_g} g` : null} />
             <Meta label="Serving size" value={product.serving_size != null ? `${product.serving_size} g` : null} />
             {isFreezeDried && (
-              <Meta label="Wet weight (freeze-dried)" value={`${wetWeight} g → ${dryWeight} g dry · ${(summary.freeze_dry_scale > 0 ? (1 / summary.freeze_dry_scale * 100) : 0).toFixed(0)}% yield`} />
+              <Meta label="Wet input → dry" value={`${totalWetG.toFixed(1)} g wet → ${totalDryG.toFixed(1)} g dry`} />
             )}
             <Meta label="RRP — NZ (inc GST)" value={product.rrp != null ? formatCurrency(product.rrp) : null} />
             <Meta label="RRP — AU (inc GST)" value={(product.rrp_au ?? product.rrp) != null ? `A${formatCurrency(product.rrp_au ?? product.rrp ?? 0)}` : null} />
@@ -236,8 +236,8 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                 <tr>
                   <th className="text-left font-medium px-5 py-2">Ingredient</th>
                   <th className="text-left font-medium px-5 py-2">Ing. SKU</th>
-                  <th className="text-right font-medium px-5 py-2">g</th>
-                  <th className="text-right font-medium px-5 py-2">kg</th>
+                  <th className="text-right font-medium px-5 py-2">Dry g</th>
+                  <th className="text-right font-medium px-5 py-2 text-blue-600">Wet g</th>
                   <th className="text-right font-medium px-5 py-2">% of wt</th>
                   <th className="text-right font-medium px-5 py-2">Serve (g)</th>
                   <th className="text-right font-medium px-5 py-2">$/kg <span className="text-gray-400 normal-case">(supplier)</span></th>
@@ -264,7 +264,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                       </td>
                       <td className="px-5 py-2.5 font-mono text-xs text-gray-600">{item.ingredients.sku_code}</td>
                       <td className="px-5 py-2.5 text-right">{item.quantity_g}</td>
-                      <td className="px-5 py-2.5 text-right">{calc.unit_in_kg.toFixed(4)}</td>
+                      <td className="px-5 py-2.5 text-right text-blue-700 tabular-nums">{Number(item.wet_quantity_g ?? item.quantity_g)}</td>
                       <td className="px-5 py-2.5 text-right">{(calc.percentage * 100).toFixed(1)}%</td>
                       <td className="px-5 py-2.5 text-right">{calc.serve_amount.toFixed(2)}</td>
                       <td className="px-5 py-2.5 text-right tabular-nums">{sym}{nativePerKg.toFixed(2)} <span className="text-[10px] text-gray-400">{cur}</span></td>
@@ -274,25 +274,14 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                 })}
               </tbody>
               <tfoot className="bg-gray-50 text-sm">
-                {/* Freeze-dry scale — dry BOM → wet input (cost is on the wet weight) */}
-                {isFreezeDried && (
-                  <tr className="border-t border-gray-200">
-                    <td colSpan={7} className="px-5 py-2 text-xs text-blue-700">
-                      × Freeze-dry yield ({summary.freeze_dry_scale.toFixed(2)}× — wet {wetWeight} g ÷ dry {dryWeight} g)
-                    </td>
-                    <td className="px-5 py-2 text-right text-xs tabular-nums text-blue-700">
-                      {formatCurrency(summary.ingredient_subtotal_wet - summary.ingredient_subtotal)}
-                    </td>
-                  </tr>
-                )}
                 {/* Wastage line — sits between the last ingredient and the subtotal */}
                 {product.wastage_pct > 0 && (
-                  <tr className={isFreezeDried ? '' : 'border-t border-gray-200'}>
+                  <tr className="border-t border-gray-200">
                     <td colSpan={7} className="px-5 py-2 text-xs text-gray-600">
                       + Contingency / wastage ({(product.wastage_pct * 100).toFixed(1)}%)
                     </td>
                     <td className="px-5 py-2 text-right text-xs tabular-nums text-gray-600">
-                      {formatCurrency(summary.ingredient_total_per_pack - summary.ingredient_subtotal_wet)}
+                      {formatCurrency(summary.ingredient_total_per_pack - summary.ingredient_subtotal)}
                     </td>
                   </tr>
                 )}

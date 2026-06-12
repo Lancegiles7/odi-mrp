@@ -63,7 +63,7 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
       .eq('is_active', true)
       .order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string | null; current_soh: number | null; opening_stock_override: number | null; original_order_qty: number | null }> | null },
     supabase.from('bom_items')
-      .select('bom_id, ingredient_id, quantity_g, boms!inner(product_id, is_active)')
+      .select('bom_id, ingredient_id, quantity_g, wet_quantity_g, boms!inner(product_id, is_active)')
       .eq('boms.is_active', true) as unknown as { data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number; boms: { product_id: string; is_active: boolean } }> | null },
     supabase.from('product_packaging')
       .select('product_id, packaging_id, quantity_per_unit, include_in_cost') as { data: Array<{ product_id: string; packaging_id: string; quantity_per_unit: number; include_in_cost: boolean }> | null },
@@ -196,8 +196,8 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
         const bomLinks = (bomItems ?? []).map((b) => ({
           product_id: b.boms.product_id,
           entity_id: b.ingredient_id,
-          // quantity_g per pack → kg per pack
-          qty_per_product_unit: Number(b.quantity_g) / 1000,
+          // wet grams per pack → kg per pack (procurement is on the wet input)
+          qty_per_product_unit: Number((b as { wet_quantity_g?: number | null }).wet_quantity_g ?? b.quantity_g) / 1000,
         }))
         const derivedById = deriveConsumption(productTotals, bomLinks)
         const overrideById = new Map((consumptionOverrides ?? []).filter((o) => o.entity_type === 'ingredient').map((o) => [o.entity_id, { units: Number(o.override_units), comment: o.comment }]))

@@ -28,24 +28,32 @@ import type {
 } from './types/database.types'
 import type { SettingsSnapshot } from './settings'
 
-// Per-line price for a BOM item (no wastage applied here — that's a
-// total-level operation per the revised spec).
+// The grams that drive cost & procurement: the WET input where set (freeze-
+// dried), else the dry quantity. Dry powders / normal lines leave wet null.
+export function lineWetGrams(item: BomItemWithIngredient): number {
+  return Number(item.wet_quantity_g ?? item.quantity_g) || 0
+}
+
+// Per-line price for a BOM item — costed on the wet input (no wastage here;
+// that's a total-level operation per the revised spec).
 export function calcLinePrice(item: BomItemWithIngredient): number {
   const pricePerKg =
     item.price_override ??
     item.ingredients.total_loaded_cost ??
     0
-  return round2((item.quantity_g / 1000) * pricePerKg)
+  return round2((lineWetGrams(item) / 1000) * pricePerKg)
 }
 
-// Derived display values for each BOM row.
+// Derived display values for each BOM row. Cost is on wet grams; % of weight
+// stays on the dry composition (what's in the sold pack).
 export function calcBomLineValues(
   item: BomItemWithIngredient,
   sizeG: number,
   servingSize: number,
 ) {
   const pricePerKg    = item.price_override ?? item.ingredients.total_loaded_cost ?? 0
-  const unitInKg      = round4(item.quantity_g / 1000)
+  const wetG          = lineWetGrams(item)
+  const unitInKg      = round4(wetG / 1000)
   const pct           = sizeG > 0 ? round4(item.quantity_g / sizeG) : 0
   const serveAmt      = sizeG > 0 ? round2((item.quantity_g / sizeG) * servingSize) : 0
   const pricePerUnit  = round2(unitInKg * pricePerKg)
@@ -88,31 +96,22 @@ export function calcProductCostSummary(
     | 'other_currency'
     | 'freight_nz_currency'
     | 'freight_au_currency'
-    | 'wet_weight_g'
     | 'apply_fx'
     | 'wastage_pct'
   >,
   bomItems: BomItemWithIngredient[],
   settings: Pick<SettingsSnapshot, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct' | 'fx_rates'>,
 ): ProductCostSummary {
-  // Dry ingredient cost — the BOM as entered (the dry composition).
+  // Ingredient cost — each line costed on its WET grams (the input that's
+  // bought), via calcLinePrice. Freeze-dried lines carry a wet_quantity_g;
+  // dry powders / normal lines fall back to quantity_g.
   const ingredientSubtotal = bomItems.reduce(
     (sum, item) => sum + calcLinePrice(item),
     0,
   )
 
-  // Freeze-dried products: the BOM is the DRY pack but the ingredients used (and
-  // bought) are the WET input. Scale the ingredient cost up by wet ÷ dry when a
-  // wet weight is set and larger than the dry pack. 1 = not freeze-dried.
-  const wetWeight     = Number(product.wet_weight_g) || 0
-  const dryWeight     = Number(product.size_g) || 0
-  const freezeDryScale = wetWeight > 0 && dryWeight > 0 && wetWeight > dryWeight
-    ? wetWeight / dryWeight
-    : 1
-  const ingredientSubtotalWet = round2(ingredientSubtotal * freezeDryScale)
-
   const wastagePct            = Number(product.wastage_pct ?? 0)
-  const ingredientTotalPerPack = round2(ingredientSubtotalWet * (1 + wastagePct))
+  const ingredientTotalPerPack = round2(ingredientSubtotal * (1 + wastagePct))
 
   // Serving-size scaling only applies when a serving is LARGER than the pack
   // (e.g. a 30g snack pack whose nutritional serving is 120g = 4 packs).
@@ -192,8 +191,6 @@ export function calcProductCostSummary(
 
   return {
     ingredient_subtotal:     round2(ingredientSubtotal),
-    freeze_dry_scale:        freezeDryScale,
-    ingredient_subtotal_wet: ingredientSubtotalWet,
     ingredient_total_per_pack: ingredientTotalPerPack,
     serving_multiplier:      servingMultiplier,
     ingredient_total:        ingredientTotal,
