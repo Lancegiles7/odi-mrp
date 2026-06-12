@@ -44,6 +44,19 @@ export function calcLinePrice(item: BomItemWithIngredient): number {
   return round2((lineWetGrams(item) / 1000) * pricePerKg)
 }
 
+// Australian per-line price for a dual-made product (AUD). Uses the
+// ingredient's AU landed cost where set; otherwise falls back to the NZ cost
+// (BOM override first, then the NZD loaded cost) converted at FX. Only the AU
+// build of a dual-manufactured product calls this — single-manufacturer
+// products still convert the NZ total wholesale.
+export function calcLinePriceAu(item: BomItemWithIngredient, fxRate: number): number {
+  const nzPerKg = item.price_override ?? item.ingredients.total_loaded_cost ?? 0
+  const auPerKg =
+    item.ingredients.total_loaded_cost_au ??
+    (fxRate > 0 ? nzPerKg / fxRate : nzPerKg)
+  return round2((lineWetGrams(item) / 1000) * auPerKg)
+}
+
 // Derived display values for each BOM row. Cost is on wet grams; % of weight
 // stays on the dry composition (what's in the sold pack).
 export function calcBomLineValues(
@@ -98,6 +111,8 @@ export function calcProductCostSummary(
     | 'freight_au_currency'
     | 'apply_fx'
     | 'wastage_pct'
+    | 'manufacturer_au'
+    | 'toll_au'
   >,
   bomItems: BomItemWithIngredient[],
   settings: Pick<SettingsSnapshot, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct' | 'fx_rates'>,
@@ -148,7 +163,32 @@ export function calcProductCostSummary(
   const freightNzCur = product.freight_nz_currency ?? 'NZD'
   const freightAuCur = product.freight_au_currency ?? 'NZD'
 
-  // NZ total — every line expressed in NZD (uses NZ freight).
+  // Dual-manufacture: when manufacturer_au is set the product is made
+  // separately in Australia (VMC), so the AU build has its own ingredient
+  // landed costs and its own toll (AUD) — it is NOT just the NZ build ÷ FX.
+  // When manufacturer_au is blank, isDual is false and every AU figure below
+  // collapses to "NZ converted at FX" — i.e. exactly the previous behaviour.
+  const isDual = !!(product.manufacturer_au && String(product.manufacturer_au).trim())
+
+  // AU ingredient total (AUD). Dual: cost each line on its AU landed cost
+  // (ingredient.total_loaded_cost_au, else NZ ÷ FX), then apply the same
+  // wastage + serving scaling. Non-dual: the NZ total simply converted.
+  const auIngredientTotal = isDual
+    ? round2(
+        bomItems.reduce((sum, item) => sum + calcLinePriceAu(item, fxRate), 0) *
+          (1 + wastagePct) *
+          servingMultiplier,
+      )
+    : round2(toAud(ingredientTotal, 'NZD'))
+
+  // AU toll (AUD). Dual: VMC's own toll where entered, else the NZ toll
+  // converted (sensible auto-fill). Non-dual: the NZ toll converted.
+  const auTollAmount = isDual
+    ? (Number(product.toll_au) > 0 ? Number(product.toll_au) : toAud(toll, tollCur))
+    : toAud(toll, tollCur)
+
+  // NZ total — every line expressed in NZD (uses NZ freight). Always the
+  // Brand Nation / NZ build.
   const nzGrandTotal = round2(
     ingredientTotal +
     packaging +
@@ -158,12 +198,14 @@ export function calcProductCostSummary(
     toNzd(freightNz, freightNzCur),
   )
 
-  // AU total — every line expressed in AUD (uses AU freight). Computed
-  // independently (not nz ÷ fx) because each line has its own native currency.
+  // AU total — every line expressed in AUD (uses AU freight). For dual-made
+  // products this is VMC's real build (AU ingredient costs + VMC toll);
+  // otherwise it's the NZ build converted, computed per-line because each
+  // input carries its own native currency.
   const auGrandTotal = round2(
-    toAud(ingredientTotal, 'NZD') +
+    auIngredientTotal +
     toAud(packaging,       'NZD') +
-    toAud(toll,      tollCur) +
+    auTollAmount +
     toAud(margin,    marginCur) +
     toAud(other,     otherCur) +
     toAud(freightAu, freightAuCur),
@@ -205,6 +247,9 @@ export function calcProductCostSummary(
     gp_au:                   gpAu,
     gp_nz_amount:            gpNzAmount,
     gp_au_amount:            gpAuAmount,
+    is_dual_manufacture:     isDual,
+    au_ingredient_total:     auIngredientTotal,
+    au_toll:                 round2(auTollAmount),
     // Back-compat aliases — default to NZ view so old UI keeps working
     grand_total: nzGrandTotal,
     cos:         cosNz,

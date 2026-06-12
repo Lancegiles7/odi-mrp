@@ -135,6 +135,7 @@ interface IngredientPayload {
   price: number | null
   freight: number | null
   total_loaded_cost: number | null
+  total_loaded_cost_au: number | null
   unit_of_measure: string | null
   description: string | null
   is_organic: boolean
@@ -200,6 +201,7 @@ async function buildPayloadFromForm(
     price,
     freight,
     total_loaded_cost,
+    total_loaded_cost_au: parseNumeric(formData.get('total_loaded_cost_au')),
     unit_of_measure:    str(formData.get('unit_of_measure')),
     description:        str(formData.get('description')),
     is_organic:         (formData.get('is_organic') as string) !== 'false',

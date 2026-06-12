@@ -51,6 +51,8 @@ export interface ProductFormData {
   apply_fx?: string
   wastage_pct_input?: string
   manufacturer?: string
+  manufacturer_au?: string
+  toll_au?: string
   opening_stock_override?: string
   // Original Order baseline (migration 018)
   original_order_qty?: string
@@ -148,6 +150,7 @@ function buildProductPayload(data: ProductFormData) {
     description:     data.description?.trim() || null,
     packaging:       parseNum(data.packaging),
     toll:            parseNum(data.toll),
+    toll_au:         parseNum(data.toll_au),
     margin:          parseNum(data.margin),
     other:           parseNum(data.other),
     freight_nz:      parseNum(data.freight_nz),
@@ -160,6 +163,7 @@ function buildProductPayload(data: ProductFormData) {
     apply_fx:        data.apply_fx === 'true',
     wastage_pct:     wastagePct,
     manufacturer:    data.manufacturer?.trim() || null,
+    manufacturer_au: data.manufacturer_au?.trim() || null,
     opening_stock_override: parseNum(data.opening_stock_override),
     is_active:       true,
     original_order_qty:    parseNum(data.original_order_qty),
@@ -186,6 +190,7 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     description:       formData.get('description') as string,
     packaging:         formData.get('packaging') as string,
     toll:              formData.get('toll') as string,
+    toll_au:           formData.get('toll_au') as string,
     margin:            formData.get('margin') as string,
     other:             formData.get('other') as string,
     freight_nz:        formData.get('freight_nz') as string,
@@ -198,6 +203,7 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     apply_fx:          formData.get('apply_fx') as string,
     wastage_pct_input: formData.get('wastage_pct_input') as string,
     manufacturer:      formData.get('manufacturer') as string,
+    manufacturer_au:   formData.get('manufacturer_au') as string,
     opening_stock_override: formData.get('opening_stock_override') as string,
     original_order_qty:    formData.get('original_order_qty') as string,
     original_order_date:   formData.get('original_order_date') as string,

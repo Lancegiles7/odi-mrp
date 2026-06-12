@@ -129,6 +129,8 @@ export type Database = {
           apply_fx: boolean
           wastage_pct: number
           manufacturer: string | null
+          manufacturer_au: string | null
+          toll_au: number | null
           opening_stock_override: number | null
           is_active: boolean
           deleted_at: string | null
@@ -167,6 +169,8 @@ export type Database = {
           apply_fx?: boolean
           wastage_pct?: number
           manufacturer?: string | null
+          manufacturer_au?: string | null
+          toll_au?: number | null
           opening_stock_override?: number | null
           is_active?: boolean
           deleted_at?: string | null
@@ -205,6 +209,8 @@ export type Database = {
           apply_fx?: boolean
           wastage_pct?: number
           manufacturer?: string | null
+          manufacturer_au?: string | null
+          toll_au?: number | null
           opening_stock_override?: number | null
           is_active?: boolean
           deleted_at?: string | null
@@ -235,6 +241,7 @@ export type Database = {
           price: number | null
           freight: number | null
           total_loaded_cost: number | null
+          total_loaded_cost_au: number | null
           is_organic: boolean
           category: string
           is_active: boolean
@@ -258,6 +265,7 @@ export type Database = {
           price?: number | null
           freight?: number | null
           total_loaded_cost?: number | null
+          total_loaded_cost_au?: number | null
           is_organic?: boolean
           category?: string
           is_active?: boolean
@@ -281,6 +289,7 @@ export type Database = {
           price?: number | null
           freight?: number | null
           total_loaded_cost?: number | null
+          total_loaded_cost_au?: number | null
           is_organic?: boolean
           category?: string
           is_active?: boolean
@@ -888,7 +897,7 @@ export type EnhancementCategory = 'demand' | 'production' | 'ingredients' | 'pac
 export type BomItemWithIngredient = BomItem & {
   ingredients: Pick<
     Ingredient,
-    'id' | 'name' | 'sku_code' | 'unit_of_measure' | 'total_loaded_cost' | 'is_organic' | 'currency' | 'price'
+    'id' | 'name' | 'sku_code' | 'unit_of_measure' | 'total_loaded_cost' | 'total_loaded_cost_au' | 'is_organic' | 'currency' | 'price'
   >
 }
 
@@ -940,6 +949,9 @@ export interface ProductCostSummary {
   gp_au: number | null                // 1 - cos_au (ratio)
   gp_nz_amount: number | null         // rrp_ex_gst_nz - nz_grand_total (dollars)
   gp_au_amount: number | null         // rrp_ex_gst_au - au_grand_total (dollars)
+  is_dual_manufacture: boolean        // true when made separately in AU (manufacturer_au set)
+  au_ingredient_total: number         // AU ingredient cost (AUD) — dual: AU landed costs; else NZ ÷ FX
+  au_toll: number                     // AU toll (AUD) — dual: VMC toll; else NZ toll converted
   /** @deprecated use nz_grand_total */
   grand_total: number
   /** @deprecated use cos_nz */

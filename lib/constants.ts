@@ -390,6 +390,7 @@ export const ENHANCEMENT_PRIORITY_BY_VALUE = new Map(ENHANCEMENT_PRIORITIES.map(
 // ============================================================
 export const MANUFACTURERS = [
   'Brand Nation',
+  'VMC',
   'I Eat Fresh',
   'Flavour Makers',
 ] as const
@@ -397,6 +398,7 @@ export const MANUFACTURERS = [
 // Colour chips for the production page "view all" table
 export const MANUFACTURER_CHIP_COLOURS: Record<string, string> = {
   'Brand Nation':   'bg-indigo-50 text-indigo-700',
+  'VMC':            'bg-amber-50 text-amber-700',
   'I Eat Fresh':    'bg-emerald-50 text-emerald-700',
   'Flavour Makers': 'bg-sky-50 text-sky-700',
 }

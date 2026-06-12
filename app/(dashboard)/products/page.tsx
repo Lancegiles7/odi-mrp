@@ -25,6 +25,7 @@ type ProductRow = {
   rrp_au: number | null
   packaging: number | null
   toll: number | null
+  toll_au: number | null
   margin: number | null
   other: number | null
   freight: number | null
@@ -37,6 +38,7 @@ type ProductRow = {
   freight_au_currency: string
   apply_fx: boolean
   wastage_pct: number
+  manufacturer_au: string | null
   is_active: boolean
   boms: Array<{
     id: string
@@ -68,14 +70,14 @@ export default async function ProductsPage({ searchParams }: PageProps) {
       .from('products')
       .select(`
         id, sku_code, name, product_type, size_g, serving_size, wet_weight_g, rrp, rrp_au,
-        packaging, toll, margin, other, freight, freight_nz, freight_au,
+        packaging, toll, toll_au, margin, other, freight, freight_nz, freight_au,
         toll_currency, margin_currency, other_currency, freight_nz_currency, freight_au_currency,
-        apply_fx, wastage_pct, is_active,
+        apply_fx, wastage_pct, manufacturer_au, is_active,
         boms (
           id, is_active,
           bom_items (
             id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
-            ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, is_organic, currency, price )
+            ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
           )
         )
       `)

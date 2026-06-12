@@ -33,7 +33,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
           id, version, is_active, notes,
           bom_items (
             id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
-            ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, is_organic, currency, price )
+            ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
           )
         )
       `)
@@ -178,12 +178,14 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             rrp={product.rrp}
             gp={summary.gp_nz} gpAmount={summary.gp_nz_amount}
             cost={summary.nz_grand_total} cos={summary.cos_nz}
+            maker={product.manufacturer}
           />
           <MarketCard
             name="Australia" currency="AUD" headerClass="bg-[#1e3a5f]" sym="A$"
             rrp={product.rrp_au ?? product.rrp}
             gp={summary.gp_au} gpAmount={summary.gp_au_amount}
             cost={summary.au_grand_total} cos={summary.cos_au}
+            maker={summary.is_dual_manufacture ? product.manufacturer_au : product.manufacturer}
           />
         </div>
 
@@ -205,6 +207,11 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         freightAu={Number(product.freight_au ?? product.freight) || 0} freightAuCurrency={product.freight_au_currency ?? 'NZD'}
         rrpExNz={summary.rrp_ex_gst_nz}
         rrpExAu={summary.rrp_ex_gst_au}
+        isDual={summary.is_dual_manufacture}
+        auIngredientTotal={summary.au_ingredient_total}
+        auToll={summary.au_toll}
+        manufacturerNz={product.manufacturer}
+        manufacturerAu={product.manufacturer_au}
       />
 
       {/* BOM table (read-only on detail; edit via Edit page which hosts the editor) */}
@@ -395,17 +402,18 @@ function LineItem({ label, value }: { label: string; value: number | null }) {
 
 // Per-market cost card: RRP (inc GST) → GP (% · $) → Cost ($ · %).
 function MarketCard({
-  name, currency, headerClass, sym, rrp, gp, gpAmount, cost, cos,
+  name, currency, headerClass, sym, rrp, gp, gpAmount, cost, cos, maker,
 }: {
   name: string; currency: string; headerClass: string; sym: string
   rrp: number | null; gp: number | null; gpAmount: number | null
-  cost: number; cos: number | null
+  cost: number; cos: number | null; maker?: string | null
 }) {
   const money = (v: number) => `${sym}${Number(v).toFixed(2)}`
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <div className={`${headerClass} text-white px-3.5 py-2 text-sm font-semibold`}>
-        {name} <span className="text-xs text-white/50 font-normal">{currency}</span>
+      <div className={`${headerClass} text-white px-3.5 py-2 text-sm font-semibold flex items-baseline justify-between`}>
+        <span>{name} <span className="text-xs text-white/50 font-normal">{currency}</span></span>
+        {maker && <span className="text-[11px] text-white/70 font-normal">{maker}</span>}
       </div>
       <div className="p-3.5">
         <div className="flex justify-between items-baseline pb-2.5 border-b border-gray-100">

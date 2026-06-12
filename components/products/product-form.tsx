@@ -201,7 +201,7 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
               />
             </Field>
 
-            <Field id="manufacturer" label="Manufacturer">
+            <Field id="manufacturer" label="Manufacturer — NZ">
               <input
                 id="manufacturer"
                 name="manufacturer"
@@ -214,6 +214,21 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
               <datalist id="manufacturer-options">
                 {MANUFACTURERS.map((m) => <option key={m} value={m} />)}
               </datalist>
+            </Field>
+
+            <Field id="manufacturer_au" label="Manufacturer — AU (optional)">
+              <input
+                id="manufacturer_au"
+                name="manufacturer_au"
+                type="text"
+                list="manufacturer-options"
+                defaultValue={product?.manufacturer_au ?? ''}
+                placeholder="e.g. VMC — leave blank if made in NZ"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">
+                Set only when Australia is made separately (e.g. VMC). The AU cost then uses its own toll + AU ingredient costs instead of converting the NZ build.
+              </p>
             </Field>
 
             <Field id="opening_stock_override" label="Opening stock override (units)">
@@ -238,8 +253,11 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
             <Field id="packaging" label="Packaging ($)">
               <NumberInput id="packaging" name="packaging" defaultValue={product?.packaging} prefix="$" />
             </Field>
-            <Field id="toll" label="Toll">
+            <Field id="toll" label="Toll — NZ">
               <MoneyInput id="toll" name="toll" currencyName="toll_currency" defaultValue={product?.toll} defaultCurrency={product?.toll_currency ?? 'AUD'} />
+            </Field>
+            <Field id="toll_au" label="Toll — AU (VMC, A$)">
+              <NumberInput id="toll_au" name="toll_au" defaultValue={product?.toll_au ?? product?.toll} prefix="A$" />
             </Field>
             <Field id="margin" label="Margin">
               <MoneyInput id="margin" name="margin" currencyName="margin_currency" defaultValue={product?.margin} defaultCurrency={product?.margin_currency ?? 'AUD'} />

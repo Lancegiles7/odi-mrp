@@ -62,6 +62,9 @@ export function IngredientForm({
     (ingredient as unknown as { fx_rate_override?: number | null })?.fx_rate_override?.toString() ?? '',
   )
   const [totalLoaded, setTotalLoaded] = useState(ingredient?.total_loaded_cost?.toString() ?? '')
+  const [loadedAu, setLoadedAu] = useState(
+    (ingredient as unknown as { total_loaded_cost_au?: number | null })?.total_loaded_cost_au?.toString() ?? '',
+  )
 
   const fxFromTable = fxRates[currency] ?? 1
   const effectiveFx = fxOverride.trim() === '' ? fxFromTable : (Number(fxOverride) || fxFromTable)
@@ -394,6 +397,34 @@ export function IngredientForm({
               />
             </div>
             <p className="text-xs text-gray-400 mt-1">Override if needed</p>
+          </div>
+        </div>
+
+        {/* Australian landed cost — for dual-made products (e.g. VMC). Optional. */}
+        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="sm:col-span-1">
+            <label htmlFor="total_loaded_cost_au" className="block text-sm font-medium text-gray-700 mb-1.5">
+              AU landed cost <span className="ml-1 text-xs text-gray-400">(AUD · optional)</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-2 text-sm text-gray-400">A$</span>
+              <input
+                id="total_loaded_cost_au"
+                name="total_loaded_cost_au"
+                type="number"
+                step="0.0001"
+                min="0"
+                value={loadedAu}
+                onChange={(e) => setLoadedAu(e.target.value)}
+                placeholder="—"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+            </div>
+          </div>
+          <div className="sm:col-span-2 flex items-end">
+            <p className="text-xs text-gray-400 mb-1.5">
+              Cost in Australia (AUD) when this ingredient is sourced for a product made there (e.g. by VMC) — a different AU supplier, or the NZ cost plus freight to Australia. Leave blank and the AU build uses the NZ cost converted at FX.
+            </p>
           </div>
         </div>
         {isEdit && (
