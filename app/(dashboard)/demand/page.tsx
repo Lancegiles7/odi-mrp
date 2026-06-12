@@ -212,7 +212,7 @@ export default async function DemandPage({ searchParams }: PageProps) {
       {orderedGroups.map((group) => {
         if (group.items.length === 0) return null
         return (
-          <details key={group.label} className="bg-white rounded-lg border border-gray-200 overflow-hidden" open={group.key === 'snacks_4bs'}>
+          <details key={group.label} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <summary className="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
               <div className="flex items-center gap-3">
                 <span className="text-gray-400">▶</span>
