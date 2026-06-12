@@ -181,7 +181,7 @@ export function PackagingDemandRow({ row, months, commentedCells, openingHistory
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-gray-400">└</span>
                   <Link href={`/products/${p.id}`} className="text-gray-700 hover:underline truncate">{p.name}</Link>
-                  <span className="text-gray-400 text-[10px] flex-shrink-0">· {p.quantityPerUnit}/unit</span>
+                  <span className="text-gray-400 text-[10px] flex-shrink-0">· {Number(p.quantityPerUnit.toFixed(3))}/unit</span>
                 </div>
               </td>
               <td className="px-3 py-1.5 text-right text-gray-400 tabular-nums">—</td>
