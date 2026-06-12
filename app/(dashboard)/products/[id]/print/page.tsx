@@ -41,7 +41,8 @@ export default async function ProductPrintPage({ params }: PageProps) {
     supabase
       .from('product_packaging')
       .select('packaging_id, quantity_per_unit, entry_mode, entry_value, include_in_cost, packaging:packaging_id(sku_code, name, type, total_loaded_cost_nzd)')
-      .eq('product_id', params.id) as unknown as { data: Array<{
+      .eq('product_id', params.id)
+      .eq('market', 'NZ') as unknown as { data: Array<{
         packaging_id: string
         quantity_per_unit: number
         entry_mode: string | null
