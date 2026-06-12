@@ -200,15 +200,25 @@ async function applySaveBackToIngredients(
   lines: POLineInput[],
 ): Promise<void> {
   for (const l of lines) {
-    if (!l.save_back_supplier_data || !l.ingredient_id) continue
-    const patch: Record<string, unknown> = {}
+    if (!l.save_back_supplier_data) continue
     const sb = l.save_back_supplier_data
-    if (sb.supplier_sku_code !== undefined) patch.supplier_sku_code  = sb.supplier_sku_code
-    if (sb.supplier_pack_size !== undefined) patch.supplier_pack_size = sb.supplier_pack_size
-    if (sb.supplier_pack_unit !== undefined) patch.supplier_pack_unit = sb.supplier_pack_unit
-    if (sb.price !== undefined)              patch.price              = sb.price
-    if (Object.keys(patch).length === 0) continue
-    await supabase.from('ingredients').update(patch).eq('id', l.ingredient_id)
+
+    // Supplier reference fields apply to both ingredients and packaging.
+    const ref: Record<string, unknown> = {}
+    if (sb.supplier_sku_code !== undefined)  ref.supplier_sku_code  = sb.supplier_sku_code
+    if (sb.supplier_pack_size !== undefined) ref.supplier_pack_size = sb.supplier_pack_size
+    if (sb.supplier_pack_unit !== undefined) ref.supplier_pack_unit = sb.supplier_pack_unit
+
+    if (l.ingredient_id) {
+      const patch = { ...ref }
+      // Price save-back is ingredient-only (matches the form).
+      if (sb.price !== undefined) patch.price = sb.price
+      if (Object.keys(patch).length > 0) await supabase.from('ingredients').update(patch).eq('id', l.ingredient_id)
+    } else if (l.packaging_id) {
+      // Reference data only — packaging price/loaded cost is owned by the
+      // packaging page so a PO edit can't leave the loaded cost stale.
+      if (Object.keys(ref).length > 0) await supabase.from('packaging').update(ref).eq('id', l.packaging_id)
+    }
   }
 }
 

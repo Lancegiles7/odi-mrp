@@ -45,9 +45,9 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       .is('deleted_at', null)
       .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string }> | null }>,
     supabase.from('packaging')
-      .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, total_loaded_cost_nzd')
+      .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price, currency, total_loaded_cost_nzd')
       .eq('is_active', true)
-      .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string; supplier_sku_code: string | null; supplier_pack_size: number | null; supplier_pack_unit: string | null; total_loaded_cost_nzd: number | null }> | null }>,
+      .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string; supplier_sku_code: string | null; supplier_pack_size: number | null; supplier_pack_unit: string | null; price: number | null; currency: string | null; total_loaded_cost_nzd: number | null }> | null }>,
     supabase.from('delivery_addresses')
       .select('id, label, street, contact_name, phone, country, is_default')
       .eq('is_active', true)

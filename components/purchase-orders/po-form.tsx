@@ -612,23 +612,35 @@ function LineRow({
 }) {
   const lineTotal = (Number(line.unit_cost) || 0) * (Number(line.quantity_ordered) || 0)
   const isIngredient = line.line_type === 'ingredient'
+  const isPackaging  = line.line_type === 'packaging'
+  // Both ingredients and packaging are purchased items with supplier reference
+  // data (code, pack size). Products / "other" lines have none.
+  const isPurchased  = isIngredient || isPackaging
   const ing = isIngredient && line.ingredient_id
     ? ingredients.find((x) => x.id === line.ingredient_id) ?? null
     : null
+  const pk = isPackaging && line.packaging_id
+    ? packaging.find((x) => x.id === line.packaging_id) ?? null
+    : null
+  // The supplier-reference source for this line (whichever item type it is).
+  const ref = ing ?? pk
+  const selectedId = line.ingredient_id ?? line.packaging_id ?? null
 
   // Effective values shown on this line (after any user edits)
-  const lineSupSku   = line.save_back_supplier_data?.supplier_sku_code  ?? ing?.supplier_sku_code  ?? ''
-  const linePackSize = line.save_back_supplier_data?.supplier_pack_size ?? ing?.supplier_pack_size ?? null
-  const linePackUom  = line.save_back_supplier_data?.supplier_pack_unit ?? ing?.supplier_pack_unit ?? line.unit_of_measure
+  const lineSupSku   = line.save_back_supplier_data?.supplier_sku_code  ?? ref?.supplier_sku_code  ?? ''
+  const linePackSize = line.save_back_supplier_data?.supplier_pack_size ?? ref?.supplier_pack_size ?? null
+  const linePackUom  = line.save_back_supplier_data?.supplier_pack_unit ?? ref?.supplier_pack_unit ?? line.unit_of_measure
   // Saved values for diff-detection
-  const savedSupSku   = ing?.supplier_sku_code  ?? null
-  const savedPackSize = ing?.supplier_pack_size ?? null
+  const savedSupSku   = ref?.supplier_sku_code  ?? null
+  const savedPackSize = ref?.supplier_pack_size ?? null
+  // Price drift / save-back stays ingredient-only (packaging loaded cost is
+  // managed on the packaging page so a PO edit can't leave it stale).
   const savedPrice    = ing?.price              ?? null
 
   // Pack-size compliance — soft warning + suggested round-up
   const qty = Number(line.quantity_ordered) || 0
   const packSize = Number(linePackSize) || 0
-  const packMismatch = isIngredient && packSize > 0 && qty > 0 && qty % packSize !== 0
+  const packMismatch = isPurchased && packSize > 0 && qty > 0 && qty % packSize !== 0
   const suggestedQty = packMismatch ? Math.ceil(qty / packSize) * packSize : null
 
   // Price drift — soft warning when entered price differs from saved
@@ -637,10 +649,10 @@ function LineRow({
   // Helper: update save-back data for this line (one field, partial)
   function patchSaveBack(patch: Partial<NonNullable<POLineInput['save_back_supplier_data']>>) {
     const current = line.save_back_supplier_data ?? {
-      supplier_sku_code:  ing?.supplier_sku_code  ?? null,
-      supplier_pack_size: ing?.supplier_pack_size ?? null,
-      supplier_pack_unit: ing?.supplier_pack_unit ?? null,
-      price:              ing?.price              ?? null,
+      supplier_sku_code:  ref?.supplier_sku_code  ?? null,
+      supplier_pack_size: ref?.supplier_pack_size ?? null,
+      supplier_pack_unit: ref?.supplier_pack_unit ?? null,
+      price:              ref?.price              ?? null,
     }
     onChange({ save_back_supplier_data: { ...current, ...patch } })
   }
@@ -713,17 +725,17 @@ function LineRow({
 
       {/* SUPPLIER CODE */}
       <td className="px-3 py-2">
-        {isIngredient ? (
+        {isPurchased ? (
           <>
             <input
-              disabled={readOnly || !line.ingredient_id}
+              disabled={readOnly || !selectedId}
               value={lineSupSku}
               onChange={(e) => patchSaveBack({ supplier_sku_code: e.target.value || null })}
               placeholder={savedSupSku ? '' : '—'}
               className={`w-full text-xs border rounded px-1.5 py-1 ${savedSupSku ? 'border-gray-200' : 'border-dashed border-gray-300 placeholder-gray-300'} disabled:bg-gray-50`}
             />
-            {!readOnly && lineSupSku !== (savedSupSku ?? '') && (
-              <p className="text-[10px] text-blue-700 mt-0.5">will save to ingredient on PO save</p>
+            {!readOnly && selectedId && lineSupSku !== (savedSupSku ?? '') && (
+              <p className="text-[10px] text-blue-700 mt-0.5">will save to {isPackaging ? 'packaging' : 'ingredient'} on PO save</p>
             )}
           </>
         ) : <span className="text-gray-300">—</span>}
@@ -760,10 +772,10 @@ function LineRow({
 
       {/* PACK SIZE */}
       <td className="px-3 py-2">
-        {isIngredient ? (
+        {isPurchased ? (
           <>
             <input
-              disabled={readOnly || !line.ingredient_id}
+              disabled={readOnly || !selectedId}
               type="number"
               step="any"
               min={0}
@@ -772,7 +784,7 @@ function LineRow({
               placeholder={savedPackSize == null ? '—' : ''}
               className={`w-full text-right text-xs border rounded px-1.5 py-1 tabular-nums ${savedPackSize == null ? 'border-dashed border-gray-300 placeholder-gray-300' : 'border-gray-200'} disabled:bg-gray-50`}
             />
-            {!readOnly && (linePackSize ?? null) !== (savedPackSize ?? null) && (
+            {!readOnly && selectedId && (linePackSize ?? null) !== (savedPackSize ?? null) && (
               <p className="text-[10px] text-blue-700 mt-0.5">will save</p>
             )}
           </>
