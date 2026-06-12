@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import {
   rollingMonths, indexDemand, indexProduction,
-  getGrandTotal, getProductionCell, resolveOpeningStock, monthLabel, calcRollingBalance,
+  getGrandTotal, getCountryTotal, getProductionCell, resolveOpeningStock, monthLabel, calcRollingBalance,
 } from '@/lib/demand'
 import { getPlanningAnchor } from '@/lib/settings'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
@@ -23,8 +23,23 @@ interface ProductRow {
   sku_code: string
   name: string
   manufacturer: string | null
+  manufacturer_au: string | null
   opening_stock_override: number | null
   is_active: boolean
+}
+
+// One production line = a product made by one maker for one market. Non-dual
+// products have a single NZ line; dual products have an NZ line (Brand Nation)
+// and an AU line (VMC), each planned and tracked separately.
+interface ProdLine {
+  key: string
+  product: ProductRow
+  market: 'NZ' | 'AU'
+  maker: string | null
+  canEditOpening: boolean
+  opening: number
+  forecastByMonth: Record<string, number>
+  productionByMonth: Record<string, number>
 }
 
 interface PageProps {
@@ -41,7 +56,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   const [{ data: products }, demand, { data: production }, { data: inventory }] = await Promise.all([
     supabase
       .from('products')
-      .select('id, sku_code, name, manufacturer, opening_stock_override, is_active')
+      .select('id, sku_code, name, manufacturer, manufacturer_au, opening_stock_override, is_active')
       .is('deleted_at', null)
       .eq('is_active', true)
       .order('manufacturer', { ascending: true, nullsFirst: false })
@@ -57,9 +72,9 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     ),
     supabase
       .from('production_plans')
-      .select('product_id, year_month, units_planned')
+      .select('product_id, year_month, units_planned, market')
       .gte('year_month', firstMonth)
-      .lte('year_month', lastMonth) as unknown as Promise<{ data: ProductionPlan[] | null }>,
+      .lte('year_month', lastMonth) as unknown as Promise<{ data: Array<ProductionPlan & { market: string | null }> | null }>,
     supabase
       .from('inventory_balances')
       .select('ingredient_id, quantity_on_hand') as unknown as Promise<{ data: Array<{ ingredient_id: string; quantity_on_hand: number }> | null }>,
@@ -67,7 +82,11 @@ export default async function ProductionPage({ searchParams }: PageProps) {
 
   const allProducts = products ?? []
   const demandIdx = indexDemand(demand)
-  const prodIdx   = indexProduction(production ?? [])
+  // Production is now planned per market. Index NZ and AU plans separately;
+  // legacy rows default to NZ so single-build behaviour is unchanged.
+  const prodRows  = (production ?? []) as Array<ProductionPlan & { market: string | null }>
+  const prodIdxNz = indexProduction(prodRows.filter((r) => (r.market ?? 'NZ') !== 'AU'))
+  const prodIdxAu = indexProduction(prodRows.filter((r) => r.market === 'AU'))
 
   // inventory_balances is keyed by ingredient_id — we don't currently have product-level stock.
   // Placeholder lookup (empty) until product stock is wired. opening_stock_override still works.
@@ -81,15 +100,33 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     return resolveOpeningStock(p.opening_stock_override, stockByProduct.get(p.id))
   }
 
-  function forecastFor(productId: string): Record<string, number> {
+  const byMonth = (fn: (m: string) => number): Record<string, number> => {
     const out: Record<string, number> = {}
-    for (const m of months) out[m] = getGrandTotal(demandIdx, productId, m)
+    for (const m of months) out[m] = fn(m)
     return out
   }
-  function productionFor(productId: string): Record<string, number> {
-    const out: Record<string, number> = {}
-    for (const m of months) out[m] = getProductionCell(prodIdx, productId, m)
-    return out
+
+  // Expand products into production lines. A dual product (manufacturer_au set)
+  // splits into an NZ line under Brand Nation (NZ-channel demand, NZ plan) and
+  // an AU line under VMC (AU-channel demand, AU plan). Non-dual products keep a
+  // single NZ line driven by all-channel demand — exactly as before.
+  const lines: ProdLine[] = []
+  for (const p of allProducts) {
+    const dual = !!(p.manufacturer_au && p.manufacturer_au.trim())
+    lines.push({
+      key: `${p.id}:NZ`, product: p, market: 'NZ', maker: p.manufacturer, canEditOpening: true,
+      opening: openingFor(p),
+      forecastByMonth:  byMonth((m) => dual ? getCountryTotal(demandIdx, p.id, m, 'NZ') : getGrandTotal(demandIdx, p.id, m)),
+      productionByMonth: byMonth((m) => getProductionCell(prodIdxNz, p.id, m)),
+    })
+    if (dual) {
+      lines.push({
+        key: `${p.id}:AU`, product: p, market: 'AU', maker: p.manufacturer_au, canEditOpening: false,
+        opening: 0,
+        forecastByMonth:  byMonth((m) => getCountryTotal(demandIdx, p.id, m, 'AUS')),
+        productionByMonth: byMonth((m) => getProductionCell(prodIdxAu, p.id, m)),
+      })
+    }
   }
 
   // Total-across-visible-products monthly shortfall counts. Drives the
@@ -97,13 +134,11 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   // (consistent regardless of which manufacturer accordion is open);
   // view-all uses the filtered set so the strip respects the manufacturer
   // filter.
-  function shortfallCountsFor(items: ProductRow[]) {
+  function shortfallCountsFor(items: ProdLine[]) {
     const totals = new Map<string, number>(months.map((m) => [m, 0]))
     const shorts = new Map<string, number>(months.map((m) => [m, 0]))
-    for (const p of items) {
-      const f = forecastFor(p.id)
-      const pr = productionFor(p.id)
-      const rolling = calcRollingBalance(months, openingFor(p), (m) => f[m] ?? 0, (m) => pr[m] ?? 0)
+    for (const ln of items) {
+      const rolling = calcRollingBalance(months, ln.opening, (m) => ln.forecastByMonth[m] ?? 0, (m) => ln.productionByMonth[m] ?? 0)
       for (const r of rolling) {
         if (r.forecast > 0)    totals.set(r.month, (totals.get(r.month) ?? 0) + 1)
         if (r.state === 'red') shorts.set(r.month, (shorts.get(r.month) ?? 0) + 1)
@@ -111,7 +146,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     }
     return { totals, shorts }
   }
-  const pageCounts = shortfallCountsFor(allProducts)
+  const pageCounts = shortfallCountsFor(lines)
 
   // Bulk-fetch (a) which (product, month) cells already have a comment,
   // and (b) which products have any opening-stock edit history and/or
@@ -121,23 +156,22 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     getProductOpeningStockSummary(allProducts.map((p) => p.id)),
   ])
 
-  // Build manufacturer groups + derived stats
-  const manufacturers = new Map<string, ProductRow[]>()
+  // Build maker groups from lines. A dual product appears under both makers:
+  // Brand Nation (its NZ line) and VMC (its AU line).
+  const manufacturers = new Map<string, ProdLine[]>()
   const UNASSIGNED = '__unassigned__'
-  for (const p of allProducts) {
-    const key = p.manufacturer ?? UNASSIGNED
+  for (const ln of lines) {
+    const key = ln.maker ?? UNASSIGNED
     if (!manufacturers.has(key)) manufacturers.set(key, [])
-    manufacturers.get(key)!.push(p)
+    manufacturers.get(key)!.push(ln)
   }
 
-  function shortfallCount(items: ProductRow[]): number {
+  function shortfallCount(items: ProdLine[]): number {
     let n = 0
-    for (const p of items) {
-      const forecast   = forecastFor(p.id)
-      const production = productionFor(p.id)
-      let bal = openingFor(p)
+    for (const ln of items) {
+      let bal = ln.opening
       for (const m of months) {
-        bal = bal + (production[m] ?? 0) - (forecast[m] ?? 0)
+        bal = bal + (ln.productionByMonth[m] ?? 0) - (ln.forecastByMonth[m] ?? 0)
         if (bal < 0) n++
       }
     }
@@ -261,23 +295,29 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((p) => (
-                      <ProductionRow
-                        key={p.id}
-                        productId={p.id}
-                        skuCode={p.sku_code}
-                        productName={p.name}
-                        manufacturer={p.manufacturer}
-                        isActive={p.is_active}
-                        openingStock={openingFor(p)}
-                        openingStockOverride={p.opening_stock_override}
-                        months={months}
-                        forecastByMonth={forecastFor(p.id)}
-                        productionByMonth={productionFor(p.id)}
-                        commentedCells={commentedCells}
-                        openingHistory={openingHistorySummary.get(p.id)}
-                      />
-                    ))}
+                    {items.map((ln) => {
+                      const dual = !!(ln.product.manufacturer_au && ln.product.manufacturer_au.trim())
+                      return (
+                        <ProductionRow
+                          key={ln.key}
+                          productId={ln.product.id}
+                          market={ln.market}
+                          marketTag={dual ? ln.market : undefined}
+                          skuCode={ln.product.sku_code}
+                          productName={ln.product.name}
+                          manufacturer={ln.maker}
+                          isActive={ln.product.is_active}
+                          openingStock={ln.opening}
+                          openingStockOverride={ln.canEditOpening ? ln.product.opening_stock_override : null}
+                          canEditOpening={ln.canEditOpening}
+                          months={months}
+                          forecastByMonth={ln.forecastByMonth}
+                          productionByMonth={ln.productionByMonth}
+                          commentedCells={commentedCells}
+                          openingHistory={openingHistorySummary.get(ln.product.id)}
+                        />
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -289,25 +329,19 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   }
 
   // ─────────── VIEW ALL ───────────
-  const mfrOptions = ['all', ...Array.from(new Set(allProducts.map((p) => p.manufacturer).filter((m): m is string => !!m))), UNASSIGNED]
+  const mfrOptions = ['all', ...Array.from(new Set(lines.map((ln) => ln.maker).filter((m): m is string => !!m))), UNASSIGNED]
   const filtered = filterMfr === 'all'
-    ? allProducts
-    : allProducts.filter((p) => (p.manufacturer ?? UNASSIGNED) === filterMfr)
+    ? lines
+    : lines.filter((ln) => (ln.maker ?? UNASSIGNED) === filterMfr)
 
   const totals = {
-    products: filtered.length,
-    active:   filtered.filter((p) => p.is_active).length,
-    inactive: filtered.filter((p) => !p.is_active).length,
-    forecast: filtered.reduce((s, p) => {
-      const f = forecastFor(p.id)
-      return s + months.reduce((a, m) => a + (f[m] ?? 0), 0)
-    }, 0),
-    production: filtered.reduce((s, p) => {
-      const prod = productionFor(p.id)
-      return s + months.reduce((a, m) => a + (prod[m] ?? 0), 0)
-    }, 0),
+    products: new Set(filtered.map((ln) => ln.product.id)).size,
+    active:   filtered.filter((ln) => ln.product.is_active).length,
+    inactive: filtered.filter((ln) => !ln.product.is_active).length,
+    forecast: filtered.reduce((s, ln) => s + months.reduce((a, m) => a + (ln.forecastByMonth[m] ?? 0), 0), 0),
+    production: filtered.reduce((s, ln) => s + months.reduce((a, m) => a + (ln.productionByMonth[m] ?? 0), 0), 0),
     shortfalls: shortfallCount(filtered),
-    opening:    filtered.reduce((s, p) => s + openingFor(p), 0),
+    opening:    filtered.reduce((s, ln) => s + ln.opening, 0),
   }
 
   // Filter-aware monthly counts for the top-of-page summary strip.
@@ -371,24 +405,30 @@ export default async function ProductionPage({ searchParams }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => (
-                <ProductionRow
-                  key={p.id}
-                  productId={p.id}
-                  skuCode={p.sku_code}
-                  productName={p.name}
-                  manufacturer={p.manufacturer}
-                  isActive={p.is_active}
-                  openingStock={openingFor(p)}
-                  openingStockOverride={p.opening_stock_override}
-                  months={months}
-                  forecastByMonth={forecastFor(p.id)}
-                  productionByMonth={productionFor(p.id)}
-                  commentedCells={commentedCells}
-                  openingHistory={openingHistorySummary.get(p.id)}
-                  showManufacturerChip
-                />
-              ))}
+              {filtered.map((ln) => {
+                const dual = !!(ln.product.manufacturer_au && ln.product.manufacturer_au.trim())
+                return (
+                  <ProductionRow
+                    key={ln.key}
+                    productId={ln.product.id}
+                    market={ln.market}
+                    marketTag={dual ? ln.market : undefined}
+                    skuCode={ln.product.sku_code}
+                    productName={ln.product.name}
+                    manufacturer={ln.maker}
+                    isActive={ln.product.is_active}
+                    openingStock={ln.opening}
+                    openingStockOverride={ln.canEditOpening ? ln.product.opening_stock_override : null}
+                    canEditOpening={ln.canEditOpening}
+                    months={months}
+                    forecastByMonth={ln.forecastByMonth}
+                    productionByMonth={ln.productionByMonth}
+                    commentedCells={commentedCells}
+                    openingHistory={openingHistorySummary.get(ln.product.id)}
+                    showManufacturerChip
+                  />
+                )
+              })}
             </tbody>
           </table>
         </div>

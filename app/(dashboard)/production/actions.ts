@@ -8,9 +8,11 @@ export async function updateProductionCell(
   productId: string,
   yearMonth: string,
   unitsPlanned: number,
+  market: 'NZ' | 'AU' = 'NZ',
 ): Promise<{ ok: boolean; error?: string }> {
   if (!/^\d{4}-\d{2}-01$/.test(yearMonth)) return { ok: false, error: 'invalid_month' }
   if (!Number.isFinite(unitsPlanned) || unitsPlanned < 0) return { ok: false, error: 'invalid_units' }
+  const mkt = market === 'AU' ? 'AU' : 'NZ'
 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,10 +27,11 @@ export async function updateProductionCell(
       {
         product_id:    productId,
         year_month:    yearMonth,
+        market:        mkt,
         units_planned: Math.round(unitsPlanned),
         updated_by:    profile?.id ?? null,
       },
-      { onConflict: 'product_id,year_month' },
+      { onConflict: 'product_id,year_month,market' },
     )
 
   if (error) return { ok: false, error: error.message }

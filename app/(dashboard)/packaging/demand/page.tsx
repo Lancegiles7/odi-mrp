@@ -40,8 +40,8 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     supabase.from('suppliers').select('id, name') as { data: Array<{ id: string; name: string }> | null },
     supabase.from('product_packaging').select('product_id, packaging_id, quantity_per_unit, market') as { data: Array<{ product_id: string; packaging_id: string; quantity_per_unit: number; market: string | null }> | null },
     supabase.from('production_plans')
-      .select('product_id, year_month, units_planned')
-      .gte('year_month', firstMonth).lte('year_month', lastMonth) as { data: Array<{ product_id: string; year_month: string; units_planned: number }> | null },
+      .select('product_id, year_month, units_planned, market')
+      .gte('year_month', firstMonth).lte('year_month', lastMonth) as { data: Array<{ product_id: string; year_month: string; units_planned: number; market: string | null }> | null },
     fetchAllRows<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }>((from, to) =>
       supabase.from('demand_forecasts')
         .select('product_id, year_month, channel, units, is_edited')
@@ -71,7 +71,8 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
   for (const m of months) { unitsByMonthByProduct.set(m, new Map()); unitsAuByMonthByProduct.set(m, new Map()) }
 
   const demandIdx = indexDemand((demand ?? []) as never[])
-  const prodIdx   = indexProduction((production ?? []) as never[])
+  const prodIdxNz = indexProduction(((production ?? []) as Array<{ market: string | null }>).filter((r) => (r.market ?? 'NZ') !== 'AU') as never[])
+  const prodIdxAu = indexProduction(((production ?? []) as Array<{ market: string | null }>).filter((r) => r.market === 'AU') as never[])
 
   for (const p of products ?? []) {
     const isDual = dualProducts.has(p.id)
@@ -87,18 +88,12 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
           if (u) unitsByMonthByProduct.get(m)!.set(p.id, u)
         }
       } else {
-        const total = getProductionCell(prodIdx, p.id, m)
-        if (!total) continue
+        // Production source: each build's own plan (Brand Nation NZ, VMC AU).
+        const nz = getProductionCell(prodIdxNz, p.id, m)
+        if (nz) unitsByMonthByProduct.get(m)!.set(p.id, nz)
         if (isDual) {
-          const nzF = getCountryTotal(demandIdx, p.id, m, 'NZ')
-          const auF = getCountryTotal(demandIdx, p.id, m, 'AUS')
-          const denom = nzF + auF
-          const au = denom > 0 ? total * (auF / denom) : 0
-          const nz = total - au
-          if (nz) unitsByMonthByProduct.get(m)!.set(p.id, nz)
+          const au = getProductionCell(prodIdxAu, p.id, m)
           if (au) unitsAuByMonthByProduct.get(m)!.set(p.id, au)
-        } else {
-          unitsByMonthByProduct.get(m)!.set(p.id, total)
         }
       }
     }

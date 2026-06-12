@@ -27,6 +27,12 @@ interface Props {
   /** Bulk-fetched opening-stock summary: drives the clock-button render. */
   openingHistory?: { hasHistory: boolean; hasComment: boolean }
   showManufacturerChip?: boolean   // true on the flat "view all" table
+  /** Which build this row plans. Production cells write to this market. */
+  market?: 'NZ' | 'AU'
+  /** Show a small NZ/AU tag (used when a product is dual-made). */
+  marketTag?: 'NZ' | 'AU'
+  /** AU lines can't edit product-level opening stock (it's shared) — show it static. */
+  canEditOpening?: boolean
 }
 
 /**
@@ -40,6 +46,7 @@ export function ProductionRow({
   productId, skuCode, productName, manufacturer, isActive,
   openingStock, openingStockOverride, months, forecastByMonth, productionByMonth,
   commentedCells, openingHistory, showManufacturerChip,
+  market = 'NZ', marketTag, canEditOpening = true,
 }: Props) {
   const [prod, setProd] = useState<Record<string, number>>(productionByMonth)
   const [opening, setOpening] = useState<number>(openingStock)
@@ -63,7 +70,7 @@ export function ProductionRow({
     setProd((p) => ({ ...p, [month]: units }))
     setError(null)
     setSaving(async () => {
-      const res = await updateProductionCell(productId, month, units)
+      const res = await updateProductionCell(productId, month, units, market)
       if (!res.ok) setError(res.error ?? 'Save failed')
     })
   }
@@ -84,6 +91,11 @@ export function ProductionRow({
         <div className="font-mono text-[11px] text-gray-500 truncate" title={skuCode}>{skuCode}</div>
         <div className="font-medium text-sm leading-snug line-clamp-2" title={productName}>
           <Link href={`/products/${productId}`} className="hover:underline">{productName}</Link>
+          {marketTag && (
+            <span className={`ml-2 text-[10px] px-1 py-0.5 rounded ${marketTag === 'AU' ? 'bg-amber-50 text-amber-700' : 'bg-indigo-50 text-indigo-700'}`}>
+              {marketTag} build
+            </span>
+          )}
           {!isActive && <span className="ml-2 text-[10px] px-1 py-0.5 bg-gray-100 text-gray-500 rounded">Inactive</span>}
           {saving && <span className="ml-2 text-[10px] text-gray-400">saving…</span>}
         </div>
@@ -99,16 +111,20 @@ export function ProductionRow({
       )}
 
       <td className="px-3 py-2 text-right">
-        <OpeningStockHistoryPopover
-          entityLabel={`Opening stock · ${productName}`}
-          description="Manual override · leave blank to fall back to inventory on hand."
-          currentValue={override}
-          onSave={useCallback((v, note) => updateOpeningStockOverride(productId, v, note), [productId])}
-          onLoadHistory={useCallback(() => getOpeningStockHistory(productId), [productId])}
-          onSaved={handleOpeningSaved}
-          hasHistory={openingHistory?.hasHistory}
-          hasComment={openingHistory?.hasComment}
-        />
+        {canEditOpening ? (
+          <OpeningStockHistoryPopover
+            entityLabel={`Opening stock · ${productName}`}
+            description="Manual override · leave blank to fall back to inventory on hand."
+            currentValue={override}
+            onSave={useCallback((v, note) => updateOpeningStockOverride(productId, v, note), [productId])}
+            onLoadHistory={useCallback(() => getOpeningStockHistory(productId), [productId])}
+            onSaved={handleOpeningSaved}
+            hasHistory={openingHistory?.hasHistory}
+            hasComment={openingHistory?.hasComment}
+          />
+        ) : (
+          <span className="text-gray-300 text-xs" title="Opening stock is tracked on the NZ build">—</span>
+        )}
       </td>
 
       {rows.map((r) => {

@@ -51,11 +51,18 @@ export async function loadProductionStrip(sb: SB, months: string[], first: strin
       sb.from('production_plans').select('product_id, year_month, units_planned').gte('year_month', first).lte('year_month', last)),
   ])
   const demandIdx = indexDemand((demand ?? []) as never[])
-  const prodIdx   = indexProduction((production ?? []) as never[])
+  // Total finished output = every maker's plan summed (a dual product's NZ + AU
+  // plans both produce the same SKU), so sum across markets rather than index.
+  const prodSummed = new Map<string, number>()
+  for (const r of production ?? []) {
+    const ym = typeof r.year_month === 'string' ? r.year_month.slice(0, 10) : r.year_month
+    const key = `${r.product_id}|${ym}`
+    prodSummed.set(key, (prodSummed.get(key) ?? 0) + Number(r.units_planned || 0))
+  }
   const { totals, shorts } = emptyCounts(months)
   for (const p of products ?? []) {
     const opening = resolveOpeningStock(p.opening_stock_override, undefined)
-    const rolling = calcRollingBalance(months, opening, (m) => getGrandTotal(demandIdx, p.id, m), (m) => getProductionCell(prodIdx, p.id, m))
+    const rolling = calcRollingBalance(months, opening, (m) => getGrandTotal(demandIdx, p.id, m), (m) => prodSummed.get(`${p.id}|${m}`) ?? 0)
     for (const r of rolling) {
       if (r.forecast > 0)    totals.set(r.month, (totals.get(r.month) ?? 0) + 1)
       if (r.state === 'red') shorts.set(r.month, (shorts.get(r.month) ?? 0) + 1)
@@ -64,11 +71,12 @@ export async function loadProductionStrip(sb: SB, months: string[], first: strin
   return { totals, shorts }
 }
 
-// Shared: month → product → production-plan units
+// Shared: month → product → production-plan units. Dashboard rollups use the
+// NZ build, so only NZ-market plans count (avoids the AU row winning last-write).
 async function productionUnitsByMonth(sb: SB, productIds: string[], months: string[], first: string, last: string) {
-  const { data: production } = await all<Array<{ product_id: string; year_month: string; units_planned: number }>>(
-    sb.from('production_plans').select('product_id, year_month, units_planned').gte('year_month', first).lte('year_month', last))
-  const prodIdx = indexProduction((production ?? []) as never[])
+  const { data: production } = await all<Array<{ product_id: string; year_month: string; units_planned: number; market: string | null }>>(
+    sb.from('production_plans').select('product_id, year_month, units_planned, market').gte('year_month', first).lte('year_month', last))
+  const prodIdx = indexProduction((production ?? []).filter((r) => (r.market ?? 'NZ') !== 'AU') as never[])
   const map = new Map<string, Map<string, number>>()
   for (const m of months) {
     const inner = new Map<string, number>()

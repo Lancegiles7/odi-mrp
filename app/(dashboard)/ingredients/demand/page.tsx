@@ -62,8 +62,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
         .order('product_id').order('year_month').order('channel')
         .range(from, to) as unknown as PromiseLike<{ data: Array<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }> | null; error: { message: string } | null }>),
     supabase.from('production_plans')
-      .select('product_id, year_month, units_planned')
-      .gte('year_month', firstMonth).lte('year_month', lastMonth) as unknown as Promise<{ data: Array<{ product_id: string; year_month: string; units_planned: number }> | null }>,
+      .select('product_id, year_month, units_planned, market')
+      .gte('year_month', firstMonth).lte('year_month', lastMonth) as unknown as Promise<{ data: Array<{ product_id: string; year_month: string; units_planned: number; market: string | null }> | null }>,
     supabase.from('purchase_orders')
       .select('id, po_number, status, expected_delivery_date')
       .in('status', ['submitted', 'partially_received'])
@@ -97,8 +97,9 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
   const unitsAuByMonthByProduct = new Map<string, Map<string, number>>()
   for (const m of months) { unitsByMonthByProduct.set(m, new Map()); unitsAuByMonthByProduct.set(m, new Map()) }
 
-  const demandIdx = indexDemand((demand ?? []) as never[])
-  const prodIdx   = indexProduction((production ?? []) as never[])
+  const demandIdx  = indexDemand((demand ?? []) as never[])
+  const prodIdxNz  = indexProduction(((production ?? []) as Array<{ market: string | null }>).filter((r) => (r.market ?? 'NZ') !== 'AU') as never[])
+  const prodIdxAu  = indexProduction(((production ?? []) as Array<{ market: string | null }>).filter((r) => r.market === 'AU') as never[])
 
   for (const p of products ?? []) {
     const isDual = activeBomByProductAu.has(p.id)
@@ -114,19 +115,12 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
           if (units) unitsByMonthByProduct.get(m)!.set(p.id, units)
         }
       } else {
-        const total = getProductionCell(prodIdx, p.id, m)
-        if (!total) continue
+        // Production source: each build's own plan (Brand Nation NZ, VMC AU).
+        const nz = getProductionCell(prodIdxNz, p.id, m)
+        if (nz) unitsByMonthByProduct.get(m)!.set(p.id, nz)
         if (isDual) {
-          // Split planned production by the forecast NZ:AU mix (all NZ if none).
-          const nzF = getCountryTotal(demandIdx, p.id, m, 'NZ')
-          const auF = getCountryTotal(demandIdx, p.id, m, 'AUS')
-          const denom = nzF + auF
-          const au = denom > 0 ? total * (auF / denom) : 0
-          const nz = total - au
-          if (nz) unitsByMonthByProduct.get(m)!.set(p.id, nz)
+          const au = getProductionCell(prodIdxAu, p.id, m)
           if (au) unitsAuByMonthByProduct.get(m)!.set(p.id, au)
-        } else {
-          unitsByMonthByProduct.get(m)!.set(p.id, total)
         }
       }
     }
