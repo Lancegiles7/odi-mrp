@@ -75,8 +75,17 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
   // conversion explicitly (e.g. AUD subtotal × FX → NZD).
   const ingCurrencies = Array.from(new Set(bomItems.map((i) => i.ingredients.currency ?? 'NZD')))
   const uniformForeign = ingCurrencies.length === 1 && ingCurrencies[0] !== 'NZD' ? ingCurrencies[0] : null
-  const foreignFx = uniformForeign ? (Number(settings.fx_rates[uniformForeign as keyof typeof settings.fx_rates]) || 1) : 1
   const curSym = (c: string | null | undefined) => (c === 'AUD' ? 'A$' : c && c !== 'NZD' ? `${c} ` : '$')
+
+  // Native (supplier-currency) ingredient totals — the true AUD figures, summed
+  // straight from the per-line prices, parallel to the NZD loaded totals.
+  const nativeRaw = bomItems.reduce(
+    (s, i) => s + (Number(i.quantity_g || 0) / 1000) * Number(i.price_override ?? i.ingredients.price ?? 0),
+    0,
+  )
+  const nativePerPack    = Math.round(nativeRaw * (1 + Number(product.wastage_pct ?? 0)) * 100) / 100
+  const nativePerServing = Math.round(nativePerPack * summary.serving_multiplier * 100) / 100
+  const fSym = curSym(uniformForeign)
 
   return (
     <div className="space-y-6">
@@ -205,7 +214,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             <div className="text-[11px] text-[#3b6d11]">Total ingredients · NZD</div>
             <div className="text-xl font-bold text-[#27500a] tabular-nums">{formatCurrency(summary.ingredient_total)}</div>
             {uniformForeign && (
-              <div className="text-[11px] text-gray-500">from {curSym(uniformForeign)}{(summary.ingredient_total / foreignFx).toFixed(2)} {uniformForeign} · ×{foreignFx.toFixed(2)}</div>
+              <div className="text-[11px] text-gray-500">from {fSym}{nativePerServing.toFixed(2)} {uniformForeign}</div>
             )}
           </div>
         </div>
@@ -272,13 +281,14 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
 
                 {/* Subtotal per pack — includes wastage */}
                 <tr className={product.wastage_pct > 0 ? '' : 'border-t border-gray-200'}>
-                  <td colSpan={2} className="px-5 py-2 font-medium">Ingredients subtotal (per pack) · NZD</td>
+                  <td colSpan={2} className="px-5 py-2 font-medium">Ingredients subtotal (per pack)</td>
                   <td className="px-5 py-2 text-right tabular-nums">
                     {bomItems.reduce((s, i) => s + Number(i.quantity_g || 0), 0).toFixed(2)}
                   </td>
                   <td colSpan={4}></td>
                   <td className="px-5 py-2 text-right font-semibold tabular-nums">
-                    {formatCurrency(summary.ingredient_total_per_pack)}
+                    {uniformForeign && <span className="text-gray-500 font-normal">{fSym}{nativePerPack.toFixed(2)} → </span>}
+                    {formatCurrency(summary.ingredient_total_per_pack)}<span className="text-[10px] text-gray-400 font-normal"> NZD</span>
                   </td>
                 </tr>
 
@@ -294,8 +304,11 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                       </td>
                     </tr>
                     <tr>
-                      <td colSpan={7} className="px-5 py-2 font-medium">Ingredient total (per serving) · NZD</td>
-                      <td className="px-5 py-2 text-right font-semibold tabular-nums">{formatCurrency(summary.ingredient_total)}</td>
+                      <td colSpan={7} className="px-5 py-2 font-medium">Ingredient total (per serving)</td>
+                      <td className="px-5 py-2 text-right font-semibold tabular-nums">
+                        {uniformForeign && <span className="text-gray-500 font-normal">{fSym}{nativePerServing.toFixed(2)} → </span>}
+                        {formatCurrency(summary.ingredient_total)}<span className="text-[10px] text-gray-400 font-normal"> NZD</span>
+                      </td>
                     </tr>
                   </>
                 )}
