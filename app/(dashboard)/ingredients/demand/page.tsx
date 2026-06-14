@@ -19,8 +19,10 @@ import { getIngredientOpeningStockSummary } from '@/lib/opening-stock-summary'
 export const metadata: Metadata = { title: 'Ingredient demand' }
 
 interface PageProps {
-  searchParams: { source?: string }
+  searchParams: { source?: string; market?: string }
 }
+
+type Market = 'combined' | 'nz' | 'au'
 
 export default async function IngredientDemandPage({ searchParams }: PageProps) {
   const supabase = createClient()
@@ -31,6 +33,12 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
 
   const source: 'production' | 'forecast' =
     searchParams.source === 'forecast' ? 'forecast' : 'production'
+
+  // Which build's procurement to show: combined (NZ + AU), NZ (Brand Nation),
+  // or AU (VMC). The page already computes the NZ and AU demand maps; this just
+  // selects which of them feed the aggregator.
+  const market: Market =
+    searchParams.market === 'nz' ? 'nz' : searchParams.market === 'au' ? 'au' : 'combined'
 
   // ── Fetch everything we need in parallel ───────────────────
   const [
@@ -167,16 +175,24 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     })
   }
 
-  // ── Aggregate ──────────────────────────────────────────────
+  // ── Aggregate (scoped to the selected market) ──────────────
+  // NZ pass explodes unitsByMonthByProduct through the NZ BOMs; AU pass explodes
+  // unitsAuByMonthByProduct through the AU BOMs. To show one market only, feed
+  // the other side empty/undefined so its pass produces nothing.
+  const emptyUnits = new Map<string, Map<string, number>>(months.map((m) => [m, new Map<string, number>()]))
+  const nzUnitsArg = market === 'au' ? emptyUnits : unitsByMonthByProduct
+  const auBomArg   = market === 'nz' ? undefined : activeBomByProductAu
+  const auUnitsArg = market === 'nz' ? undefined : unitsAuByMonthByProduct
+
   const groups = aggregateIngredientDemand({
     ingredients: ingredients ?? [],
     suppliers: suppliers ?? [],
     activeBomByProduct,
-    activeBomByProductAu,
+    activeBomByProductAu: auBomArg,
     bomItemsByBom,
     products: products ?? [],
-    unitsByMonthByProduct,
-    unitsAuByMonthByProduct,
+    unitsByMonthByProduct: nzUnitsArg,
+    unitsAuByMonthByProduct: auUnitsArg,
     months,
     arrivalsByIngredient,
   })
@@ -236,9 +252,19 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
   const demandSummary = demandSummaryParts[0] ?? '0'
   const demandSubParts = demandSummaryParts.slice(1)
 
+  // Build a URL preserving the other toggle's current value.
+  const hrefFor = (s: 'forecast' | 'production', m: Market) => {
+    const p = new URLSearchParams()
+    if (s === 'forecast') p.set('source', 'forecast')
+    if (m !== 'combined') p.set('market', m)
+    const str = p.toString()
+    return str ? `/ingredients/demand?${str}` : '/ingredients/demand'
+  }
+  const marketLabel = market === 'nz' ? 'NZ build · Brand Nation' : market === 'au' ? 'AU build · VMC' : 'NZ + AU combined'
+
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Ingredient demand</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -246,22 +272,35 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
             <span className="font-semibold text-gray-800">
               {source === 'production' ? 'production plan' : 'demand forecast'}
             </span>
-            {' · '}Balance = opening − cumulative demand
+            {' · '}<span className="font-semibold text-gray-800">{marketLabel}</span>
           </p>
         </div>
-        <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
-          <Link
-            href="/ingredients/demand?source=forecast"
-            className={`px-3 py-1.5 font-medium ${source === 'forecast' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-          >
-            From forecast
-          </Link>
-          <Link
-            href="/ingredients/demand"
-            className={`px-3 py-1.5 font-medium border-l border-gray-300 ${source === 'production' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-          >
-            From production plan
-          </Link>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+            {([['combined', 'Combined'], ['nz', 'NZ'], ['au', 'AU']] as [Market, string][]).map(([m, label], i) => (
+              <Link
+                key={m}
+                href={hrefFor(source, m)}
+                className={`px-3 py-1.5 font-medium ${i > 0 ? 'border-l border-gray-300' : ''} ${market === m ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+          <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+            <Link
+              href={hrefFor('forecast', market)}
+              className={`px-3 py-1.5 font-medium ${source === 'forecast' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+            >
+              From forecast
+            </Link>
+            <Link
+              href={hrefFor('production', market)}
+              className={`px-3 py-1.5 font-medium border-l border-gray-300 ${source === 'production' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+            >
+              From production plan
+            </Link>
+          </div>
         </div>
       </div>
 
