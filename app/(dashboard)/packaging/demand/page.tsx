@@ -145,7 +145,9 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     unitsByMonthByProduct,
     unitsAuByMonthByProduct,
     months,
-    arrivalsByPackaging,
+    // Open POs replenish the NZ pool — not tagged to the AU build, so they don't
+    // offset AU demand. Apply them in NZ / Combined only.
+    arrivalsByPackaging: market === 'au' ? undefined : arrivalsByPackaging,
   })
 
   // Generic group shape used by the renderer below

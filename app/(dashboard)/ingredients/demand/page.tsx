@@ -201,7 +201,9 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     unitsByMonthByProduct: nzUnitsArg,
     unitsAuByMonthByProduct: auUnitsArg,
     months,
-    arrivalsByIngredient,
+    // Open POs replenish the NZ procurement pool — they aren't tagged to the AU
+    // build, so they don't offset AU demand. Apply them in NZ / Combined only.
+    arrivalsByIngredient: market === 'au' ? undefined : arrivalsByIngredient,
   })
 
   // ── Derived totals for tiles ───────────────────────────────
