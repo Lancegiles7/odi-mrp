@@ -15,9 +15,10 @@ export const metadata: Metadata = { title: 'Packaging demand' }
 
 type Source  = 'production' | 'forecast'
 type GroupBy = 'supplier' | 'product_group'
+type Market  = 'combined' | 'nz' | 'au'
 
 interface PageProps {
-  searchParams: { source?: string; group?: string }
+  searchParams: { source?: string; group?: string; market?: string }
 }
 
 export default async function PackagingDemandPage({ searchParams }: PageProps) {
@@ -29,6 +30,11 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
 
   const source: Source = searchParams.source === 'forecast' ? 'forecast' : 'production'
   const groupBy: GroupBy = searchParams.group === 'product_group' ? 'product_group' : 'supplier'
+  const market: Market = searchParams.market === 'nz' ? 'nz' : searchParams.market === 'au' ? 'au' : 'combined'
+  const openingForMarket = (pk: { opening_stock_override: number | null; opening_stock_override_au?: number | null }) =>
+    market === 'au' ? (pk.opening_stock_override_au ?? 0)
+    : market === 'nz' ? (pk.opening_stock_override ?? 0)
+    : (pk.opening_stock_override ?? 0) + (pk.opening_stock_override_au ?? 0)
 
   const [
     { data: products }, { data: packaging }, { data: suppliers },
@@ -36,7 +42,7 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     { data: openPos }, { data: openPoLines },
   ] = await Promise.all([
     supabase.from('products').select('id, sku_code, name, product_type').is('deleted_at', null) as { data: Array<{ id: string; sku_code: string; name: string; product_type: string | null }> | null },
-    supabase.from('packaging').select('id, sku_code, name, type, unit_of_measure, supplier_id, opening_stock_override').eq('is_active', true).order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string; supplier_id: string | null; opening_stock_override: number | null }> | null },
+    supabase.from('packaging').select('id, sku_code, name, type, unit_of_measure, supplier_id, opening_stock_override, opening_stock_override_au').eq('is_active', true).order('name') as { data: Array<{ id: string; sku_code: string; name: string; type: string; unit_of_measure: string; supplier_id: string | null; opening_stock_override: number | null; opening_stock_override_au: number | null }> | null },
     supabase.from('suppliers').select('id, name') as { data: Array<{ id: string; name: string }> | null },
     supabase.from('product_packaging').select('product_id, packaging_id, quantity_per_unit, market') as { data: Array<{ product_id: string; packaging_id: string; quantity_per_unit: number; market: string | null }> | null },
     supabase.from('production_plans')
@@ -124,10 +130,17 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     })
   }
 
+  // Scope the explosion to the selected market by filtering which packaging
+  // links feed it (each link explodes through its own market's units).
+  const ppForMarket = (pp ?? []).filter((p) =>
+    market === 'nz' ? (p.market ?? 'NZ') !== 'AU'
+    : market === 'au' ? p.market === 'AU'
+    : true,
+  )
   const supplierGroups = aggregatePackagingDemand({
     packaging:        packaging ?? [],
     suppliers:        suppliers ?? [],
-    productPackaging: pp ?? [],
+    productPackaging: ppForMarket,
     products:         products ?? [],
     unitsByMonthByProduct,
     unitsAuByMonthByProduct,
@@ -189,7 +202,7 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     supplierGroups.flatMap((g) => g.packaging.map((r) => [r.packaging.id, r])),
   ).values())
   const totalItems      = uniqueRows.length
-  const totalShortfalls = uniqueRows.filter((r) => hasAnyShortfall(r, r.packaging.opening_stock_override ?? 0, months)).length
+  const totalShortfalls = uniqueRows.filter((r) => hasAnyShortfall(r, openingForMarket(r.packaging), months)).length
 
   // Page-level monthly shortfall counts (every packaging item across every
   // supplier / group). Drives the single top-of-page summary strip — totals
@@ -197,7 +210,7 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
   const pageTotals = new Map<string, number>(months.map((m) => [m, 0]))
   const pageShorts = new Map<string, number>(months.map((m) => [m, 0]))
   for (const r of uniqueRows) {
-    const opening = r.packaging.opening_stock_override ?? 0
+    const opening = openingForMarket(r.packaging)
     const states  = monthShortfallStates(r, opening, months)
     for (const m of months) {
       if ((r.demandByMonth.get(m) ?? 0) > 0) pageTotals.set(m, (pageTotals.get(m) ?? 0) + 1)
@@ -207,15 +220,18 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
 
   const [commentedCells, openingHistorySummary] = await Promise.all([
     getCellsWithComments('packaging', uniqueRows.map((r) => r.packaging.id), firstMonth, lastMonth),
-    getPackagingOpeningStockSummary(uniqueRows.map((r) => r.packaging.id)),
+    getPackagingOpeningStockSummary(uniqueRows.map((r) => r.packaging.id), market === 'au' ? 'AU' : 'NZ'),
   ])
 
   const sourceLabel = source === 'production' ? 'production plan' : 'demand forecast'
   const groupLabel  = groupBy === 'supplier' ? 'supplier' : 'product group'
 
-  // Helper to keep the OTHER param when toggling each control
-  const sourceLink = (s: Source)  => `/packaging/demand?source=${s}&group=${groupBy}`
-  const groupLink  = (g: GroupBy) => `/packaging/demand?source=${source}&group=${g}`
+  // Helper to keep the OTHER params when toggling each control
+  const mq = market === 'combined' ? '' : `&market=${market}`
+  const sourceLink = (s: Source)  => `/packaging/demand?source=${s}&group=${groupBy}${mq}`
+  const groupLink  = (g: GroupBy) => `/packaging/demand?source=${source}&group=${g}${mq}`
+  const marketLink = (m: Market)  => `/packaging/demand?source=${source}&group=${groupBy}${m === 'combined' ? '' : `&market=${m}`}`
+  const marketLabel = market === 'nz' ? 'NZ build · Brand Nation' : market === 'au' ? 'AU build · VMC' : 'NZ + AU combined'
 
   return (
     <div className="space-y-5">
@@ -226,9 +242,18 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
             Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · Based on{' '}
             <span className="font-semibold text-gray-800">{sourceLabel}</span>
             {' · '}Grouped by <span className="font-semibold text-gray-800">{groupLabel}</span>
+            {' · '}<span className="font-semibold text-gray-800">{marketLabel}</span>
           </p>
         </div>
         <div className="flex flex-col gap-2 items-end">
+          <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+            {([['combined', 'Combined'], ['nz', 'NZ'], ['au', 'AU']] as [Market, string][]).map(([m, label], i) => (
+              <Link key={m} href={marketLink(m)}
+                className={`px-3 py-1.5 font-medium ${i > 0 ? 'border-l border-gray-300' : ''} ${market === m ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>
+                {label}
+              </Link>
+            ))}
+          </div>
           <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
             <Link href={sourceLink('forecast')}
               className={`px-3 py-1.5 font-medium ${source === 'forecast' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>
@@ -314,9 +339,10 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
                 <tbody>
                   {g.rows.map((row) => (
                     <PackagingDemandRow
-                      key={row.packaging.id}
+                      key={`${row.packaging.id}-${market}`}
                       row={row}
                       months={months}
+                      market={market}
                       commentedCells={commentedCells}
                       openingHistory={openingHistorySummary.get(row.packaging.id)}
                     />

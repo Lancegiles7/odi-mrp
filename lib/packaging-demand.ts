@@ -19,6 +19,7 @@ export interface PackagingRow {
     unit_of_measure: string
     supplier_id: string | null
     opening_stock_override: number | null
+    opening_stock_override_au: number | null
   }
   demandByMonth: Map<string, number>
   totalDemand: number
@@ -48,6 +49,7 @@ export interface AggregateInput {
     unit_of_measure: string
     supplier_id: string | null
     opening_stock_override: number | null
+    opening_stock_override_au?: number | null
   }>
   suppliers: Array<{ id: string; name: string }>
   /** market tags which build a link belongs to; 'AU' rows explode through the
@@ -73,7 +75,7 @@ export function aggregatePackagingDemand(input: AggregateInput): SupplierGroup[]
   const rows = new Map<string, PackagingRow>()
   for (const pk of packaging) {
     rows.set(pk.id, {
-      packaging: pk,
+      packaging: { ...pk, opening_stock_override_au: pk.opening_stock_override_au ?? null },
       demandByMonth: new Map(months.map((m) => [m, 0])),
       totalDemand: 0,
       arrivingByMonth: new Map(months.map((m) => [m, 0])),

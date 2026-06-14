@@ -18,6 +18,8 @@ interface Props {
   commentedCells: Set<string>
   /** Bulk-fetched opening-stock summary: drives the clock-button render. */
   openingHistory?: { hasHistory: boolean; hasComment: boolean }
+  /** Which build's stocktake to check against. Combined = NZ + AU (read-only sum). */
+  market?: 'combined' | 'nz' | 'au'
 }
 
 function fmt(n: number): string {
@@ -28,12 +30,22 @@ function fmt(n: number): string {
   return n.toFixed(2)
 }
 
-export function IngredientDemandRow({ row, months, commentedCells, openingHistory }: Props) {
+export function IngredientDemandRow({ row, months, commentedCells, openingHistory, market = 'combined' }: Props) {
+  const isCombined = market === 'combined'
+  const marketUpper: 'NZ' | 'AU' = market === 'au' ? 'AU' : 'NZ'
+  const nzStock = row.ingredient.opening_stock_override ?? 0
+  const auStock = row.ingredient.opening_stock_override_au ?? 0
+
   const [open, setOpen] = useState(false)
-  const [override, setOverride] = useState<number | null>(row.ingredient.opening_stock_override)
+  // The editable stocktake for the selected single market (NZ or AU).
+  const [override, setOverride] = useState<number | null>(
+    market === 'au' ? row.ingredient.opening_stock_override_au : row.ingredient.opening_stock_override,
+  )
   const [error, setError] = useState<string | null>(null)
 
-  const opening = override ?? 0
+  // Combined view checks against both stocktakes summed (read-only); a single
+  // market view checks against (and edits) that market's stocktake.
+  const opening = isCombined ? nzStock + auStock : (override ?? 0)
   const stateByMonth   = useMemo(() => monthShortfallStates(row, opening, months), [row, opening, months])
   const balanceByMonth = useMemo(() => monthRunningBalances(row, opening, months), [row, opening, months])
   const shortByMonth   = useMemo(() => monthShortAmounts(row, opening, months),    [row, opening, months])
@@ -41,8 +53,8 @@ export function IngredientDemandRow({ row, months, commentedCells, openingHistor
 
   const ingredientId = row.ingredient.id
   const ingredientName = row.ingredient.name
-  const onSave        = useCallback((v: number | null, note: string) => updateIngredientOpeningStock(ingredientId, v, note), [ingredientId])
-  const onLoadHistory = useCallback(() => getIngredientOpeningStockHistory(ingredientId), [ingredientId])
+  const onSave        = useCallback((v: number | null, note: string) => updateIngredientOpeningStock(ingredientId, v, note, marketUpper), [ingredientId, marketUpper])
+  const onLoadHistory = useCallback(() => getIngredientOpeningStockHistory(ingredientId, marketUpper), [ingredientId, marketUpper])
   function handleSaved(next: number | null) {
     setOverride(next)
     setError(null)
@@ -78,9 +90,14 @@ export function IngredientDemandRow({ row, months, commentedCells, openingHistor
         </td>
 
         <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+          {isCombined ? (
+            <span className="text-sm tabular-nums text-gray-700" title="NZ + AU stocktake — edit each in its NZ / AU view">
+              {fmt(opening)}
+            </span>
+          ) : (
           <OpeningStockHistoryPopover
-            entityLabel={`Opening stock · ${ingredientName}`}
-            description={`Manual override in ${unit} — leave blank to fall back to on-hand inventory.`}
+            entityLabel={`${marketUpper} stocktake · ${ingredientName}`}
+            description={`${marketUpper} opening stock in ${unit} — leave blank to fall back to on-hand inventory.`}
             currentValue={override}
             unitLabel={unit}
             onSave={onSave}
@@ -89,6 +106,7 @@ export function IngredientDemandRow({ row, months, commentedCells, openingHistor
             hasHistory={openingHistory?.hasHistory}
             hasComment={openingHistory?.hasComment}
           />
+          )}
         </td>
 
         {months.map((m) => {

@@ -14,10 +14,13 @@ export async function updatePackagingOpeningStock(
   packagingId: string,
   value: number | null,
   note?: string | null,
+  market: 'NZ' | 'AU' = 'NZ',
 ): Promise<{ ok: boolean; error?: string }> {
   if (value !== null && (!Number.isFinite(value) || value < 0)) {
     return { ok: false, error: 'invalid_value' }
   }
+  const mkt = market === 'AU' ? 'AU' : 'NZ'
+  const col = mkt === 'AU' ? 'opening_stock_override_au' : 'opening_stock_override'
 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,10 +28,10 @@ export async function updatePackagingOpeningStock(
 
   const { data: existing } = await supabase
     .from('packaging')
-    .select('opening_stock_override')
+    .select(col)
     .eq('id', packagingId)
-    .maybeSingle() as { data: { opening_stock_override: number | null } | null }
-  const previousValue = existing?.opening_stock_override ?? null
+    .maybeSingle() as { data: Record<string, number | null> | null }
+  const previousValue = existing?.[col] ?? null
 
   const trimmedNote   = note?.trim() || null
   const valueChanged  = (previousValue ?? null) !== (value ?? null)
@@ -38,7 +41,7 @@ export async function updatePackagingOpeningStock(
   if (valueChanged) {
     const { error: updateErr } = await supabase
       .from('packaging')
-      .update({ opening_stock_override: value })
+      .update({ [col]: value })
       .eq('id', packagingId)
     if (updateErr) return { ok: false, error: updateErr.message }
   }
@@ -53,6 +56,7 @@ export async function updatePackagingOpeningStock(
       previous_value: previousValue,
       new_value:      value,
       note:           trimmedNote,
+      market:         mkt,
       changed_by:     profile?.id ?? null,
     })
   if (histErr) return { ok: false, error: `Couldn't save audit: ${histErr.message}` }
@@ -68,6 +72,7 @@ export async function updatePackagingOpeningStock(
  */
 export async function getPackagingOpeningStockHistory(
   packagingId: string,
+  market: 'NZ' | 'AU' = 'NZ',
 ): Promise<{ ok: boolean; rows: OpeningStockHistoryRow[]; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -77,6 +82,7 @@ export async function getPackagingOpeningStockHistory(
     .from('packaging_opening_stock_history')
     .select('id, previous_value, new_value, note, changed_at, user_profiles:changed_by ( full_name )')
     .eq('packaging_id', packagingId)
+    .eq('market', market === 'AU' ? 'AU' : 'NZ')
     .order('changed_at', { ascending: false })
     .limit(50) as unknown as { data: Array<{
       id: string

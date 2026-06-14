@@ -16,6 +16,8 @@ interface Props {
   commentedCells: Set<string>
   /** Bulk-fetched opening-stock summary: drives the clock-button render. */
   openingHistory?: { hasHistory: boolean; hasComment: boolean }
+  /** Which build's stocktake to check against. Combined = NZ + AU (read-only sum). */
+  market?: 'combined' | 'nz' | 'au'
 }
 
 function fmt(n: number): string {
@@ -26,12 +28,19 @@ function fmt(n: number): string {
   return n.toFixed(2)
 }
 
-export function PackagingDemandRow({ row, months, commentedCells, openingHistory }: Props) {
+export function PackagingDemandRow({ row, months, commentedCells, openingHistory, market = 'combined' }: Props) {
+  const isCombined = market === 'combined'
+  const marketUpper: 'NZ' | 'AU' = market === 'au' ? 'AU' : 'NZ'
+  const nzStock = row.packaging.opening_stock_override ?? 0
+  const auStock = row.packaging.opening_stock_override_au ?? 0
+
   const [open, setOpen] = useState(false)
-  const [override, setOverride] = useState<number | null>(row.packaging.opening_stock_override)
+  const [override, setOverride] = useState<number | null>(
+    market === 'au' ? row.packaging.opening_stock_override_au : row.packaging.opening_stock_override,
+  )
   const [error, setError] = useState<string | null>(null)
 
-  const opening = override ?? 0
+  const opening = isCombined ? nzStock + auStock : (override ?? 0)
   const stateByMonth   = useMemo(() => monthShortfallStates(row, opening, months), [row, opening, months])
   const balanceByMonth = useMemo(() => monthRunningBalances(row, opening, months), [row, opening, months])
   const shortByMonth   = useMemo(() => monthShortAmounts(row, opening, months),    [row, opening, months])
@@ -41,8 +50,8 @@ export function PackagingDemandRow({ row, months, commentedCells, openingHistory
   const packagingId   = row.packaging.id
   const packagingName = row.packaging.name
   const unit          = row.packaging.unit_of_measure
-  const onSave        = useCallback((v: number | null, note: string) => updatePackagingOpeningStock(packagingId, v, note), [packagingId])
-  const onLoadHistory = useCallback(() => getPackagingOpeningStockHistory(packagingId), [packagingId])
+  const onSave        = useCallback((v: number | null, note: string) => updatePackagingOpeningStock(packagingId, v, note, marketUpper), [packagingId, marketUpper])
+  const onLoadHistory = useCallback(() => getPackagingOpeningStockHistory(packagingId, marketUpper), [packagingId, marketUpper])
   function handleSaved(next: number | null) {
     setOverride(next)
     setError(null)
@@ -67,17 +76,23 @@ export function PackagingDemandRow({ row, months, commentedCells, openingHistory
           </div>
         </td>
         <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-          <OpeningStockHistoryPopover
-            entityLabel={`Opening stock · ${packagingName}`}
-            description={`Manual override in ${unit} — leave blank to fall back to on-hand inventory.`}
-            currentValue={override}
-            unitLabel={unit}
-            onSave={onSave}
-            onLoadHistory={onLoadHistory}
-            onSaved={handleSaved}
-            hasHistory={openingHistory?.hasHistory}
-            hasComment={openingHistory?.hasComment}
-          />
+          {isCombined ? (
+            <span className="text-sm tabular-nums text-gray-700" title="NZ + AU stocktake — edit each in its NZ / AU view">
+              {fmt(opening)}
+            </span>
+          ) : (
+            <OpeningStockHistoryPopover
+              entityLabel={`${marketUpper} stocktake · ${packagingName}`}
+              description={`${marketUpper} opening stock in ${unit} — leave blank to fall back to on-hand inventory.`}
+              currentValue={override}
+              unitLabel={unit}
+              onSave={onSave}
+              onLoadHistory={onLoadHistory}
+              onSaved={handleSaved}
+              hasHistory={openingHistory?.hasHistory}
+              hasComment={openingHistory?.hasComment}
+            />
+          )}
         </td>
         {months.map((m) => {
           const v        = row.demandByMonth.get(m) ?? 0

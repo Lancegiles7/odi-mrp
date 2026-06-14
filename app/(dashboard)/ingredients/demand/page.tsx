@@ -40,6 +40,13 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
   const market: Market =
     searchParams.market === 'nz' ? 'nz' : searchParams.market === 'au' ? 'au' : 'combined'
 
+  // The stocktake to check demand against for the selected market: NZ uses the
+  // NZ opening stock, AU the Australian stocktake, Combined the two summed.
+  const openingForMarket = (ing: { opening_stock_override: number | null; opening_stock_override_au: number | null }) =>
+    market === 'au' ? (ing.opening_stock_override_au ?? 0)
+    : market === 'nz' ? (ing.opening_stock_override ?? 0)
+    : (ing.opening_stock_override ?? 0) + (ing.opening_stock_override_au ?? 0)
+
   // ── Fetch everything we need in parallel ───────────────────
   const [
     { data: products }, { data: ingredients }, { data: suppliers },
@@ -51,10 +58,10 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       .select('id, sku_code, name, size_g, wet_weight_g, wastage_pct')
       .is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; size_g: number | null; wet_weight_g: number | null; wastage_pct: number | null }> | null }>,
     supabase.from('ingredients')
-      .select('id, sku_code, name, unit_of_measure, supplier_id, opening_stock_override, is_active')
+      .select('id, sku_code, name, unit_of_measure, supplier_id, opening_stock_override, opening_stock_override_au, is_active')
       .eq('is_active', true) as unknown as Promise<{ data: Array<{
         id: string; sku_code: string; name: string; unit_of_measure: string | null;
-        supplier_id: string | null; opening_stock_override: number | null; is_active: boolean
+        supplier_id: string | null; opening_stock_override: number | null; opening_stock_override_au: number | null; is_active: boolean
       }> | null }>,
     supabase.from('suppliers')
       .select('id, name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
@@ -209,7 +216,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       totalIngredients++
       const unit = demandUnitLabel(row.ingredient.unit_of_measure)
       demandByUnit.set(unit, (demandByUnit.get(unit) ?? 0) + row.totalDemand)
-      const opening = row.ingredient.opening_stock_override ?? 0
+      const opening = openingForMarket(row.ingredient)
       // Skip shortfall count for ingredients with no supplier — there's
       // nothing the user can action on those, so they shouldn't pad the
       // headline number. They still render in the table; only the tile
@@ -230,7 +237,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       // Exclude "Supplier not set" ingredients — consistent with the headline
       // shortfall count, which only tallies ingredients that have a supplier.
       if (!row.ingredient.supplier_id) continue
-      const opening = row.ingredient.opening_stock_override ?? 0
+      const opening = openingForMarket(row.ingredient)
       const states  = monthShortfallStates(row, opening, months)
       for (const m of months) {
         if ((row.demandByMonth.get(m) ?? 0) > 0) pageTotals.set(m, (pageTotals.get(m) ?? 0) + 1)
@@ -241,7 +248,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
 
   const [commentedCells, openingHistorySummary] = await Promise.all([
     getCellsWithComments('ingredient', allIngredientIds, firstMonth, lastMonth),
-    getIngredientOpeningStockSummary(allIngredientIds),
+    getIngredientOpeningStockSummary(allIngredientIds, market === 'au' ? 'AU' : 'NZ'),
   ])
 
   const demandSummaryParts: string[] = []
@@ -370,9 +377,10 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
                 <tbody>
                   {g.ingredients.map((row) => (
                     <IngredientDemandRow
-                      key={row.ingredient.id}
+                      key={`${row.ingredient.id}-${market}`}
                       row={row}
                       months={months}
+                      market={market}
                       commentedCells={commentedCells}
                       openingHistory={openingHistorySummary.get(row.ingredient.id)}
                     />

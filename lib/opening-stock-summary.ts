@@ -44,22 +44,24 @@ export async function getProductOpeningStockSummary(productIds: string[]): Promi
   return rollUp(data ?? [], (r) => r.product_id)
 }
 
-export async function getIngredientOpeningStockSummary(ingredientIds: string[]): Promise<Map<string, OpeningStockSummary>> {
+export async function getIngredientOpeningStockSummary(ingredientIds: string[], market: 'NZ' | 'AU' = 'NZ'): Promise<Map<string, OpeningStockSummary>> {
   if (ingredientIds.length === 0) return new Map()
   const supabase = createClient()
   const { data } = await supabase
     .from('ingredient_opening_stock_history')
     .select('ingredient_id, note')
+    .eq('market', market === 'AU' ? 'AU' : 'NZ')
     .in('ingredient_id', ingredientIds) as unknown as { data: Array<HistoryRow & { ingredient_id: string }> | null }
   return rollUp(data ?? [], (r) => r.ingredient_id)
 }
 
-export async function getPackagingOpeningStockSummary(packagingIds: string[]): Promise<Map<string, OpeningStockSummary>> {
+export async function getPackagingOpeningStockSummary(packagingIds: string[], market: 'NZ' | 'AU' = 'NZ'): Promise<Map<string, OpeningStockSummary>> {
   if (packagingIds.length === 0) return new Map()
   const supabase = createClient()
   const { data } = await supabase
     .from('packaging_opening_stock_history')
     .select('packaging_id, note')
+    .eq('market', market === 'AU' ? 'AU' : 'NZ')
     .in('packaging_id', packagingIds) as unknown as { data: Array<HistoryRow & { packaging_id: string }> | null }
   return rollUp(data ?? [], (r) => r.packaging_id)
 }

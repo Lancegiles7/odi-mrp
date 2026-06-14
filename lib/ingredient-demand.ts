@@ -24,6 +24,7 @@ export interface IngredientDemandInput {
     unit_of_measure: string | null
     supplier_id: string | null
     opening_stock_override: number | null
+    opening_stock_override_au?: number | null
   }>
 
   /** suppliers keyed by id (supplier_id may be null on an ingredient) */
@@ -86,6 +87,7 @@ export interface IngredientRow {
     name: string
     unit_of_measure: string | null
     opening_stock_override: number | null
+    opening_stock_override_au: number | null
     supplier_id: string | null
   }
   /** month → demand in the ingredient's display UOM */
@@ -161,6 +163,7 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
         name: ing.name,
         unit_of_measure: ing.unit_of_measure,
         opening_stock_override: ing.opening_stock_override,
+        opening_stock_override_au: ing.opening_stock_override_au ?? null,
         supplier_id: ing.supplier_id,
       },
       demandByMonth: new Map(months.map((m) => [m, 0])),
