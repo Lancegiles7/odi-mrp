@@ -80,9 +80,9 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       .select('product_id, year_month, units_planned, market')
       .gte('year_month', firstMonth).lte('year_month', lastMonth) as unknown as Promise<{ data: Array<{ product_id: string; year_month: string; units_planned: number; market: string | null }> | null }>,
     supabase.from('purchase_orders')
-      .select('id, po_number, status, expected_delivery_date')
+      .select('id, po_number, status, expected_delivery_date, market')
       .in('status', ['submitted', 'partially_received'])
-      .not('expected_delivery_date', 'is', null) as unknown as Promise<{ data: Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null }> | null }>,
+      .not('expected_delivery_date', 'is', null) as unknown as Promise<{ data: Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null; market: string | null }> | null }>,
     supabase.from('purchase_order_lines')
       .select('purchase_order_id, ingredient_id, quantity_ordered, quantity_received, unit_of_measure')
       .not('ingredient_id', 'is', null) as unknown as Promise<{ data: Array<{ purchase_order_id: string; ingredient_id: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string }> | null }>,
@@ -143,8 +143,14 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
 
   // ── Build arrivals map: ingredient_id → [{ po, month, qty }] ──
   // Only include lines from open POs with a delivery date inside the window.
-  const poById = new Map<string, { po_number: string; expected_delivery_date: string | null }>()
-  for (const p of openPos ?? []) poById.set(p.id, { po_number: p.po_number, expected_delivery_date: p.expected_delivery_date })
+  // Only count POs raised for the selected build (Combined counts all). POs are
+  // tagged NZ/AU on their header; an AU PO replenishes the AU build, etc.
+  const poById = new Map<string, { po_number: string; expected_delivery_date: string | null; market: string }>()
+  for (const p of openPos ?? []) {
+    const poMarket = p.market === 'AU' ? 'AU' : 'NZ'
+    if (market !== 'combined' && poMarket !== (market === 'au' ? 'AU' : 'NZ')) continue
+    poById.set(p.id, { po_number: p.po_number, expected_delivery_date: p.expected_delivery_date, market: poMarket })
+  }
 
   const arrivalsByIngredient = new Map<string, Array<{ po_id: string; po_number: string; month: string; qty: number }>>()
   const ingredientById = new Map((ingredients ?? []).map((i) => [i.id, i]))
@@ -201,9 +207,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     unitsByMonthByProduct: nzUnitsArg,
     unitsAuByMonthByProduct: auUnitsArg,
     months,
-    // Open POs replenish the NZ procurement pool — they aren't tagged to the AU
-    // build, so they don't offset AU demand. Apply them in NZ / Combined only.
-    arrivalsByIngredient: market === 'au' ? undefined : arrivalsByIngredient,
+    // Arrivals are already scoped to the selected market's POs (above).
+    arrivalsByIngredient,
   })
 
   // ── Derived totals for tiles ───────────────────────────────

@@ -101,7 +101,7 @@ export async function loadIngredientStrip(sb: SB, months: string[], first: strin
     all<Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null }>>(
       sb.from('bom_items').select('bom_id, ingredient_id, quantity_g, wet_quantity_g')),
     all<Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null }>>(
-      sb.from('purchase_orders').select('id, po_number, status, expected_delivery_date').in('status', ['submitted', 'partially_received']).not('expected_delivery_date', 'is', null)),
+      sb.from('purchase_orders').select('id, po_number, status, expected_delivery_date').eq('market', 'NZ').in('status', ['submitted', 'partially_received']).not('expected_delivery_date', 'is', null)),
     all<Array<{ purchase_order_id: string; ingredient_id: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string }>>(
       sb.from('purchase_order_lines').select('purchase_order_id, ingredient_id, quantity_ordered, quantity_received, unit_of_measure').not('ingredient_id', 'is', null)),
   ])
@@ -168,7 +168,7 @@ export async function loadPackagingStrip(sb: SB, months: string[], first: string
     all<Array<{ product_id: string; packaging_id: string; quantity_per_unit: number; market: string | null }>>(
       sb.from('product_packaging').select('product_id, packaging_id, quantity_per_unit, market')),
     all<Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null }>>(
-      sb.from('purchase_orders').select('id, po_number, status, expected_delivery_date').in('status', ['submitted', 'partially_received']).not('expected_delivery_date', 'is', null)),
+      sb.from('purchase_orders').select('id, po_number, status, expected_delivery_date').eq('market', 'NZ').in('status', ['submitted', 'partially_received']).not('expected_delivery_date', 'is', null)),
     all<Array<{ purchase_order_id: string; packaging_id: string | null; quantity_ordered: number; quantity_received: number }>>(
       sb.from('purchase_order_lines').select('purchase_order_id, packaging_id, quantity_ordered, quantity_received').not('packaging_id', 'is', null)),
   ])

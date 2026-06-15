@@ -50,6 +50,7 @@ export default async function NewPurchaseOrderPage() {
       initialPoNumber={poNumber}
       initialSupplierId=""
       initialCurrency="NZD"
+      initialMarket="NZ"
       initialIssuerId={null}
       initialCompanyId={null}
       initialOrderDate={todayStr}

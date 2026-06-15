@@ -64,6 +64,7 @@ export async function createPurchaseOrder(input: {
   po_number: string
   supplier_id: string
   currency?: string
+  market?: string
   issuer_id?: string | null
   company_id?: string | null
   order_date: string
@@ -91,6 +92,7 @@ export async function createPurchaseOrder(input: {
       po_number:              input.po_number.trim(),
       supplier_id:            input.supplier_id,
       currency:               (input.currency ?? 'NZD').toUpperCase(),
+      market:                 input.market === 'AU' ? 'AU' : 'NZ',
       issuer_id:              input.issuer_id ?? null,
       company_id:             input.company_id ?? null,
       status:                 'draft',
@@ -136,6 +138,7 @@ export async function updatePurchaseOrder(input: {
   po_number: string
   supplier_id: string
   currency?: string
+  market?: string
   issuer_id?: string | null
   company_id?: string | null
   order_date: string
@@ -164,6 +167,7 @@ export async function updatePurchaseOrder(input: {
       po_number:              input.po_number.trim(),
       supplier_id:            input.supplier_id,
       currency:               (input.currency ?? 'NZD').toUpperCase(),
+      market:                 input.market === 'AU' ? 'AU' : 'NZ',
       issuer_id:              input.issuer_id ?? null,
       company_id:             input.company_id ?? null,
       order_date:             input.order_date,

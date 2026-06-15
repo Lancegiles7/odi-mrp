@@ -69,6 +69,7 @@ export interface POFormProps {
   initialPoNumber: string
   initialSupplierId: string
   initialCurrency: string          // 'NZD' default
+  initialMarket?: string           // 'NZ' default — which build the PO is for
   initialIssuerId: string | null
   initialCompanyId: string | null
   initialOrderDate: string         // 'YYYY-MM-DD'
@@ -108,6 +109,7 @@ export function POForm(props: POFormProps) {
   const [supplierId, setSupplierId] = useState(props.initialSupplierId)
   const [currency, setCurrency]     = useState(props.initialCurrency || 'NZD')
   const [currencyManuallySet, setCurrencyManuallySet] = useState(props.mode === 'edit')
+  const [market, setMarket]         = useState<'NZ' | 'AU'>(props.initialMarket === 'AU' ? 'AU' : 'NZ')
   const [issuerId, setIssuerId] = useState<string>(
     props.initialIssuerId ?? props.issuers.find((i) => i.is_default)?.id ?? props.issuers[0]?.id ?? '',
   )
@@ -212,6 +214,7 @@ export function POForm(props: POFormProps) {
         po_number: poNumber,
         supplier_id: supplierId,
         currency,
+        market,
         issuer_id: issuerId || null,
         company_id: companyId || null,
         order_date: orderDate,
@@ -345,6 +348,21 @@ export function POForm(props: POFormProps) {
                   ⚠ supplier&apos;s currency is {supplier.currency.toUpperCase()} — overriding to {currency}
                 </p>
               )}
+            </Field>
+
+            <Field label="Build / market">
+              <select
+                disabled={!isEditable}
+                value={market}
+                onChange={(e) => setMarket(e.target.value === 'AU' ? 'AU' : 'NZ')}
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
+              >
+                <option value="NZ">NZ · Brand Nation</option>
+                <option value="AU">AU · VMC</option>
+              </select>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Which build this order replenishes. Drives the matching market on Ingredient / Packaging demand.
+              </p>
             </Field>
 
             <Field label="From company">

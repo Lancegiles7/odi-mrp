@@ -55,9 +55,9 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
         .order('product_id').order('year_month').order('channel')
         .range(from, to) as unknown as PromiseLike<{ data: Array<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }> | null; error: { message: string } | null }>),
     supabase.from('purchase_orders')
-      .select('id, po_number, status, expected_delivery_date')
+      .select('id, po_number, status, expected_delivery_date, market')
       .in('status', ['submitted', 'partially_received'])
-      .not('expected_delivery_date', 'is', null) as { data: Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null }> | null },
+      .not('expected_delivery_date', 'is', null) as { data: Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null; market: string | null }> | null },
     supabase.from('purchase_order_lines')
       .select('purchase_order_id, packaging_id, quantity_ordered, quantity_received')
       .not('packaging_id', 'is', null) as { data: Array<{ purchase_order_id: string; packaging_id: string | null; quantity_ordered: number; quantity_received: number }> | null },
@@ -111,8 +111,11 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
   // arrival bucket for that packaging item × month. Mirrors the
   // ingredient-demand arrivals build (without the UoM conversion since
   // packaging is always tracked as 'each').
+  // Only count POs raised for the selected build (Combined counts all).
   const poById = new Map<string, { po_number: string; expected_delivery_date: string | null }>()
   for (const p of openPos ?? []) {
+    const poMarket = p.market === 'AU' ? 'AU' : 'NZ'
+    if (market !== 'combined' && poMarket !== (market === 'au' ? 'AU' : 'NZ')) continue
     poById.set(p.id, { po_number: p.po_number, expected_delivery_date: p.expected_delivery_date })
   }
   const arrivalsByPackaging = new Map<string, Array<{ po_id: string; po_number: string; month: string; qty: number }>>()
@@ -145,9 +148,8 @@ export default async function PackagingDemandPage({ searchParams }: PageProps) {
     unitsByMonthByProduct,
     unitsAuByMonthByProduct,
     months,
-    // Open POs replenish the NZ pool — not tagged to the AU build, so they don't
-    // offset AU demand. Apply them in NZ / Combined only.
-    arrivalsByPackaging: market === 'au' ? undefined : arrivalsByPackaging,
+    // Arrivals are already scoped to the selected market's POs (above).
+    arrivalsByPackaging,
   })
 
   // Generic group shape used by the renderer below

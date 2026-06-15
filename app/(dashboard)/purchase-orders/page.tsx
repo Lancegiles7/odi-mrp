@@ -11,6 +11,7 @@ interface POListRow {
   order_date: string
   expected_delivery_date: string | null
   supplier_id: string
+  market: string | null
 }
 
 interface PageProps {
@@ -45,7 +46,7 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
 
   const [{ data: pos }, { data: suppliers }, { data: lines }] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('id, po_number, status, order_date, expected_delivery_date, supplier_id')
+      .select('id, po_number, status, order_date, expected_delivery_date, supplier_id, market')
       .order('po_number', { ascending: false }) as unknown as Promise<{ data: POListRow[] | null }>,
     supabase.from('suppliers')
       .select('id, name')
@@ -145,6 +146,9 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
                   <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-2 font-mono">
                       <Link href={`/purchase-orders/${p.id}`} className="hover:underline text-gray-900">{p.po_number}</Link>
+                      {p.market === 'AU' && (
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-sans">AU</span>
+                      )}
                     </td>
                     <td className="px-4 py-2 text-gray-700">{supplierById.get(p.supplier_id) ?? '—'}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-gray-600">{stats.count}</td>

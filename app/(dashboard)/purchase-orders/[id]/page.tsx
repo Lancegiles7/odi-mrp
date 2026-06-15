@@ -15,7 +15,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
 
   const [{ data: po }, { data: lines }, { data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }, { data: issuers }, { data: companies }] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('id, po_number, supplier_id, currency, issuer_id, company_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes')
+      .select('id, po_number, supplier_id, currency, market, issuer_id, company_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
         id: string; po_number: string; supplier_id: string; currency: string | null; issuer_id: string | null;
@@ -89,6 +89,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       initialPoNumber={po.po_number}
       initialSupplierId={po.supplier_id}
       initialCurrency={po.currency ?? 'NZD'}
+      initialMarket={po.market ?? 'NZ'}
       initialIssuerId={po.issuer_id}
       initialCompanyId={po.company_id}
       initialOrderDate={po.order_date.slice(0, 10)}
