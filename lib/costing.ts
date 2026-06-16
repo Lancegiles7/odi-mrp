@@ -34,14 +34,29 @@ export function lineWetGrams(item: BomItemWithIngredient): number {
   return Number(item.wet_quantity_g ?? item.quantity_g) || 0
 }
 
+// Count-based units (each pouch / unit / case …) are priced per unit and the
+// BOM quantity is a unit count, not grams. Weight units (kg/g) are priced per
+// kg and the BOM quantity is grams.
+const COUNT_UOMS = new Set(['each', 'unit', 'case', 'box', 'bag', 'pallet'])
+export function isCountUom(uom: string | null | undefined): boolean {
+  return COUNT_UOMS.has((uom ?? '').trim().toLowerCase())
+}
+
+// Cost of a quantity at a per-unit-of-measure price. For count items the price
+// is per unit and qty is a unit count (no /1000); for weight items the price is
+// per kg and qty is grams.
+function costAtUom(qty: number, perUom: number, uom: string | null | undefined): number {
+  return isCountUom(uom) ? round2(qty * perUom) : round2((qty / 1000) * perUom)
+}
+
 // Per-line price for a BOM item — costed on the wet input (no wastage here;
 // that's a total-level operation per the revised spec).
 export function calcLinePrice(item: BomItemWithIngredient): number {
-  const pricePerKg =
+  const perUom =
     item.price_override ??
     item.ingredients.total_loaded_cost ??
     0
-  return round2((lineWetGrams(item) / 1000) * pricePerKg)
+  return costAtUom(lineWetGrams(item), perUom, item.ingredients.unit_of_measure)
 }
 
 // Australian per-line price for a dual-made product (AUD). Uses the
@@ -50,33 +65,38 @@ export function calcLinePrice(item: BomItemWithIngredient): number {
 // build of a dual-manufactured product calls this — single-manufacturer
 // products still convert the NZ total wholesale.
 export function calcLinePriceAu(item: BomItemWithIngredient, fxRate: number): number {
-  const nzPerKg = item.price_override ?? item.ingredients.total_loaded_cost ?? 0
-  const auPerKg =
+  const nzPerUom = item.price_override ?? item.ingredients.total_loaded_cost ?? 0
+  const auPerUom =
     item.ingredients.total_loaded_cost_au ??
-    (fxRate > 0 ? nzPerKg / fxRate : nzPerKg)
-  return round2((lineWetGrams(item) / 1000) * auPerKg)
+    (fxRate > 0 ? nzPerUom / fxRate : nzPerUom)
+  return costAtUom(lineWetGrams(item), auPerUom, item.ingredients.unit_of_measure)
 }
 
 // Derived display values for each BOM row. Cost is on wet grams; % of weight
-// stays on the dry composition (what's in the sold pack).
+// stays on the dry composition (what's in the sold pack). Count items (each /
+// unit) carry a unit count instead of grams — % of weight doesn't apply.
 export function calcBomLineValues(
   item: BomItemWithIngredient,
   sizeG: number,
   servingSize: number,
 ) {
-  const pricePerKg    = item.price_override ?? item.ingredients.total_loaded_cost ?? 0
+  const perUom        = item.price_override ?? item.ingredients.total_loaded_cost ?? 0
+  const isCount       = isCountUom(item.ingredients.unit_of_measure)
   const wetG          = lineWetGrams(item)
-  const unitInKg      = round4(wetG / 1000)
-  const pct           = sizeG > 0 ? round4(item.quantity_g / sizeG) : 0
-  const serveAmt      = sizeG > 0 ? round2((item.quantity_g / sizeG) * servingSize) : 0
-  const pricePerUnit  = round2(unitInKg * pricePerKg)
+  // For count items unit_in_kg holds the unit count (so unit_in_kg × per-unit
+  // price still yields the line cost); for weight items it's kg.
+  const unitInKg      = isCount ? round4(wetG) : round4(wetG / 1000)
+  const pct           = !isCount && sizeG > 0 ? round4(item.quantity_g / sizeG) : 0
+  const serveAmt      = !isCount && sizeG > 0 ? round2((item.quantity_g / sizeG) * servingSize) : 0
+  const pricePerUnit  = costAtUom(wetG, perUom, item.ingredients.unit_of_measure)
 
   return {
     unit_in_kg:     unitInKg,
     percentage:     pct,
     serve_amount:   serveAmt,
-    price_per_kg:   round2(pricePerKg),
+    price_per_kg:   round2(perUom),
     price_per_unit: pricePerUnit,
+    is_count:       isCount,
   }
 }
 

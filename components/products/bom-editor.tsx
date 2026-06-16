@@ -18,6 +18,7 @@ interface EditorRow {
   sort_order: number
   is_organic: boolean
   total_loaded_cost: number | null
+  unit_of_measure: string | null
 }
 
 interface BomEditorProps {
@@ -45,6 +46,7 @@ function makeRow(item?: BomItemWithIngredient, idx?: number): EditorRow {
       sort_order: item.sort_order,
       is_organic: item.ingredients.is_organic,
       total_loaded_cost: item.ingredients.total_loaded_cost,
+      unit_of_measure: item.ingredients.unit_of_measure,
     }
   }
   return {
@@ -59,6 +61,7 @@ function makeRow(item?: BomItemWithIngredient, idx?: number): EditorRow {
     sort_order: idx ?? 0,
     is_organic: true,
     total_loaded_cost: null,
+    unit_of_measure: null,
   }
 }
 
@@ -78,7 +81,7 @@ function calcRow(row: EditorRow, sizeG: number, servingSize: number) {
         id: row.ingredient_id,
         name: row.ingredient_name,
         sku_code: row.ingredient_sku,
-        unit_of_measure: 'g',
+        unit_of_measure: row.unit_of_measure ?? 'g',
         total_loaded_cost: row.total_loaded_cost,
         is_organic: row.is_organic,
       },
@@ -126,6 +129,7 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
       ingredient_sku: ing.sku_code,
       is_organic: ing.is_organic,
       total_loaded_cost: ing.total_loaded_cost,
+      unit_of_measure: ing.unit_of_measure,
     })
   }
 

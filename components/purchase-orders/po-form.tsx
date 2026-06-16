@@ -167,6 +167,9 @@ export function POForm(props: POFormProps) {
       if (patch.ingredient_id && patch.ingredient_id !== l.ingredient_id) {
         const ing = props.ingredients.find((x) => x.id === patch.ingredient_id)
         if (ing) {
+          // Order in the ingredient's own unit (e.g. 'each' for finished pouches,
+          // 'kg' for bulk). Price prefill is per that unit.
+          if (ing.unit_of_measure) next.unit_of_measure = ing.unit_of_measure
           if (
             next.unit_cost == null &&
             ing.price != null &&
