@@ -78,6 +78,7 @@ export interface POFormProps {
   initialDeliveryAddressId: string | null
   initialDeliveryNotes: string | null
   initialNotes: string | null
+  initialExternalNotes?: string | null
   initialLines: POLineInput[]
   status: 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled'
   suppliers: SupplierOption[]
@@ -120,6 +121,7 @@ export function POForm(props: POFormProps) {
   const [orderDate, setOrderDate]   = useState(props.initialOrderDate)
   const [expected, setExpected]     = useState(props.initialExpected ?? '')
   const [notes, setNotes]           = useState(props.initialNotes ?? '')
+  const [externalNotes, setExternalNotes] = useState(props.initialExternalNotes ?? '')
   const [deliveryAddressId, setDeliveryAddressId] = useState(
     props.initialDeliveryAddressId
       ?? props.deliveryAddresses.find((a) => a.is_default && a.country === 'NZ')?.id
@@ -217,6 +219,7 @@ export function POForm(props: POFormProps) {
         delivery_address_id: deliveryAddressId || null,
         delivery_notes: deliveryNotes || null,
         notes: notes || null,
+        external_notes: externalNotes || null,
         lines,
       }
       const res = props.mode === 'new'
@@ -500,14 +503,25 @@ export function POForm(props: POFormProps) {
             </div>
           </div>
 
-          <Field label="Notes (internal)">
+          <Field label="External note (shown on the PO)">
+            <textarea
+              disabled={!isEditable}
+              rows={2}
+              value={externalNotes}
+              onChange={(e) => setExternalNotes(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
+              placeholder="Note printed on the PO for the supplier"
+            />
+          </Field>
+
+          <Field label="Internal note (not shown on the PO)">
             <textarea
               disabled={!isEditable}
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-50"
-              placeholder="Special instructions, quote refs, etc."
+              placeholder="For your team only — quote refs, reminders, etc."
             />
           </Field>
 

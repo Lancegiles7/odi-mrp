@@ -72,6 +72,7 @@ export async function createPurchaseOrder(input: {
   delivery_address_id: string | null
   delivery_notes: string | null
   notes: string | null
+  external_notes: string | null
   lines: POLineInput[]
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   const supabase = createClient()
@@ -101,6 +102,7 @@ export async function createPurchaseOrder(input: {
       delivery_address_id:    input.delivery_address_id,
       delivery_notes:         input.delivery_notes,
       notes:                  input.notes,
+      external_notes:         input.external_notes,
       created_by:             profile?.id ?? null,
     })
     .select('id')
@@ -146,6 +148,7 @@ export async function updatePurchaseOrder(input: {
   delivery_address_id: string | null
   delivery_notes: string | null
   notes: string | null
+  external_notes: string | null
   lines: POLineInput[]
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
@@ -175,6 +178,7 @@ export async function updatePurchaseOrder(input: {
       delivery_address_id:    input.delivery_address_id,
       delivery_notes:         input.delivery_notes,
       notes:                  input.notes,
+      external_notes:         input.external_notes,
     })
     .eq('id', input.id)
   if (hErr) return { ok: false, error: hErr.message }

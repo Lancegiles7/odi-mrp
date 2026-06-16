@@ -62,6 +62,7 @@ export default async function NewPurchaseOrderPage() {
       initialDeliveryAddressId={null}
       initialDeliveryNotes={null}
       initialNotes={null}
+      initialExternalNotes={null}
       initialLines={[]}
       status="draft"
       suppliers={suppliers ?? []}

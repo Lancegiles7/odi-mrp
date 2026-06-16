@@ -16,7 +16,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
 
   const [{ data: po }, { data: lines }, { data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }, { data: issuers }, { data: companies }] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('id, po_number, supplier_id, currency, market, issuer_id, company_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes')
+      .select('id, po_number, supplier_id, currency, market, issuer_id, company_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, external_notes')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
         id: string; po_number: string; supplier_id: string; currency: string | null; issuer_id: string | null;
@@ -24,7 +24,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         status: 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled';
         order_date: string; expected_delivery_date: string | null;
         delivery_address_id: string | null; delivery_notes: string | null;
-        notes: string | null;
+        notes: string | null; market: string | null; external_notes: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
       .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes, supplier_code, supplier_pack_size')
@@ -102,6 +102,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       initialDeliveryAddressId={po.delivery_address_id}
       initialDeliveryNotes={po.delivery_notes}
       initialNotes={po.notes}
+      initialExternalNotes={po.external_notes}
       initialLines={initialLines}
       status={po.status}
       suppliers={suppliers ?? []}

@@ -43,12 +43,12 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
 
   const [{ data: po }, { data: lines }, settings] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('po_number, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, supplier_id, currency, issuer_id, company_id')
+      .select('po_number, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, external_notes, supplier_id, currency, issuer_id, company_id')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
         po_number: string; status: string; order_date: string; expected_delivery_date: string | null;
         delivery_address_id: string | null; delivery_notes: string | null;
-        notes: string | null; supplier_id: string; currency: string | null; issuer_id: string | null;
+        notes: string | null; external_notes: string | null; supplier_id: string; currency: string | null; issuer_id: string | null;
         company_id: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
@@ -320,6 +320,13 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
             </tr>
           </tfoot>
         </table>
+
+        {po.external_notes && (
+          <div className="mb-4 p-3 border border-gray-200 rounded text-[10px] text-gray-700">
+            <div className="font-semibold text-gray-900 mb-1">Notes</div>
+            <div className="whitespace-pre-line">{po.external_notes}</div>
+          </div>
+        )}
 
         {po.delivery_notes && (
           <div className="mb-4 p-3 border border-gray-200 rounded text-[10px] text-gray-700">
