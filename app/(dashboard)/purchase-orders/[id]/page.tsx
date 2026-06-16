@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { POForm } from '@/components/purchase-orders/po-form'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
+import { getAppSettings } from '@/lib/settings'
 
 export const metadata: Metadata = { title: 'Purchase order' }
 
@@ -64,6 +65,9 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
 
   if (!po) notFound()
 
+  const settings = await getAppSettings()
+  const fxRate = Number(settings.fx_rates?.AUD) || 1.2
+
   const initialLines: POLineInput[] = (lines ?? []).map((l) => ({
     id: l.id,
     line_type:
@@ -90,6 +94,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       initialSupplierId={po.supplier_id}
       initialCurrency={po.currency ?? 'NZD'}
       initialMarket={po.market ?? 'NZ'}
+      fxRate={fxRate}
       initialIssuerId={po.issuer_id}
       initialCompanyId={po.company_id}
       initialOrderDate={po.order_date.slice(0, 10)}

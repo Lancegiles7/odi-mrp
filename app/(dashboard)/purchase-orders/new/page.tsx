@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { POForm } from '@/components/purchase-orders/po-form'
 import { generatePoNumber } from '@/app/(dashboard)/purchase-orders/actions'
+import { getAppSettings } from '@/lib/settings'
 
 export const metadata: Metadata = { title: 'New purchase order' }
 
@@ -43,6 +44,8 @@ export default async function NewPurchaseOrderPage() {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const poNumber = await generatePoNumber()
+  const settings = await getAppSettings()
+  const fxRate = Number(settings.fx_rates?.AUD) || 1.2
 
   return (
     <POForm
@@ -51,6 +54,7 @@ export default async function NewPurchaseOrderPage() {
       initialSupplierId=""
       initialCurrency="NZD"
       initialMarket="NZ"
+      fxRate={fxRate}
       initialIssuerId={null}
       initialCompanyId={null}
       initialOrderDate={todayStr}

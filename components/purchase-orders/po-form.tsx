@@ -70,6 +70,7 @@ export interface POFormProps {
   initialSupplierId: string
   initialCurrency: string          // 'NZD' default
   initialMarket?: string           // 'NZ' default — which build the PO is for
+  fxRate?: number                  // NZD per 1 AUD — converts ingredient/packaging price to the PO currency
   initialIssuerId: string | null
   initialCompanyId: string | null
   initialOrderDate: string         // 'YYYY-MM-DD'
@@ -110,6 +111,21 @@ export function POForm(props: POFormProps) {
   const [currency, setCurrency]     = useState(props.initialCurrency || 'NZD')
   const [currencyManuallySet, setCurrencyManuallySet] = useState(props.mode === 'edit')
   const [market, setMarket]         = useState<'NZ' | 'AU'>(props.initialMarket === 'AU' ? 'AU' : 'NZ')
+
+  // Convert an ingredient/packaging price into the PO's currency (fx = NZD per
+  // 1 AUD). Lets the price prefill even when the item is priced in AUD and the
+  // PO is in NZD (or vice versa) instead of leaving it blank.
+  const fxRate = props.fxRate && props.fxRate > 0 ? props.fxRate : 1
+  function toPoCurrency(amount: number, fromCurrency: string | null | undefined): number {
+    const from = (fromCurrency ?? 'NZD').toUpperCase()
+    const to = currency.toUpperCase()
+    let v = amount
+    if (from !== to) {
+      if (from === 'AUD' && to === 'NZD') v = amount * fxRate
+      else if (from === 'NZD' && to === 'AUD') v = amount / fxRate
+    }
+    return Math.round(v * 10000) / 10000
+  }
   const [issuerId, setIssuerId] = useState<string>(
     props.initialIssuerId ?? props.issuers.find((i) => i.is_default)?.id ?? props.issuers[0]?.id ?? '',
   )
@@ -168,32 +184,21 @@ export function POForm(props: POFormProps) {
         const ing = props.ingredients.find((x) => x.id === patch.ingredient_id)
         if (ing) {
           // Order in the ingredient's own unit (e.g. 'each' for finished pouches,
-          // 'kg' for bulk). Price prefill is per that unit.
+          // 'kg' for bulk). Price prefill is per that unit, converted to the PO
+          // currency when they differ (e.g. an AUD-priced ingredient on an NZD PO).
           if (ing.unit_of_measure) next.unit_of_measure = ing.unit_of_measure
-          if (
-            next.unit_cost == null &&
-            ing.price != null &&
-            (ing.currency ?? 'NZD').toUpperCase() === currency.toUpperCase()
-          ) {
-            next.unit_cost = Number(ing.price)
+          if (next.unit_cost == null && ing.price != null) {
+            next.unit_cost = toPoCurrency(Number(ing.price), ing.currency)
           }
         }
       }
-      // Pre-fill from packaging item. The PO is denominated in the
-      // supplier's currency, so we pre-fill the supplier-currency
-      // price (pk.price) — NOT the NZD-loaded cost, which already has
-      // FX baked in. Only auto-fill when the packaging item's currency
-      // matches the current PO currency; otherwise the user has to
-      // enter it explicitly so we don't silently mis-price the line.
+      // Pre-fill from packaging item — its supplier-currency price (NOT the
+      // NZD-loaded cost), converted to the PO currency when they differ.
       if (patch.packaging_id && patch.packaging_id !== l.packaging_id) {
         const pk = props.packaging.find((x) => x.id === patch.packaging_id)
         if (pk) {
-          if (
-            next.unit_cost == null &&
-            pk.price != null &&
-            (pk.currency ?? 'NZD').toUpperCase() === currency.toUpperCase()
-          ) {
-            next.unit_cost = Number(pk.price)
+          if (next.unit_cost == null && pk.price != null) {
+            next.unit_cost = toPoCurrency(Number(pk.price), pk.currency)
           }
           if (pk.unit_of_measure) next.unit_of_measure = pk.unit_of_measure
         }
