@@ -111,21 +111,6 @@ export function POForm(props: POFormProps) {
   const [currency, setCurrency]     = useState(props.initialCurrency || 'NZD')
   const [currencyManuallySet, setCurrencyManuallySet] = useState(props.mode === 'edit')
   const [market, setMarket]         = useState<'NZ' | 'AU'>(props.initialMarket === 'AU' ? 'AU' : 'NZ')
-
-  // Convert an ingredient/packaging price into the PO's currency (fx = NZD per
-  // 1 AUD). Lets the price prefill even when the item is priced in AUD and the
-  // PO is in NZD (or vice versa) instead of leaving it blank.
-  const fxRate = props.fxRate && props.fxRate > 0 ? props.fxRate : 1
-  function toPoCurrency(amount: number, fromCurrency: string | null | undefined): number {
-    const from = (fromCurrency ?? 'NZD').toUpperCase()
-    const to = currency.toUpperCase()
-    let v = amount
-    if (from !== to) {
-      if (from === 'AUD' && to === 'NZD') v = amount * fxRate
-      else if (from === 'NZD' && to === 'AUD') v = amount / fxRate
-    }
-    return Math.round(v * 10000) / 10000
-  }
   const [issuerId, setIssuerId] = useState<string>(
     props.initialIssuerId ?? props.issuers.find((i) => i.is_default)?.id ?? props.issuers[0]?.id ?? '',
   )
@@ -187,8 +172,10 @@ export function POForm(props: POFormProps) {
           // 'kg' for bulk). Price prefill is per that unit, converted to the PO
           // currency when they differ (e.g. an AUD-priced ingredient on an NZD PO).
           if (ing.unit_of_measure) next.unit_of_measure = ing.unit_of_measure
+          // Prefill the saved supplier price as-is (adjust per the PO currency
+          // if needed). No silent FX conversion.
           if (next.unit_cost == null && ing.price != null) {
-            next.unit_cost = toPoCurrency(Number(ing.price), ing.currency)
+            next.unit_cost = Number(ing.price)
           }
         }
       }
@@ -198,7 +185,7 @@ export function POForm(props: POFormProps) {
         const pk = props.packaging.find((x) => x.id === patch.packaging_id)
         if (pk) {
           if (next.unit_cost == null && pk.price != null) {
-            next.unit_cost = toPoCurrency(Number(pk.price), pk.currency)
+            next.unit_cost = Number(pk.price)
           }
           if (pk.unit_of_measure) next.unit_of_measure = pk.unit_of_measure
         }
