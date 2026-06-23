@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Odi MRP — Receive screen: Lot #, Expiry & COA mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-gray-100 p-8">
+<div class="max-w-[1500px] mx-auto space-y-8">
+
+<header>
+  <h1 class="text-xl font-semibold">Receive screen — Lot #, Expiry &amp; COA</h1>
+  <p class="text-sm text-gray-600 mt-1">
+    Proposed redesign of the PO receive screen. The single free-text “Note” box is split into a dedicated
+    <b>Lot&nbsp;#</b> field and an <b>Expiry</b> date-picker, and each line gains a <b>COA</b> (Certificate of Analysis)
+    file upload. A free-text note remains for anything else (QA, backorder).
+  </p>
+</header>
+
+<!-- ============================================================ -->
+<!-- BEFORE / AFTER NOTE                                          -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg p-5 text-xs text-gray-600">
+  <div class="grid grid-cols-2 gap-6">
+    <div>
+      <div class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Today</div>
+      <div class="border border-gray-200 rounded px-3 py-2 bg-gray-50">
+        One <b>Note</b> box per line — lot, expiry and any comment all typed together:
+        <div class="mt-1 font-mono text-[11px] text-gray-700">Lot #: 260725 Expiry: 9.2.29</div>
+      </div>
+      <p class="mt-2">Not sortable, not searchable, no way to flag expiring stock, nowhere to keep the COA.</p>
+    </div>
+    <div>
+      <div class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Proposed</div>
+      <div class="border border-emerald-200 rounded px-3 py-2 bg-emerald-50/50">
+        Structured <b>Lot&nbsp;#</b> + <b>Expiry</b> + attached <b>COA</b>, with a short note for the rest.
+      </div>
+      <p class="mt-2">Captured against the stock movement, so we can later search by lot, warn on approaching expiry, and open the COA from the receipt history.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- RECEIVE SCREEN                                               -->
+<!-- ============================================================ -->
+<section class="bg-white rounded-lg border border-gray-200">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-gray-500">← Back to PO</span>
+      <div>
+        <h1 class="text-base font-semibold">Receive — PO-2026-119</h1>
+        <p class="text-xs text-gray-500 mt-0.5">Pacific Flavour · expected 2026-06-17</p>
+      </div>
+    </div>
+    <div class="text-xs text-gray-500">Tip: leave at 0 to skip a line · price can be amended at receipt</div>
+  </div>
+
+  <table class="w-full text-xs">
+    <thead>
+      <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <th class="text-left px-4 py-2 font-medium">Item</th>
+        <th class="text-right px-3 py-2 font-medium">Ordered</th>
+        <th class="text-right px-3 py-2 font-medium">Already&nbsp;rec'd</th>
+        <th class="text-right px-3 py-2 font-medium">Receiving now</th>
+        <th class="text-right px-3 py-2 font-medium">Invoice price</th>
+        <th class="text-left px-3 py-2 font-medium">Lot #</th>
+        <th class="text-left px-3 py-2 font-medium">Expiry</th>
+        <th class="text-left px-3 py-2 font-medium">COA</th>
+        <th class="text-left px-3 py-2 font-medium">Note</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <!-- Row 1 — fully captured, COA attached -->
+      <tr class="border-t border-gray-100 align-top">
+        <td class="px-4 py-2">
+          <div class="font-medium">Beef Bone Broth Organic</div>
+          <div class="text-[10px] text-gray-500 font-mono">ING-ORG-BFBRTH-FD</div>
+        </td>
+        <td class="px-3 py-2 text-right tabular-nums">400 kg</td>
+        <td class="px-3 py-2 text-right tabular-nums text-gray-500">0</td>
+        <td class="px-3 py-2 text-right">
+          <input value="400" class="w-20 text-right text-xs border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" />
+        </td>
+        <td class="px-3 py-2 text-right">
+          <input value="71.00" class="w-20 text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+        </td>
+        <td class="px-3 py-2">
+          <input value="260725" placeholder="Lot / batch #" class="w-28 text-xs border border-gray-200 rounded px-1.5 py-1 font-mono" />
+        </td>
+        <td class="px-3 py-2">
+          <input type="date" value="2029-02-09" class="text-xs border border-gray-200 rounded px-1.5 py-1" />
+        </td>
+        <td class="px-3 py-2">
+          <div class="flex items-center gap-1.5">
+            <span class="inline-flex items-center gap-1 text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 rounded px-1.5 py-1">
+              <span>📄</span> COA_BeefBroth_260725.pdf
+              <button class="text-emerald-700/60 hover:text-emerald-900 ml-0.5">✕</button>
+            </span>
+          </div>
+        </td>
+        <td class="px-3 py-2">
+          <input placeholder="QA note · backorder" class="w-36 text-xs border border-gray-200 rounded px-1.5 py-1" />
+        </td>
+      </tr>
+
+      <!-- Row 2 — expiry approaching (soft warning), COA not yet attached -->
+      <tr class="border-t border-gray-100 align-top bg-amber-50/40">
+        <td class="px-4 py-2">
+          <div class="font-medium">Manuka Honey 25+</div>
+          <div class="text-[10px] text-gray-500 font-mono">ING-ORG-MANUKA-25</div>
+        </td>
+        <td class="px-3 py-2 text-right tabular-nums">60 kg</td>
+        <td class="px-3 py-2 text-right tabular-nums text-gray-500">0</td>
+        <td class="px-3 py-2 text-right">
+          <input value="60" class="w-20 text-right text-xs border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" />
+        </td>
+        <td class="px-3 py-2 text-right">
+          <input value="38.00" class="w-20 text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+        </td>
+        <td class="px-3 py-2">
+          <input value="MH0926" placeholder="Lot / batch #" class="w-28 text-xs border border-gray-200 rounded px-1.5 py-1 font-mono" />
+        </td>
+        <td class="px-3 py-2">
+          <input type="date" value="2026-09-01" class="text-xs border border-amber-300 bg-amber-50 rounded px-1.5 py-1" />
+          <div class="text-[10px] text-amber-800 mt-0.5">⚠ expires in ~10 wks</div>
+        </td>
+        <td class="px-3 py-2">
+          <button class="inline-flex items-center gap-1 text-[11px] border border-gray-300 rounded px-2 py-1 text-gray-600 hover:bg-gray-50">
+            ⤓ Attach COA
+          </button>
+          <div class="text-[10px] text-gray-400 mt-0.5">PDF / JPG · optional</div>
+        </td>
+        <td class="px-3 py-2">
+          <input placeholder="QA note · backorder" class="w-36 text-xs border border-gray-200 rounded px-1.5 py-1" />
+        </td>
+      </tr>
+
+      <!-- Row 3 — packaging line: lot/expiry typically N/A but still allowed -->
+      <tr class="border-t border-gray-100 align-top">
+        <td class="px-4 py-2">
+          <div class="font-medium">Stand-up Pouch 200g (kraft)</div>
+          <div class="text-[10px] text-gray-500 font-mono">PKG-POUCH-200-KR</div>
+        </td>
+        <td class="px-3 py-2 text-right tabular-nums">5,000 each</td>
+        <td class="px-3 py-2 text-right tabular-nums text-gray-500">0</td>
+        <td class="px-3 py-2 text-right">
+          <input value="5000" class="w-20 text-right text-xs border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums" />
+        </td>
+        <td class="px-3 py-2 text-right">
+          <input value="0.42" class="w-20 text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+        </td>
+        <td class="px-3 py-2">
+          <input placeholder="Lot / batch #" class="w-28 text-xs border border-gray-200 rounded px-1.5 py-1 font-mono" />
+        </td>
+        <td class="px-3 py-2">
+          <input type="date" class="text-xs border border-gray-200 rounded px-1.5 py-1 text-gray-400" />
+        </td>
+        <td class="px-3 py-2">
+          <button class="inline-flex items-center gap-1 text-[11px] border border-gray-300 rounded px-2 py-1 text-gray-600 hover:bg-gray-50">
+            ⤓ Attach COA
+          </button>
+        </td>
+        <td class="px-3 py-2">
+          <input placeholder="QA note · backorder" class="w-36 text-xs border border-gray-200 rounded px-1.5 py-1" />
+        </td>
+      </tr>
+
+    </tbody>
+  </table>
+
+  <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-4">
+    <div class="text-xs text-gray-600">
+      Status will move to <span class="font-semibold text-emerald-700">Received</span>.
+      On confirm, received qty moves into <b>Stock on Hand</b> at <b>Main Warehouse</b>;
+      Lot&nbsp;#, Expiry and COA are saved against each receipt and visible in the PO’s receipt history.
+    </div>
+    <div class="flex gap-2 flex-shrink-0">
+      <span class="px-3 py-1.5 text-xs border border-gray-300 rounded-md text-gray-600">Cancel</span>
+      <span class="px-3 py-1.5 text-xs bg-emerald-700 text-white rounded-md">Confirm receipt + update SOH</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- WHAT GETS STORED                                             -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg p-5">
+  <h2 class="text-sm font-semibold mb-2">What changes behind the scenes</h2>
+  <ul class="text-xs text-gray-600 space-y-1.5 list-disc pl-5">
+    <li><b>Lot&nbsp;#</b> and <b>Expiry</b> become real fields on the receipt (stock movement), alongside the existing note — so they’re searchable and reportable.</li>
+    <li><b>COA</b> files are stored using the same documents mechanism already used for ingredient documents, attached to the receipt/lot.</li>
+    <li><b>Expiry warning</b> (amber) is a nice-to-have: flag lots within a configurable window. Can be left out of round one.</li>
+    <li>Existing receipts are untouched — their combined lot/expiry text stays in the note field as-is.</li>
+  </ul>
+  <div class="mt-3 text-xs text-gray-500 border-t border-gray-100 pt-3">
+    <b>Open question for you:</b> can a single delivery line arrive as <i>more than one</i> lot
+    (e.g. 400&nbsp;kg split across two batches with different expiries)? If yes, we’d add a
+    “+ split into lots” option per line. If one lot per line covers it in practice, we keep it simple.
+  </div>
+</section>
+
+</div>
+</body>
+</html>

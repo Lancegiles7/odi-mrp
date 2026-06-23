@@ -734,6 +734,10 @@ export type Database = {
           purchase_order_line_id: string | null
           unit_cost: number | null
           notes: string
+          lot_number: string | null
+          expiry_date: string | null
+          coa_file_path: string | null
+          coa_file_name: string | null
           created_at: string
           created_by: string | null
         }
@@ -756,6 +760,10 @@ export type Database = {
           purchase_order_line_id?: string | null
           unit_cost?: number | null
           notes?: string
+          lot_number?: string | null
+          expiry_date?: string | null
+          coa_file_path?: string | null
+          coa_file_name?: string | null
           created_at?: string
           created_by?: string | null
         }
@@ -778,6 +786,10 @@ export type Database = {
           purchase_order_line_id?: string | null
           unit_cost?: number | null
           notes?: string
+          lot_number?: string | null
+          expiry_date?: string | null
+          coa_file_path?: string | null
+          coa_file_name?: string | null
           created_at?: string
           created_by?: string | null
         }

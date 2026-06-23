@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { POForm } from '@/components/purchase-orders/po-form'
+import { ReceiptHistory } from '@/components/purchase-orders/receipt-history'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
 import { getAppSettings } from '@/lib/settings'
 
@@ -87,9 +88,10 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
   }))
 
   return (
-    <POForm
-      mode="edit"
-      poId={po.id}
+    <div className="space-y-6">
+      <POForm
+        mode="edit"
+        poId={po.id}
       initialPoNumber={po.po_number}
       initialSupplierId={po.supplier_id}
       initialCurrency={po.currency ?? 'NZD'}
@@ -112,6 +114,8 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       deliveryAddresses={addresses ?? []}
       issuers={issuers ?? []}
       companies={companies ?? []}
-    />
+      />
+      <ReceiptHistory poId={po.id} />
+    </div>
   )
 }

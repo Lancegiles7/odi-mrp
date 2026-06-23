@@ -309,7 +309,16 @@ export async function deletePurchaseOrder(id: string): Promise<{ ok: boolean; er
 // ============================================================
 export async function receivePoLines(input: {
   po_id: string
-  receipts: Array<{ line_id: string; receiving_now: number; invoice_unit_cost: number | null; note: string | null }>
+  receipts: Array<{
+    line_id: string
+    receiving_now: number
+    invoice_unit_cost: number | null
+    note: string | null
+    lot_number?: string | null
+    expiry_date?: string | null      // ISO yyyy-mm-dd
+    coa_file_path?: string | null
+    coa_file_name?: string | null
+  }>
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -377,8 +386,12 @@ export async function receivePoLines(input: {
           purchase_order_line_id: line.id,
           unit_cost:              invoiceCost,
           notes:                  r.note?.trim() ?? '',
+          lot_number:             r.lot_number?.trim() || null,
+          expiry_date:            r.expiry_date?.trim() || null,
+          coa_file_path:          r.coa_file_path?.trim() || null,
+          coa_file_name:          r.coa_file_name?.trim() || null,
           created_by:             profile?.id ?? null,
-        })
+        } as never)
       if (mvErr) return { ok: false, error: `Stock movement failed: ${mvErr.message}` }
     }
   }
@@ -400,6 +413,74 @@ export async function receivePoLines(input: {
   revalidatePath(`/purchase-orders/${input.po_id}`)
   revalidatePath('/ingredients/demand')
   return { ok: true }
+}
+
+// ============================================================
+// Receipt COA (Certificate of Analysis) attachments
+// Files live in the private `receipt-docs` Storage bucket; the path +
+// filename are recorded on the stock_movements row at receipt time.
+//
+// Upload happens as soon as the user picks a file (so the receive form
+// can show the chip immediately). If they then remove it before
+// confirming, removeReceiptCoa() deletes the orphaned object.
+// ============================================================
+const RECEIPT_COA_BUCKET = 'receipt-docs'
+const RECEIPT_COA_MAX_BYTES = 10 * 1024 * 1024 // 10 MB
+
+export async function uploadReceiptCoa(
+  formData: FormData,
+): Promise<{ ok: boolean; file_path?: string; file_name?: string; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  const lineId = ((formData.get('line_id') as string | null) ?? '').trim()
+  const file   = formData.get('file') as File | null
+
+  if (!lineId)                       return { ok: false, error: 'Missing line id' }
+  if (!file || file.size === 0)      return { ok: false, error: 'No file selected' }
+  if (file.size > RECEIPT_COA_MAX_BYTES) return { ok: false, error: 'File too large (10 MB max)' }
+
+  // Object path: <line_id>/<timestamp>-<filename>. Timestamp avoids clobbering
+  // when the same filename is re-uploaded.
+  const safeName   = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
+  const ts         = String(new Date().getTime())
+  const objectPath = `${lineId}/${ts}-${safeName}`
+
+  const { error: uploadErr } = await supabase.storage
+    .from(RECEIPT_COA_BUCKET)
+    .upload(objectPath, file, { contentType: file.type, upsert: false })
+  if (uploadErr) return { ok: false, error: `Upload failed: ${uploadErr.message}` }
+
+  return { ok: true, file_path: objectPath, file_name: file.name }
+}
+
+export async function removeReceiptCoa(filePath: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+  if (!filePath) return { ok: false, error: 'Missing file path' }
+
+  const { error } = await supabase.storage.from(RECEIPT_COA_BUCKET).remove([filePath])
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function getReceiptCoaUrl(
+  filePath: string,
+  fileName: string,
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+  if (!filePath) return { ok: false, error: 'Missing file path' }
+
+  const { data: signed, error } = await supabase.storage
+    .from(RECEIPT_COA_BUCKET)
+    .createSignedUrl(filePath, 60, { download: fileName || true })
+
+  if (error || !signed) return { ok: false, error: error?.message ?? 'Sign failed' }
+  return { ok: true, url: signed.signedUrl }
 }
 
 // ============================================================
