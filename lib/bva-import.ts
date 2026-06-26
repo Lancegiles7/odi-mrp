@@ -81,8 +81,12 @@ export function retailFromUpstock(rows: Row[], ym: string): RetailActuals {
     if (monthOf(r['Created Date']) !== ym) continue
     revenue += num(r['Line Amount'])
     const code = str(r['Product Code'])
-    const mult = code.toUpperCase().includes('PCH') ? 6 : 1
-    if (code) units[bvaGroup(code)] += num(r['Quantity']) * mult
+    if (code) {
+      const match = resolveRetail(code, str(r['Product Name']))
+      const sku = match?.sku ?? code
+      const pack = match?.pack ?? 1
+      units[bvaGroup(sku)] += num(r['Quantity']) * pack
+    }
     const ordNo = str(r['Order Number'])
     if (ordNo) {
       if (str(r['Customer']).toLowerCase().startsWith('woolworths')) ww.add(ordNo)
@@ -130,6 +134,119 @@ export function actualsToFigureLines(d2c: D2cActuals, retail: RetailActuals, sam
     out[`smpl_${g}`]  = samples[g]
   }
   return out
+}
+
+// ============================================================
+// Retail (Upstock) → canonical product mapping
+// Confirmed with Lance. Each Upstock product maps to an FG- product and a
+// pack size (units per Upstock line) so retail counts in single units, like
+// D2C. SRC-/SHIP- codes also resolve by suffix as a fallback for new flavours;
+// the barcode "FS … Shipper" display units must be listed explicitly.
+// ============================================================
+export interface RetailMatch { sku: string; pack: number }
+
+export const RETAIL_MAP: Record<string, RetailMatch> = {
+  'SRC-ODI-PCH-BRY':  { sku: 'FG-ODI-PCH-BRY',  pack: 6 },
+  'SRC-ODI-PCH-CKN':  { sku: 'FG-ODI-PCH-CKN',  pack: 6 },
+  'SRC-ODI-PCH-VAN':  { sku: 'FG-ODI-PCH-VAN',  pack: 6 },
+  'SRC-ODI-PCH-VEG':  { sku: 'FG-ODI-PCH-VEG',  pack: 6 },
+  'SRC-ODI-SAC-BRO':  { sku: 'FG-ODI-SAC-BRO',  pack: 15 },
+  'SRC-ODI-SAC-CAR':  { sku: 'FG-ODI-SAC-CAR',  pack: 15 },
+  'SRC-ODI-SAC-BET':  { sku: 'FG-ODI-SAC-BET',  pack: 15 },
+  'SRC-ODI-SAC-BLU':  { sku: 'FG-ODI-SAC-BLU',  pack: 15 },
+  'SRC-ODI-SAC-BCR':  { sku: 'FG-ODI-SAC-BCR',  pack: 15 },
+  'SRC-ODI-BITE-BAN': { sku: 'FG-ODI-BITE-BAN', pack: 5 },
+  'SRC-ODI-BITE-BRN': { sku: 'FG-ODI-BITE-BRN', pack: 5 },
+  'SRC-ODI-BAL-COA':  { sku: 'FG-ODI-BAL-COA',  pack: 6 },
+  'SRC-ODI-CCO-VAN':  { sku: 'FG-ODI-CCO-VAN',  pack: 6 },
+  'SHIP-ODI-TUB-BC':  { sku: 'FG-ODI-TUB-BC',   pack: 4 },
+  'SHIP-ODI-TUB-SB':  { sku: 'FG-ODI-TUB-SB',   pack: 4 },
+  'SHIP-ODI-TUB-BBB': { sku: 'FG-ODI-TUB-BBB',  pack: 4 },
+  'SHIP-ODI-TUB-MB':  { sku: 'FG-ODI-TUB-MB',   pack: 4 },
+  // "FS … Shipper" display units (barcode SKUs) — marketing names, confirmed by Lance
+  '9421907651408':    { sku: 'FG-ODI-SAC-BRO',  pack: 25 }, // Growing Greens → Broccoli
+  '9421907651385':    { sku: 'FG-ODI-SAC-BLU',  pack: 25 }, // Blooming Blueberry → Blueberry
+  '9421907651392':    { sku: 'FG-ODI-SAC-CAR',  pack: 25 }, // Pumpkin & Carrot → Carrot
+  '9421907651378':    { sku: 'FG-ODI-SAC-BET',  pack: 25 }, // Flourishing Cauli → Beetroot
+  '9421907651354':    { sku: 'FG-ODI-TUB-BC',   pack: 4 },  // Baby Cereal Tub Shipper
+  '9421907651330':    { sku: 'FG-ODI-TUB-BBB',  pack: 4 },  // Bone Broth Tub Shipper
+}
+
+/** Pack size embedded in an Upstock product name ("x 6 Pack", "20g x 15", "25 x 20g"). */
+export function parsePack(name: string): number {
+  const n = name.toLowerCase()
+  let m = n.match(/x\s*(\d+)\s*pack/) || n.match(/(\d+)\s*pack/)
+  if (m) return Number(m[1])
+  m = n.match(/(\d+)\s*x\s*\d+\s*g/)        // "25 x 20g" shipper
+  if (m) return Number(m[1])
+  m = n.match(/\d+\s*g\s*x\s*(\d+)/)         // "20g x 15"
+  if (m) return Number(m[1])
+  m = n.match(/x\s*(\d+)/)
+  if (m) return Number(m[1])
+  return 1
+}
+
+/** Resolve an Upstock line to a canonical FG sku + pack size, or null. */
+export function resolveRetail(code: string, name: string): RetailMatch | null {
+  if (RETAIL_MAP[code]) return RETAIL_MAP[code]
+  // Fallback for new SRC-/SHIP- flavours: suffix → FG- sku, pack from name.
+  if (/^(SRC|SHIP)-ODI-/i.test(code)) {
+    return { sku: 'FG-' + code.slice(code.indexOf('-') + 1), pack: parsePack(name) }
+  }
+  return null
+}
+
+export interface PerProduct {
+  d2c: Record<string, number>      // sku → single units
+  retail: Record<string, number>
+  samples: Record<string, number>
+  unmatchedRetail: string[]        // Upstock codes we couldn't resolve
+}
+
+/** Per-product single-unit totals by channel for `ym`, keyed by FG sku. */
+export function perProductUnits(shopify: Row[], upstock: Row[], samplesAoa: unknown[][], ym: string): PerProduct {
+  const d2c: Record<string, number> = {}
+  const retail: Record<string, number> = {}
+  const samples: Record<string, number> = {}
+  const unmatched = new Set<string>()
+
+  // D2C — Shopify line items (singles), carry month down the order's rows.
+  let cur: string | null = null
+  for (const r of shopify) {
+    const created = str(r['Created at'])
+    if (created) cur = monthOf(created)
+    if (str(r['Cancelled at'])) continue
+    if (cur !== ym) continue
+    const sku = str(r['Lineitem sku'])
+    const qty = num(r['Lineitem quantity'])
+    if (sku && qty) d2c[sku] = (d2c[sku] ?? 0) + qty
+  }
+
+  // Retail — Upstock, mapped to FG sku × pack size.
+  for (const r of upstock) {
+    if (monthOf(r['Created Date']) !== ym) continue
+    const code = str(r['Product Code'])
+    if (!code) continue
+    const match = resolveRetail(code, str(r['Product Name']))
+    if (!match) { unmatched.add(code); continue }
+    retail[match.sku] = (retail[match.sku] ?? 0) + num(r['Quantity']) * match.pack
+  }
+
+  // Samples — MONTHLY TOTAL row across FG sku columns.
+  let skuRow: unknown[] | null = null
+  let totalRow: unknown[] | null = null
+  for (const row of samplesAoa) {
+    if (!skuRow && row.some((c) => str(c).startsWith('FG-ODI'))) skuRow = row
+    if (!totalRow && str(row[0]).toUpperCase().startsWith('MONTHLY TOTAL')) totalRow = row
+  }
+  if (skuRow && totalRow) {
+    for (let c = 0; c < skuRow.length; c++) {
+      const sku = str(skuRow[c])
+      if (sku.startsWith('FG-ODI')) samples[sku] = (samples[sku] ?? 0) + num(totalRow[c])
+    }
+  }
+
+  return { d2c, retail, samples, unmatchedRetail: Array.from(unmatched) }
 }
 
 /** "2026-07-01" → "July 2026" (sample tracker sheet name). */

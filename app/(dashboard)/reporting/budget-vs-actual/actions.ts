@@ -8,7 +8,7 @@ import type { Channel, EntityType } from '@/lib/budget-vs-actual'
 import { fyMonths, fyStartFor } from '@/lib/budget-vs-actual'
 import {
   d2cFromShopify, retailFromUpstock, samplesFromSheet,
-  actualsToFigureLines, sampleSheetName,
+  actualsToFigureLines, sampleSheetName, perProductUnits,
 } from '@/lib/bva-import'
 
 const REVAL = '/reporting/budget-vs-actual'
@@ -21,6 +21,7 @@ const REVAL = '/reporting/budget-vs-actual'
 // ============================================================
 export async function importBvaActuals(formData: FormData): Promise<{
   ok: boolean; error?: string; wrote?: Record<string, number>
+  productsMatched?: number; unmatchedSkus?: string[]; unmatchedRetail?: string[]
 }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -48,28 +49,64 @@ export async function importBvaActuals(formData: FormData): Promise<{
   }
 
   try {
-    const d2c    = d2cFromShopify(await rowsOf(shopify), ym)
-    const retail = retailFromUpstock(await rowsOf(upstock), ym)
-
-    let samp = { sachets: 0, tubs: 0, snacks: 0, pouches: 0, other: 0 }
+    const shopifyRows = await rowsOf(shopify)
+    const upstockRows = await rowsOf(upstock)
+    let samplesAoa: unknown[][] = []
     if (samples && samples.size > 0) {
       const wb = XLSX.read(await samples.arrayBuffer(), { type: 'array', raw: true })
       const sheetName = wb.SheetNames.find((n) => n === sampleSheetName(yearMonth)) ?? wb.SheetNames[wb.SheetNames.length - 1]
-      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: '' }) as unknown[][]
-      samp = samplesFromSheet(aoa)
+      samplesAoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: '' }) as unknown[][]
     }
 
-    const lines = actualsToFigureLines(d2c, retail, samp)
+    // ── Summary figures (revenue / orders / group units) → bva_figures ──
+    const d2c    = d2cFromShopify(shopifyRows, ym)
+    const retail = retailFromUpstock(upstockRows, ym)
+    const samp   = samplesFromSheet(samplesAoa)
+    const lines  = actualsToFigureLines(d2c, retail, samp)
 
     const { data: profile } = await supabase.from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
-    const rows = Object.entries(lines).map(([line_key, actual]) => ({
+    const figRows = Object.entries(lines).map(([line_key, actual]) => ({
       year_month: yearMonth, line_key, actual, updated_at: new Date().toISOString(), updated_by: profile?.id ?? null,
     }))
-    const { error } = await supabase.from('bva_figures').upsert(rows as never, { onConflict: 'year_month,line_key' })
-    if (error) return { ok: false, error: `Save failed: ${error.message}` }
+    const { error: figErr } = await supabase.from('bva_figures').upsert(figRows as never, { onConflict: 'year_month,line_key' })
+    if (figErr) return { ok: false, error: `Save failed: ${figErr.message}` }
+
+    // ── Per-product actuals (single units by channel) → product_actuals ──
+    const pp = perProductUnits(shopifyRows, upstockRows, samplesAoa, ym)
+    const wantedSkus = Array.from(new Set(Object.keys(pp.d2c).concat(Object.keys(pp.retail), Object.keys(pp.samples))))
+    const { data: prods } = await supabase.from('products')
+      .select('id, sku_code').in('sku_code', wantedSkus) as { data: Array<{ id: string; sku_code: string }> | null }
+    const idBySku = new Map((prods ?? []).map((p) => [p.sku_code, p.id]))
+
+    const unmatchedSkus: string[] = []
+    const paRows: Array<{ product_id: string; year_month: string; channel: string; units: number }> = []
+    const addChannel = (map: Record<string, number>, channel: string) => {
+      for (const [sku, units] of Object.entries(map)) {
+        const id = idBySku.get(sku)
+        if (!id) { unmatchedSkus.push(sku); continue }
+        paRows.push({ product_id: id, year_month: yearMonth, channel, units })
+      }
+    }
+    addChannel(pp.d2c, 'nz_d2c')
+    addChannel(pp.retail, 'nz_retail')
+    addChannel(pp.samples, 'nz_samples')
+
+    let productsMatched = 0
+    if (paRows.length > 0) {
+      const { error: paErr } = await supabase.from('product_actuals')
+        .upsert(paRows as never, { onConflict: 'product_id,year_month,channel' })
+      if (paErr) return { ok: false, error: `Per-product save failed: ${paErr.message}` }
+      productsMatched = new Set(paRows.map((r) => r.product_id)).size
+    }
 
     revalidatePath(REVAL)
-    return { ok: true, wrote: lines }
+    return {
+      ok: true,
+      wrote: lines,
+      productsMatched,
+      unmatchedSkus: Array.from(new Set(unmatchedSkus)),
+      unmatchedRetail: pp.unmatchedRetail,
+    }
   } catch (e) {
     return { ok: false, error: `Could not read the files: ${(e as Error).message}` }
   }

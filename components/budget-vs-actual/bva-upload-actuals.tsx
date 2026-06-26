@@ -12,7 +12,7 @@ export function BvaUploadActuals({ months, defaultMonth }: { months: MonthOpt[];
   const [pending, start] = useTransition()
   const [month, setMonth] = useState(defaultMonth)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<Record<string, number> | null>(null)
+  const [done, setDone] = useState<Awaited<ReturnType<typeof importBvaActuals>> | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
 
   const openMonths = months.filter((m) => !m.closed)
@@ -23,7 +23,7 @@ export function BvaUploadActuals({ months, defaultMonth }: { months: MonthOpt[];
     start(async () => {
       const res = await importBvaActuals(formData)
       if (!res.ok) { setError(res.error ?? 'Import failed'); return }
-      setDone(res.wrote ?? {})
+      setDone(res)
       router.refresh()
     })
   }
@@ -58,14 +58,23 @@ export function BvaUploadActuals({ months, defaultMonth }: { months: MonthOpt[];
               {error && <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">{error}</div>}
 
               {done && (
-                <div className="text-xs bg-emerald-50 border border-emerald-200 rounded px-3 py-2">
-                  <div className="font-medium text-emerald-800 mb-1">Saved ✓</div>
+                <div className="text-xs bg-emerald-50 border border-emerald-200 rounded px-3 py-2 space-y-1.5">
+                  <div className="font-medium text-emerald-800">Saved ✓</div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-gray-700 tabular-nums">
-                    <span>D2C revenue: ${Math.round(done.rev_d2c ?? 0).toLocaleString()}</span>
-                    <span>Retail revenue: ${Math.round(done.rev_retail ?? 0).toLocaleString()}</span>
-                    <span>D2C orders: {done.ord_d2c ?? 0}</span>
-                    <span>Retail orders: {done.ord_retail ?? 0} (WW {done.ord_retail_ww ?? 0})</span>
+                    <span>D2C revenue: ${Math.round(done.wrote?.rev_d2c ?? 0).toLocaleString()}</span>
+                    <span>Retail revenue: ${Math.round(done.wrote?.rev_retail ?? 0).toLocaleString()}</span>
+                    <span>D2C orders: {done.wrote?.ord_d2c ?? 0}</span>
+                    <span>Retail orders: {done.wrote?.ord_retail ?? 0} (WW {done.wrote?.ord_retail_ww ?? 0})</span>
                   </div>
+                  <div className="text-gray-700 pt-1 border-t border-emerald-100">
+                    {done.productsMatched ?? 0} products matched (Products / Ingredients / Packaging tabs updated)
+                  </div>
+                  {!!done.unmatchedSkus?.length && (
+                    <div className="text-amber-700">⚠ Unmatched SKUs (ignored): {done.unmatchedSkus.join(', ')}</div>
+                  )}
+                  {!!done.unmatchedRetail?.length && (
+                    <div className="text-amber-700">⚠ Unmatched retail codes: {done.unmatchedRetail.join(', ')}</div>
+                  )}
                 </div>
               )}
 
