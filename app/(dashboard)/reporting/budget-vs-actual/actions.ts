@@ -8,7 +8,7 @@ import type { Channel, EntityType } from '@/lib/budget-vs-actual'
 import { fyMonths, fyStartFor } from '@/lib/budget-vs-actual'
 import {
   d2cFromShopify, retailFromUpstock, samplesFromSheet,
-  actualsToFigureLines, sampleSheetName, perProductUnits,
+  actualsToFigureLines, sampleSheetName, perProductUnits, toSystemSku,
 } from '@/lib/bva-import'
 
 const REVAL = '/reporting/budget-vs-actual'
@@ -73,17 +73,19 @@ export async function importBvaActuals(formData: FormData): Promise<{
 
     // ── Per-product actuals (single units by channel) → product_actuals ──
     const pp = perProductUnits(shopifyRows, upstockRows, samplesAoa, ym)
-    const wantedSkus = Array.from(new Set(Object.keys(pp.d2c).concat(Object.keys(pp.retail), Object.keys(pp.samples))))
+    // Export uses FG- codes; the product master uses system SKUs — translate.
+    const wantedFg = Array.from(new Set(Object.keys(pp.d2c).concat(Object.keys(pp.retail), Object.keys(pp.samples))))
+    const wantedSystem = Array.from(new Set(wantedFg.map(toSystemSku)))
     const { data: prods } = await supabase.from('products')
-      .select('id, sku_code').in('sku_code', wantedSkus) as { data: Array<{ id: string; sku_code: string }> | null }
+      .select('id, sku_code').in('sku_code', wantedSystem) as { data: Array<{ id: string; sku_code: string }> | null }
     const idBySku = new Map((prods ?? []).map((p) => [p.sku_code, p.id]))
 
     const unmatchedSkus: string[] = []
     const paRows: Array<{ product_id: string; year_month: string; channel: string; units: number }> = []
     const addChannel = (map: Record<string, number>, channel: string) => {
-      for (const [sku, units] of Object.entries(map)) {
-        const id = idBySku.get(sku)
-        if (!id) { unmatchedSkus.push(sku); continue }
+      for (const [fgSku, units] of Object.entries(map)) {
+        const id = idBySku.get(toSystemSku(fgSku))
+        if (!id) { unmatchedSkus.push(fgSku); continue }
         paRows.push({ product_id: id, year_month: yearMonth, channel, units })
       }
     }
