@@ -187,6 +187,7 @@ export interface ProductRow {
   product_id: string
   sku: string
   name: string
+  group: string | null   // product_type, for grouping the table
   opening: number | null
   /** Budget by channel (mapped from demand_forecasts: ecomm→d2c, pipefill→samples). */
   budget_by_channel: Record<Channel, number>
@@ -221,7 +222,7 @@ function fillChannels(partial: Partial<Record<Channel, number>>): Record<Channel
 }
 
 export function computeProductRow(input: {
-  product:   { id: string; sku_code: string; name: string }
+  product:   { id: string; sku_code: string; name: string; product_type?: string | null }
   opening:   number | null
   budget_by_channel: Partial<Record<Channel, number>>
   channels:  Partial<Record<Channel, number>>
@@ -245,6 +246,7 @@ export function computeProductRow(input: {
     product_id: input.product.id,
     sku:        input.product.sku_code,
     name:       input.product.name,
+    group:      input.product.product_type ?? null,
     opening:    input.opening,
     budget_by_channel: budgetFull,
     budget_total,

@@ -202,7 +202,7 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
 
   // ── Build product rows ──
   const productRows: ProductRow[] = (products ?? []).map((p) => computeProductRow({
-    product:           { id: p.id, sku_code: p.sku_code, name: p.name },
+    product:           { id: p.id, sku_code: p.sku_code, name: p.name, product_type: p.product_type },
     opening:           openingForProduct(p.id, p.current_soh),
     budget_by_channel: budgetByProduct.get(p.id) ?? {},
     channels:          channelsByProduct.get(p.id) ?? {},
