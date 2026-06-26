@@ -121,6 +121,60 @@ export function varBadgeClass(actual: number, budget: number): string {
 }
 
 // ============================================================
+// Summary figures (bva_figures): revenue / orders / group units
+// ============================================================
+
+export interface FigurePair { budget: number | null; actual: number | null }
+export type FigureMap = Record<string, FigurePair>
+
+/** Product groups shown in the summary units panel (order matters). */
+export const SUMMARY_GROUPS: Array<{ key: string; label: string }> = [
+  { key: 'units_sachets', label: 'Sachets' },
+  { key: 'units_tubs',    label: 'Tubs' },
+  { key: 'units_snacks',  label: 'Snacks' },
+  { key: 'units_pouches', label: 'Pouches' },
+]
+
+/** Variance amount + percent (actual − budget). Null-safe. */
+export function variance(actual: number | null, budget: number | null): { abs: number; pct: number | null } {
+  const a = actual ?? 0
+  const b = budget ?? 0
+  const abs = a - b
+  const pct = b !== 0 ? abs / b : null
+  return { abs, pct }
+}
+
+/** $12,345 (no decimals). */
+export function fmtMoney(n: number | null | undefined): string {
+  if (n == null) return '—'
+  return `$${Math.round(n).toLocaleString()}`
+}
+
+/** 12,345 (no decimals). */
+export function fmtNum(n: number | null | undefined): string {
+  if (n == null) return '—'
+  return Math.round(n).toLocaleString()
+}
+
+/** "+12%" / "−8%" / "—". */
+export function fmtPct(pct: number | null): string {
+  if (pct == null) return '—'
+  const s = Math.round(pct * 100)
+  return `${s > 0 ? '+' : ''}${s}%`
+}
+
+/** Fraction of the month elapsed up to (and including) `asOf`. 0–1. */
+export function proRataFactor(yearMonth: string, asOf: Date): number {
+  const [y, m] = yearMonth.split('-').map(Number)
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  // Only meaningful when asOf is within this month.
+  const sameMonth = asOf.getUTCFullYear() === y && asOf.getUTCMonth() === m - 1
+  if (!sameMonth) return 1
+  const day = Math.min(asOf.getUTCDate(), daysInMonth)
+  return day / daysInMonth
+}
+
+// ============================================================
 // Aggregation helpers (called by server pages, given pre-fetched data)
 // ============================================================
 

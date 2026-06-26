@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Odi MRP — Budget vs Actual (rework) mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+  .pos { color:#047857; } .neg { color:#b91c1c; }
+</style>
+</head>
+<body class="bg-gray-100 p-8">
+<div class="max-w-[1500px] mx-auto space-y-8">
+
+<header>
+  <h1 class="text-xl font-semibold">Budget vs Actual — rework</h1>
+  <p class="text-sm text-gray-600 mt-1">
+    Year-to-date <b>and</b> per-month assessment · units <b>&amp;</b> revenue · month-to-date pro-rata ·
+    closed months frozen to the original budget · actuals uploaded from your three monthly exports.
+  </p>
+</header>
+
+<!-- ============================================================ -->
+<!-- 1 · CONTROL BAR                                              -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg p-4">
+  <div class="flex flex-wrap items-center gap-3">
+    <select class="text-sm border-gray-300 rounded px-2 py-1.5 bg-gray-50" disabled>
+      <option>FY 2026/27 (current)</option>
+    </select>
+
+    <div class="flex items-center gap-1 text-sm">
+      <span class="text-gray-500 mr-1">Scope:</span>
+      <button class="px-3 py-1.5 rounded-md bg-emerald-700 text-white">Year to date</button>
+      <button class="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700">May</button>
+      <button class="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700">June</button>
+      <select class="px-2 py-1.5 rounded-md border border-gray-300 text-gray-700">
+        <option>Pick month…</option><option>Apr</option><option>Jul</option>
+      </select>
+    </div>
+
+    <label class="flex items-center gap-2 text-sm text-gray-400 ml-2" title="Only applies to the current, in-progress month">
+      <input type="checkbox" disabled /> Pro-rata to date <span class="text-[11px]">(current month only)</span>
+    </label>
+
+    <div class="ml-auto flex items-center gap-2">
+      <span class="text-[11px] text-gray-500">Apr&nbsp;✓ &nbsp;May&nbsp;🔒 &nbsp;Jun&nbsp;🔒 &nbsp;Jul&nbsp;…</span>
+      <button class="px-3 py-1.5 text-sm bg-emerald-700 text-white rounded-md">⤓ Upload month exports</button>
+    </div>
+  </div>
+  <p class="text-[11px] text-gray-500 mt-2">
+    🔒 = month closed: budget is frozen to the <b>original</b> FY27 figures and actuals are locked. Revising the forecast later does <b>not</b> change a closed month.
+  </p>
+</section>
+
+<!-- ============================================================ -->
+<!-- 2 · HEADLINE (selected scope = Year to date, Apr–Jun)        -->
+<!-- ============================================================ -->
+<section class="grid grid-cols-3 gap-4">
+  <div class="bg-white border border-gray-200 rounded-lg p-4">
+    <div class="text-[11px] uppercase tracking-wider text-gray-500">Revenue — YTD (Apr–Jun)</div>
+    <div class="mt-1 text-2xl font-semibold tabular-nums">$182,400 <span class="text-sm font-normal text-gray-400">actual</span></div>
+    <div class="text-xs text-gray-600 mt-1 tabular-nums">Budget $214,000 · <span class="neg font-medium">−$31,600 (−14.8%)</span></div>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-lg p-4">
+    <div class="text-[11px] uppercase tracking-wider text-gray-500">Units sold — YTD</div>
+    <div class="mt-1 text-2xl font-semibold tabular-nums">38,910 <span class="text-sm font-normal text-gray-400">actual</span></div>
+    <div class="text-xs text-gray-600 mt-1 tabular-nums">Budget 44,300 · <span class="neg font-medium">−5,390 (−12.2%)</span></div>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-lg p-4">
+    <div class="text-[11px] uppercase tracking-wider text-gray-500">Samples given (cost)</div>
+    <div class="mt-1 text-2xl font-semibold tabular-nums">1,240 <span class="text-sm font-normal text-gray-400">units</span></div>
+    <div class="text-xs text-gray-600 mt-1 tabular-nums">≈ $2,180 at BOM cost · no revenue</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3 · BY CHANNEL                                               -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">By channel — Year to date</h2>
+    <p class="text-xs text-gray-500 mt-0.5">D2C from Shopify · Retail from Upstock (pouches counted as single units) · Samples from the tracker.</p>
+  </div>
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <th class="text-left px-4 py-2">Channel</th>
+        <th class="text-right px-3 py-2">Units budget</th>
+        <th class="text-right px-3 py-2">Units actual</th>
+        <th class="text-right px-3 py-2">Unit var</th>
+        <th class="text-right px-3 py-2">Rev budget</th>
+        <th class="text-right px-3 py-2">Rev actual</th>
+        <th class="text-right px-3 py-2">Rev var</th>
+      </tr>
+    </thead>
+    <tbody class="tabular-nums">
+      <tr class="border-t border-gray-100">
+        <td class="px-4 py-2 font-medium">D2C (Shopify)</td>
+        <td class="px-3 py-2 text-right">22,100</td><td class="px-3 py-2 text-right">19,540</td>
+        <td class="px-3 py-2 text-right neg">−2,560 (−12%)</td>
+        <td class="px-3 py-2 text-right">$148,000</td><td class="px-3 py-2 text-right">$129,800</td>
+        <td class="px-3 py-2 text-right neg">−$18,200 (−12%)</td>
+      </tr>
+      <tr class="border-t border-gray-100">
+        <td class="px-4 py-2 font-medium">Retail (Upstock)</td>
+        <td class="px-3 py-2 text-right">22,200</td><td class="px-3 py-2 text-right">19,370</td>
+        <td class="px-3 py-2 text-right neg">−2,830 (−13%)</td>
+        <td class="px-3 py-2 text-right">$66,000</td><td class="px-3 py-2 text-right">$52,600</td>
+        <td class="px-3 py-2 text-right neg">−$13,400 (−20%)</td>
+      </tr>
+      <tr class="border-t border-gray-100 text-gray-500">
+        <td class="px-4 py-2 font-medium">Samples</td>
+        <td class="px-3 py-2 text-right">—</td><td class="px-3 py-2 text-right">1,240</td>
+        <td class="px-3 py-2 text-right">—</td>
+        <td class="px-3 py-2 text-right">—</td><td class="px-3 py-2 text-right">$0</td>
+        <td class="px-3 py-2 text-right">—</td>
+      </tr>
+      <tr class="border-t-2 border-gray-200 font-semibold bg-gray-50/60">
+        <td class="px-4 py-2">Total (sales)</td>
+        <td class="px-3 py-2 text-right">44,300</td><td class="px-3 py-2 text-right">38,910</td>
+        <td class="px-3 py-2 text-right neg">−5,390 (−12%)</td>
+        <td class="px-3 py-2 text-right">$214,000</td><td class="px-3 py-2 text-right">$182,400</td>
+        <td class="px-3 py-2 text-right neg">−$31,600 (−15%)</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3.5 · ORDERS ASSESSMENT                                      -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">Orders — Year to date</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Order counts (not units): Ecomm total, and Retail split Woolworths vs the rest — per the budget.</p>
+  </div>
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <th class="text-left px-4 py-2">Stream</th>
+        <th class="text-right px-3 py-2">Orders budget</th>
+        <th class="text-right px-3 py-2">Orders actual</th>
+        <th class="text-right px-3 py-2">Variance</th>
+        <th class="text-left px-4 py-2">Source</th>
+      </tr>
+    </thead>
+    <tbody class="tabular-nums">
+      <tr class="border-t border-gray-100">
+        <td class="px-4 py-2 font-medium">Ecomm (D2C)</td>
+        <td class="px-3 py-2 text-right">2,050</td>
+        <td class="px-3 py-2 text-right">1,309</td>
+        <td class="px-3 py-2 text-right neg">−741 (−36%)</td>
+        <td class="px-4 py-2 text-[11px] text-gray-500">Shopify orders vs budget "Grand Total – Orders"</td>
+      </tr>
+      <tr class="border-t border-gray-100 font-medium">
+        <td class="px-4 py-2">Retail — total</td>
+        <td class="px-3 py-2 text-right">468</td>
+        <td class="px-3 py-2 text-right">821</td>
+        <td class="px-3 py-2 text-right pos">+353 (+75%)</td>
+        <td class="px-4 py-2 text-[11px] text-gray-500">Upstock orders vs budget retail "Orders" (row 198)</td>
+      </tr>
+      <tr class="border-t border-gray-100 text-gray-600">
+        <td class="px-4 py-2 pl-8">↳ Woolworths</td>
+        <td class="px-3 py-2 text-right text-gray-300">— <span class="text-[10px]">(no split in budget)</span></td>
+        <td class="px-3 py-2 text-right">534</td>
+        <td class="px-3 py-2 text-right text-gray-300">—</td>
+        <td class="px-4 py-2 text-[11px] text-gray-500">Upstock customer = "Woolworths – …"</td>
+      </tr>
+      <tr class="border-t border-gray-100 text-gray-600">
+        <td class="px-4 py-2 pl-8">↳ Other retailers</td>
+        <td class="px-3 py-2 text-right text-gray-300">—</td>
+        <td class="px-3 py-2 text-right">287</td>
+        <td class="px-3 py-2 text-right text-gray-300">—</td>
+        <td class="px-4 py-2 text-[11px] text-gray-500">Upstock, all non-Woolworths customers</td>
+      </tr>
+      <tr class="border-t-2 border-gray-200 font-semibold bg-gray-50/60">
+        <td class="px-4 py-2">All orders</td>
+        <td class="px-3 py-2 text-right">2,518</td>
+        <td class="px-3 py-2 text-right">2,130</td>
+        <td class="px-3 py-2 text-right neg">−388 (−15%)</td>
+        <td class="px-4 py-2 text-[11px] text-gray-500">Ecomm + Retail</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="px-5 py-2 text-[11px] text-gray-600 bg-gray-50/60 border-t border-gray-100">
+    Budget retail orders is a single total (no Woolworths/rest split in the budget), so the WW vs rest breakdown is shown on the actual side only. AUS retail orders budget is 0 until Sep 2026.
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 4 · BY PRODUCT                                               -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+    <div>
+      <h2 class="text-base font-semibold">By product — Year to date</h2>
+      <p class="text-xs text-gray-500 mt-0.5">Switch the Scope buttons above to drill into a single closed month (e.g. June).</p>
+    </div>
+    <div class="text-[11px] text-gray-500">Toggle: <span class="font-medium text-gray-700">Units</span> · Revenue</div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs">
+      <thead>
+        <tr class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+          <th class="text-left px-4 py-2 sticky left-0 bg-gray-50">Product</th>
+          <th class="text-right px-3 py-2">D2C bud</th><th class="text-right px-3 py-2">D2C act</th>
+          <th class="text-right px-3 py-2">Retail bud</th><th class="text-right px-3 py-2">Retail act</th>
+          <th class="text-right px-3 py-2">Samples</th>
+          <th class="text-right px-3 py-2 bg-blue-50/60">Units bud</th><th class="text-right px-3 py-2 bg-emerald-50/60">Units act</th>
+          <th class="text-right px-3 py-2">Unit var</th>
+          <th class="text-right px-3 py-2">Rev var</th>
+        </tr>
+      </thead>
+      <tbody class="tabular-nums">
+        <!-- ── GROUP: Sachets ── -->
+        <tr class="bg-gray-100/80 text-[11px] uppercase tracking-wider text-gray-600 font-semibold">
+          <td class="px-4 py-1.5 sticky left-0 bg-gray-100/80" colspan="10">Sachets</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2 pl-6 sticky left-0 bg-white"><div class="font-medium">Blueberry Sachet</div><div class="text-[10px] text-gray-400 font-mono">FG-ODI-SAC-BLU</div></td>
+          <td class="px-3 py-2 text-right">4,510</td><td class="px-3 py-2 text-right">4,180</td>
+          <td class="px-3 py-2 text-right">3,200</td><td class="px-3 py-2 text-right">2,640</td>
+          <td class="px-3 py-2 text-right text-gray-400">289</td>
+          <td class="px-3 py-2 text-right bg-blue-50/40">7,710</td><td class="px-3 py-2 text-right bg-emerald-50/40">6,820</td>
+          <td class="px-3 py-2 text-right neg">−890 (−12%)</td>
+          <td class="px-3 py-2 text-right neg">−$1,260</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2 pl-6 sticky left-0 bg-white"><div class="font-medium">Beetroot Sachet</div><div class="text-[10px] text-gray-400 font-mono">FG-ODI-SAC-BET</div></td>
+          <td class="px-3 py-2 text-right">3,180</td><td class="px-3 py-2 text-right">3,010</td>
+          <td class="px-3 py-2 text-right">2,400</td><td class="px-3 py-2 text-right">2,180</td>
+          <td class="px-3 py-2 text-right text-gray-400">130</td>
+          <td class="px-3 py-2 text-right bg-blue-50/40">5,580</td><td class="px-3 py-2 text-right bg-emerald-50/40">5,190</td>
+          <td class="px-3 py-2 text-right neg">−390 (−7%)</td>
+          <td class="px-3 py-2 text-right neg">−$560</td>
+        </tr>
+        <tr class="border-t border-gray-100 text-gray-400">
+          <td class="px-4 py-1.5 pl-6 sticky left-0 bg-white italic text-[11px]">Broccoli · Carrot · Baby Cereal sachets…</td>
+          <td class="px-3 py-1.5 text-right" colspan="9"></td>
+        </tr>
+        <tr class="border-t border-gray-200 bg-gray-50 font-semibold">
+          <td class="px-4 py-2 pl-4 sticky left-0 bg-gray-50">Sachets — subtotal</td>
+          <td class="px-3 py-2 text-right">12,400</td><td class="px-3 py-2 text-right">11,250</td>
+          <td class="px-3 py-2 text-right">9,800</td><td class="px-3 py-2 text-right">8,420</td>
+          <td class="px-3 py-2 text-right text-gray-500">540</td>
+          <td class="px-3 py-2 text-right bg-blue-50/60">22,200</td><td class="px-3 py-2 text-right bg-emerald-50/60">19,670</td>
+          <td class="px-3 py-2 text-right neg">−2,530 (−11%)</td>
+          <td class="px-3 py-2 text-right neg">−$3,640</td>
+        </tr>
+
+        <!-- ── GROUP: Tubs ── -->
+        <tr class="bg-gray-100/80 text-[11px] uppercase tracking-wider text-gray-600 font-semibold">
+          <td class="px-4 py-1.5 sticky left-0 bg-gray-100/80" colspan="10">Tubs</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2 pl-6 sticky left-0 bg-white"><div class="font-medium">Beef Bone Broth Tub</div><div class="text-[10px] text-gray-400 font-mono">FG-ODI-TUB-BBB</div></td>
+          <td class="px-3 py-2 text-right">1,540</td><td class="px-3 py-2 text-right">1,610</td>
+          <td class="px-3 py-2 text-right">980</td><td class="px-3 py-2 text-right">900</td>
+          <td class="px-3 py-2 text-right text-gray-400">43</td>
+          <td class="px-3 py-2 text-right bg-blue-50/40">2,520</td><td class="px-3 py-2 text-right bg-emerald-50/40">2,510</td>
+          <td class="px-3 py-2 text-right text-gray-500">−10 (0%)</td>
+          <td class="px-3 py-2 text-right pos">+$120</td>
+        </tr>
+        <tr class="border-t border-gray-200 bg-gray-50 font-semibold">
+          <td class="px-4 py-2 pl-4 sticky left-0 bg-gray-50">Tubs — subtotal</td>
+          <td class="px-3 py-2 text-right">4,120</td><td class="px-3 py-2 text-right">4,260</td>
+          <td class="px-3 py-2 text-right">2,640</td><td class="px-3 py-2 text-right">2,510</td>
+          <td class="px-3 py-2 text-right text-gray-500">95</td>
+          <td class="px-3 py-2 text-right bg-blue-50/60">6,760</td><td class="px-3 py-2 text-right bg-emerald-50/60">6,770</td>
+          <td class="px-3 py-2 text-right pos">+10 (0%)</td>
+          <td class="px-3 py-2 text-right pos">+$140</td>
+        </tr>
+
+        <!-- ── GROUP: Bites & Bars ── -->
+        <tr class="bg-gray-100/80 text-[11px] uppercase tracking-wider text-gray-600 font-semibold">
+          <td class="px-4 py-1.5 sticky left-0 bg-gray-100/80" colspan="10">Bites &amp; Bars</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2 pl-6 sticky left-0 bg-white"><div class="font-medium">Brownie Bite</div><div class="text-[10px] text-gray-400 font-mono">FG-ODI-BITE-BRN</div></td>
+          <td class="px-3 py-2 text-right">3,000</td><td class="px-3 py-2 text-right">2,450</td>
+          <td class="px-3 py-2 text-right">2,400</td><td class="px-3 py-2 text-right">1,980</td>
+          <td class="px-3 py-2 text-right text-gray-400">420</td>
+          <td class="px-3 py-2 text-right bg-blue-50/40">5,400</td><td class="px-3 py-2 text-right bg-emerald-50/40">4,430</td>
+          <td class="px-3 py-2 text-right neg">−970 (−18%)</td>
+          <td class="px-3 py-2 text-right neg">−$2,910</td>
+        </tr>
+        <tr class="border-t border-gray-200 bg-gray-50 font-semibold">
+          <td class="px-4 py-2 pl-4 sticky left-0 bg-gray-50">Bites &amp; Bars — subtotal</td>
+          <td class="px-3 py-2 text-right">3,000</td><td class="px-3 py-2 text-right">2,450</td>
+          <td class="px-3 py-2 text-right">2,400</td><td class="px-3 py-2 text-right">1,980</td>
+          <td class="px-3 py-2 text-right text-gray-500">420</td>
+          <td class="px-3 py-2 text-right bg-blue-50/60">5,400</td><td class="px-3 py-2 text-right bg-emerald-50/60">4,430</td>
+          <td class="px-3 py-2 text-right neg">−970 (−18%)</td>
+          <td class="px-3 py-2 text-right neg">−$2,910</td>
+        </tr>
+
+        <!-- ── GROUP: Pouches (retail) ── -->
+        <tr class="bg-gray-100/80 text-[11px] uppercase tracking-wider text-gray-600 font-semibold">
+          <td class="px-4 py-1.5 sticky left-0 bg-gray-100/80" colspan="10">Pouches <span class="normal-case font-normal text-gray-400">(retail only · ×6)</span></td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-4 py-2 pl-6 sticky left-0 bg-white"><div class="font-medium">Organic Berry Pouch</div><div class="text-[10px] text-gray-400 font-mono">SRC-ODI-PCH-BRY · ×6</div></td>
+          <td class="px-3 py-2 text-right text-gray-300">—</td><td class="px-3 py-2 text-right text-gray-300">—</td>
+          <td class="px-3 py-2 text-right">3,600</td><td class="px-3 py-2 text-right">3,180</td>
+          <td class="px-3 py-2 text-right text-gray-400">—</td>
+          <td class="px-3 py-2 text-right bg-blue-50/40">3,600</td><td class="px-3 py-2 text-right bg-emerald-50/40">3,180</td>
+          <td class="px-3 py-2 text-right neg">−420 (−12%)</td>
+          <td class="px-3 py-2 text-right neg">−$1,150</td>
+        </tr>
+        <tr class="border-t border-gray-200 bg-gray-50 font-semibold">
+          <td class="px-4 py-2 pl-4 sticky left-0 bg-gray-50">Pouches — subtotal</td>
+          <td class="px-3 py-2 text-right text-gray-300">—</td><td class="px-3 py-2 text-right text-gray-300">—</td>
+          <td class="px-3 py-2 text-right">9,400</td><td class="px-3 py-2 text-right">8,140</td>
+          <td class="px-3 py-2 text-right text-gray-500">—</td>
+          <td class="px-3 py-2 text-right bg-blue-50/60">9,400</td><td class="px-3 py-2 text-right bg-emerald-50/60">8,140</td>
+          <td class="px-3 py-2 text-right neg">−1,260 (−13%)</td>
+          <td class="px-3 py-2 text-right neg">−$3,440</td>
+        </tr>
+        <tr class="border-t border-gray-100 text-gray-400">
+          <td class="px-4 py-1.5 sticky left-0 bg-white italic text-[11px]">…Snacks, Puffs &amp; Melts, and other groups follow the same pattern…</td>
+          <td class="px-3 py-1.5 text-right" colspan="9"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 5 · UPLOAD MONTH EXPORTS (modal mock)                        -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">⤓ Upload month exports — <span class="text-gray-500 font-normal">July 2026 (current month)</span></h2>
+    <p class="text-xs text-gray-500 mt-0.5">Drop the same three files each month. The system reads each format automatically — no reformatting.</p>
+  </div>
+  <div class="p-5 grid grid-cols-3 gap-4">
+    <!-- Shopify -->
+    <div class="border border-dashed border-emerald-300 bg-emerald-50/40 rounded-lg p-4">
+      <div class="text-sm font-semibold">D2C · Shopify</div>
+      <div class="text-[11px] text-gray-500 mb-2">orders_export.csv</div>
+      <div class="text-xs text-emerald-800 bg-white border border-emerald-200 rounded px-2 py-1.5">
+        ✓ orders_export_1.csv<br><span class="text-gray-600">312 orders · 28 SKUs matched · 1 unmatched</span>
+      </div>
+      <div class="text-[11px] text-amber-700 mt-1">⚠ unmatched: FG-ODI-XYZ (ignored)</div>
+    </div>
+    <!-- Upstock -->
+    <div class="border border-dashed border-emerald-300 bg-emerald-50/40 rounded-lg p-4">
+      <div class="text-sm font-semibold">Retail · Upstock</div>
+      <div class="text-[11px] text-gray-500 mb-2">Odi Nutrition - Standard.csv</div>
+      <div class="text-xs text-emerald-800 bg-white border border-emerald-200 rounded px-2 py-1.5">
+        ✓ Odi Nutrition - Standard.csv<br><span class="text-gray-600">96 lines · pouches ×6 applied · 14 SKUs matched</span>
+      </div>
+    </div>
+    <!-- Samples -->
+    <div class="border border-dashed border-gray-300 rounded-lg p-4">
+      <div class="text-sm font-semibold">Samples · Tracker</div>
+      <div class="text-[11px] text-gray-500 mb-2">Odi Organic Sample Tracker.xlsx</div>
+      <div class="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-1.5 border-dashed text-center py-4">
+        Drop .xlsx here
+      </div>
+      <div class="text-[11px] text-gray-500 mt-1">Reads the <b>July</b> sheet's MONTHLY&nbsp;TOTAL row; ignores the "already in Shopify" rows below the divider.</div>
+    </div>
+  </div>
+  <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+    <label class="flex items-center gap-2 text-xs text-gray-700">
+      <input type="checkbox" checked /> Pro-rata budget to date — comparing <b>1–7 Jul</b> (7 of 31 days ≈ 23%)
+    </label>
+    <button class="px-3 py-1.5 text-sm bg-emerald-700 text-white rounded-md">Save actuals for July</button>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 6 · NOTES                                                    -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg p-5">
+  <h2 class="text-sm font-semibold mb-2">How the rules work</h2>
+  <ul class="text-xs text-gray-600 space-y-1.5 list-disc pl-5">
+    <li><b>Closed months (May, Jun):</b> budget = the original FY27 figures, frozen. Re-forecasting later never moves a closed month.</li>
+    <li><b>Revenue:</b> actual revenue comes straight from the export files; budget revenue = budget units × a per-product/channel price (editable price list, seeded from your budget). Samples carry no revenue.</li>
+    <li><b>Pro-rata:</b> only offered for the current, in-progress month. Scales that month's budget by days-elapsed ÷ days-in-month so a mid-month export compares fairly.</li>
+    <li><b>YTD:</b> sums every closed month so far (Apr–Jun now) plus the pro-rata'd current month if you include it.</li>
+    <li><b>Retail pouches:</b> 1 Upstock carton = 6 units.</li>
+  </ul>
+  <div class="mt-3 text-xs text-gray-500 border-t border-gray-100 pt-3">
+    <b>One thing I'll confirm during build:</b> the budget-revenue price list (D2C vs retail wholesale price per product). I'll seed it from your budget model and show it for you to sanity-check.
+  </div>
+</section>
+
+</div>
+</body>
+</html>

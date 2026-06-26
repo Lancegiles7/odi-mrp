@@ -2,10 +2,11 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import {
-  fyStartFor, fyMonths, fyLabel, shortMonth, addMonths,
-  computeProductRow, deriveConsumption,
-  type Channel, type ProductRow,
+  fyStartFor, fyMonths, fyLabel, shortMonth, addMonths, ymKey,
+  computeProductRow, deriveConsumption, proRataFactor,
+  type Channel, type ProductRow, type FigureMap,
 } from '@/lib/budget-vs-actual'
+import { SummaryTab } from '@/components/budget-vs-actual/summary-tab'
 import { ProductsTab } from '@/components/budget-vs-actual/products-tab'
 import { IngredientsTab } from '@/components/budget-vs-actual/ingredients-tab'
 import { PackagingTab } from '@/components/budget-vs-actual/packaging-tab'
@@ -16,7 +17,7 @@ import { MonthSelector } from '@/components/budget-vs-actual/month-selector'
 export const metadata: Metadata = { title: 'Budget vs Actual' }
 
 interface PageProps {
-  searchParams: { fy?: string; month?: string; tab?: string }
+  searchParams: { fy?: string; month?: string; tab?: string; scope?: string; prorata?: string }
 }
 
 export default async function BudgetVsActualPage({ searchParams }: PageProps) {
@@ -26,7 +27,7 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
   const today = new Date()
   const defaultFyStart = fyStartFor(today)
   const fyStart  = searchParams.fy    ?? defaultFyStart
-  const tab      = (searchParams.tab as 'products' | 'ingredients' | 'packaging' | undefined) ?? 'products'
+  const tab      = (searchParams.tab as 'summary' | 'products' | 'ingredients' | 'packaging' | undefined) ?? 'summary'
   const months   = fyMonths(fyStart)
   const defaultMonth = pickDefaultMonth(today, months)
   const month    = searchParams.month ?? defaultMonth
@@ -103,6 +104,66 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
   const isLocked   = !!monthLock
   const isFyStart  = month === months[0]
 
+  // ── Summary figures (bva_figures) for the whole FY + FY locks ──
+  const [{ data: figRows }, { data: fyLocks }] = await Promise.all([
+    supabase.from('bva_figures')
+      .select('year_month, line_key, budget, actual')
+      .gte('year_month', months[0]).lte('year_month', months[11]) as { data: Array<{ year_month: string; line_key: string; budget: number | null; actual: number | null }> | null },
+    supabase.from('month_locks')
+      .select('year_month')
+      .gte('year_month', months[0]).lte('year_month', months[11]) as { data: Array<{ year_month: string }> | null },
+  ])
+
+  const lockedSet = new Set((fyLocks ?? []).map((l) => ymKey(l.year_month)!))
+  // figures indexed by month → line_key (plain objects to keep iteration simple)
+  const figByMonth: Record<string, Record<string, { budget: number | null; actual: number | null }>> = {}
+  const monthsWithData = new Set<string>()
+  for (const r of figRows ?? []) {
+    const mk = ymKey(r.year_month)!
+    monthsWithData.add(mk)
+    ;(figByMonth[mk] ??= {})[r.line_key] = {
+      budget: r.budget != null ? Number(r.budget) : null,
+      actual: r.actual != null ? Number(r.actual) : null,
+    }
+  }
+
+  const summaryMonths = months.map((m) => ({
+    key: m, label: shortMonth(m), closed: lockedSet.has(m), hasData: monthsWithData.has(m),
+  }))
+
+  const todayMonthKey = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, '0')}-01`
+  const scope = searchParams.scope ?? 'ytd'
+  const proRataOn = searchParams.prorata === '1'
+  const isCurrentMonthScope = scope === todayMonthKey
+  const proRata = isCurrentMonthScope
+    ? (() => {
+        const factor = proRataFactor(scope, today)
+        const [y, mm] = scope.split('-').map(Number)
+        const daysInMonth = new Date(Date.UTC(y, mm, 0)).getUTCDate()
+        return { factor, daysElapsed: Math.round(factor * daysInMonth), daysInMonth }
+      })()
+    : null
+
+  // Aggregate figures for the active scope (sum across YTD months, or one month).
+  const scopeMonths = scope === 'ytd'
+    ? months.filter((m) => monthsWithData.has(m))
+    : (monthsWithData.has(scope) ? [scope] : [])
+  const summaryFigures: FigureMap = {}
+  for (const m of scopeMonths) {
+    const applyProRata = proRataOn && isCurrentMonthScope && m === scope
+    const factor = applyProRata && proRata ? proRata.factor : 1
+    const mMap = figByMonth[m] ?? {}
+    for (const key of Object.keys(mMap)) {
+      const pair = mMap[key]
+      const cur = summaryFigures[key] ?? { budget: null, actual: null }
+      const bud = pair.budget != null ? pair.budget * factor : null
+      summaryFigures[key] = {
+        budget: bud != null ? (cur.budget ?? 0) + bud : cur.budget,
+        actual: pair.actual != null ? (cur.actual ?? 0) + pair.actual : cur.actual,
+      }
+    }
+  }
+
   // ── Build product opening map: this month's opening_soh, else current_soh, else prev month's effective EOM ──
   const stockThisByEntity = new Map<string, { opening: number | null; counted: number | null }>()
   for (const s of stockCountsThis ?? []) {
@@ -164,24 +225,39 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
             {isLocked && <span className="ml-2 inline-flex items-center gap-1 text-[11px] px-2 py-0.5 bg-gray-900 text-white rounded">🔒 Locked</span>}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap items-end">
-          <MonthSelector fyStart={fyStart} month={month} months={months} tab={tab} />
-          {!isLocked && <UploadActualsButton year_month={month} isFyStart={isFyStart} />}
-          <LockMonthButton year_month={month} isLocked={isLocked} isAdmin={isAdmin} />
-        </div>
+        {tab !== 'summary' && (
+          <div className="flex gap-2 flex-wrap items-end">
+            <MonthSelector fyStart={fyStart} month={month} months={months} tab={tab} />
+            {!isLocked && <UploadActualsButton year_month={month} isFyStart={isFyStart} />}
+            <LockMonthButton year_month={month} isLocked={isLocked} isAdmin={isAdmin} />
+          </div>
+        )}
       </div>
 
       {/* Tab nav */}
       <div className="flex border-b border-gray-200 -mb-px">
+        <TabLink href={`/reporting/budget-vs-actual?fy=${fyStart}&tab=summary&scope=${scope}`}      label="Summary"     count={0} active={tab === 'summary'} />
         <TabLink href={`/reporting/budget-vs-actual?fy=${fyStart}&month=${month}&tab=products`}    label="Products"    count={productRows.length} active={tab === 'products'} />
         <TabLink href={`/reporting/budget-vs-actual?fy=${fyStart}&month=${month}&tab=ingredients`} label="Ingredients" count={(ingredients ?? []).length} active={tab === 'ingredients'} />
         <TabLink href={`/reporting/budget-vs-actual?fy=${fyStart}&month=${month}&tab=packaging`}   label="Packaging"   count={(packaging ?? []).length} active={tab === 'packaging'} />
       </div>
 
-      {isFyStart && (
+      {isFyStart && tab !== 'summary' && (
         <div className="p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-900">
           <strong>FY-start month.</strong> The Opening column from your upload will be saved as each item&rsquo;s baseline. After this month, opening auto-rolls from the previous month&rsquo;s closing (counted EOM if entered, else system-calculated).
         </div>
+      )}
+
+      {tab === 'summary' && (
+        <SummaryTab
+          fyStart={fyStart}
+          scope={scope}
+          months={summaryMonths}
+          figures={summaryFigures}
+          proRata={proRata}
+          proRataOn={proRataOn}
+          isCurrentMonthScope={isCurrentMonthScope}
+        />
       )}
 
       {tab === 'products' && (

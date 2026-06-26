@@ -795,6 +795,36 @@ export type Database = {
         }
         Relationships: []
       }
+      bva_figures: {
+        Row: {
+          id: string
+          year_month: string
+          line_key: string
+          budget: number | null
+          actual: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          year_month: string
+          line_key: string
+          budget?: number | null
+          actual?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          year_month?: string
+          line_key?: string
+          budget?: number | null
+          actual?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
     }
 
     Views: {
