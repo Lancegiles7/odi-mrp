@@ -730,3 +730,37 @@ export async function purgeExpiredProducts(): Promise<{ purged: number }> {
   revalidatePath('/products/trash')
   return { purged: data?.length ?? 0 }
 }
+
+// ============================================================
+// exportProductsCsv — product master as CSV (system SKU, name, group,
+// prices). Used to build the Budget-vs-Actual import mapping between the
+// FG- export codes and the MRP system SKUs.
+// ============================================================
+export async function exportProductsCsv(): Promise<{ ok: boolean; csv?: string; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  const { data: products, error } = await supabase
+    .from('products')
+    .select('sku_code, name, product_type, rrp, rrp_au, is_active')
+    .is('deleted_at', null)
+    .order('product_type')
+    .order('name') as { data: Array<{
+      sku_code: string; name: string; product_type: string | null
+      rrp: number | null; rrp_au: number | null; is_active: boolean
+    }> | null }
+
+  if (error) return { ok: false, error: error.message }
+
+  const esc = (v: unknown) => {
+    const s = v == null ? '' : String(v)
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const header = ['system_sku', 'name', 'group', 'rrp_nz', 'rrp_au', 'is_active']
+  const lines = [header.join(',')]
+  for (const p of products ?? []) {
+    lines.push([p.sku_code, p.name, p.product_type ?? '', p.rrp ?? '', p.rrp_au ?? '', p.is_active].map(esc).join(','))
+  }
+  return { ok: true, csv: lines.join('\n') }
+}

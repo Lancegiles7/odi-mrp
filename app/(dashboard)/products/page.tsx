@@ -5,6 +5,7 @@ import { formatCurrency } from '@/lib/utils'
 import { getAppSettings } from '@/lib/settings'
 import { calcProductCostSummary } from '@/lib/costing'
 import { PRODUCT_GROUPS } from '@/lib/constants'
+import { ExportProductsButton } from '@/components/products/export-products-button'
 import type { BomItemWithIngredient, ProductGroup } from '@/lib/types/database.types'
 
 export const metadata: Metadata = { title: 'Products / BOMs' }
@@ -125,6 +126,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportProductsButton />
           <Link
             href="/products/import"
             className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
