@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { setProductActual, setOpeningSoh } from '@/app/(dashboard)/reporting/budget-vs-actual/actions'
 import type { Channel } from '@/lib/budget-vs-actual'
@@ -21,6 +21,12 @@ export function ActualCellInput({
   const [value, setValue] = useState<string>(initial > 0 ? String(initial) : '')
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
+
+  // Re-sync when the underlying value changes (e.g. switching month) so the
+  // editable cell never shows a stale figure from the previous month.
+  useEffect(() => {
+    setValue(initial > 0 ? String(initial) : '')
+  }, [initial, year_month, product_id, channel])
 
   function save() {
     if (isLocked) return
@@ -66,6 +72,10 @@ export function OpeningCellInput({
   const [value, setValue] = useState<string>(initial != null ? String(initial) : '')
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setValue(initial != null ? String(initial) : '')
+  }, [initial, year_month, entity_id])
 
   function save() {
     if (isLocked) return

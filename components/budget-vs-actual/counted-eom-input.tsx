@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { setMonthlyStockCount } from '@/app/(dashboard)/reporting/budget-vs-actual/actions'
 import type { EntityType } from '@/lib/budget-vs-actual'
@@ -18,6 +18,10 @@ export function CountedEomInput({
   const [value, setValue] = useState<string>(initial != null ? String(initial) : '')
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setValue(initial != null ? String(initial) : '')
+  }, [initial, year_month, entity_id])
 
   function save() {
     if (isLocked) return
