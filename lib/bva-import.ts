@@ -199,6 +199,8 @@ export const FG_TO_SYSTEM: Record<string, string> = {
   'FG-ODI-TUB-BBB':  'ODI-ODI-ORGA-BEEF-TUB-125G',
   'FG-ODI-TUB-MB':   'ODI-ODI-ORGA-MEAL-TUB-125G',
   'FG-ODI-TUB-SB':   'ODI-ODI-ORGA-SMOO-TUB-125G',
+  // Legacy / pre-rebrand SKUs
+  'ODIMEAL':         'ODI-ODI-ORGA-MEAL-TUB-125G', // "NutriDense Meal Booster" → Meal Booster
 }
 
 /** Translate an export FG- code to the MRP system SKU (identity if unmapped). */
