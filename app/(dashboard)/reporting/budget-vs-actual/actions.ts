@@ -1,12 +1,79 @@
 'use server'
 
+import * as XLSX from 'xlsx'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { Channel, EntityType } from '@/lib/budget-vs-actual'
 import { fyMonths, fyStartFor } from '@/lib/budget-vs-actual'
+import {
+  d2cFromShopify, retailFromUpstock, samplesFromSheet,
+  actualsToFigureLines, sampleSheetName,
+} from '@/lib/bva-import'
 
 const REVAL = '/reporting/budget-vs-actual'
+
+// ============================================================
+// importBvaActuals — parse the three monthly exports (Shopify D2C,
+// Upstock retail, sample tracker) and write the actuals for one month
+// into bva_figures. Budget rows are left untouched; locked months are
+// blocked. Returns the figures it wrote so the UI can preview them.
+// ============================================================
+export async function importBvaActuals(formData: FormData): Promise<{
+  ok: boolean; error?: string; wrote?: Record<string, number>
+}> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  const yearMonth = String(formData.get('year_month') ?? '').trim()
+  if (!/^\d{4}-\d{2}-01$/.test(yearMonth)) return { ok: false, error: 'Pick a valid month' }
+  const ym = yearMonth.slice(0, 7)
+
+  // Closed months keep their actuals — don't overwrite.
+  const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', yearMonth).maybeSingle() as { data: { year_month: string } | null }
+  if (lock) return { ok: false, error: `${ym} is closed (locked). Unlock it first to re-import.` }
+
+  const shopify = formData.get('shopify') as File | null
+  const upstock = formData.get('upstock') as File | null
+  const samples = formData.get('samples') as File | null
+  if (!shopify && !upstock && !samples) return { ok: false, error: 'Attach at least one export file' }
+
+  // raw:true keeps CSV date/number columns as their original strings — otherwise
+  // SheetJS coerces "2026-06-26 …" into an Excel serial and month matching fails.
+  async function rowsOf(file: File | null): Promise<Record<string, unknown>[]> {
+    if (!file || file.size === 0) return []
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: true })
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { raw: true, defval: '' }) as Record<string, unknown>[]
+  }
+
+  try {
+    const d2c    = d2cFromShopify(await rowsOf(shopify), ym)
+    const retail = retailFromUpstock(await rowsOf(upstock), ym)
+
+    let samp = { sachets: 0, tubs: 0, snacks: 0, pouches: 0, other: 0 }
+    if (samples && samples.size > 0) {
+      const wb = XLSX.read(await samples.arrayBuffer(), { type: 'array', raw: true })
+      const sheetName = wb.SheetNames.find((n) => n === sampleSheetName(yearMonth)) ?? wb.SheetNames[wb.SheetNames.length - 1]
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: '' }) as unknown[][]
+      samp = samplesFromSheet(aoa)
+    }
+
+    const lines = actualsToFigureLines(d2c, retail, samp)
+
+    const { data: profile } = await supabase.from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+    const rows = Object.entries(lines).map(([line_key, actual]) => ({
+      year_month: yearMonth, line_key, actual, updated_at: new Date().toISOString(), updated_by: profile?.id ?? null,
+    }))
+    const { error } = await supabase.from('bva_figures').upsert(rows as never, { onConflict: 'year_month,line_key' })
+    if (error) return { ok: false, error: `Save failed: ${error.message}` }
+
+    revalidatePath(REVAL)
+    return { ok: true, wrote: lines }
+  } catch (e) {
+    return { ok: false, error: `Could not read the files: ${(e as Error).message}` }
+  }
+}
 
 // ============================================================
 // uploadProductActuals

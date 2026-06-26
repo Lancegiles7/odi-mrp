@@ -5,6 +5,7 @@ import {
   variance, fmtMoney, fmtNum, fmtPct, SUMMARY_GROUPS,
   shortMonth, type FigureMap,
 } from '@/lib/budget-vs-actual'
+import { BvaUploadActuals } from './bva-upload-actuals'
 
 interface MonthOpt { key: string; label: string; closed: boolean; hasData: boolean }
 
@@ -62,6 +63,12 @@ export function SummaryTab({ fyStart, scope, months, figures, proRata, proRataOn
             Pro-rata budget to date ({proRata.daysElapsed}/{proRata.daysInMonth} days ≈ {Math.round(proRata.factor * 100)}%)
           </label>
         )}
+        <div className="ml-auto">
+          <BvaUploadActuals
+            months={months.map((m) => ({ key: m.key, label: m.label, closed: m.closed }))}
+            defaultMonth={(scope !== 'ytd' ? scope : months.find((m) => !m.closed)?.key) ?? months[0]?.key ?? ''}
+          />
+        </div>
       </div>
 
       {/* Revenue */}
