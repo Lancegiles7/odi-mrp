@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { convertGramsToIngredientUom } from '@/lib/ingredient-demand'
 
 export type POStatus = 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled'
 
@@ -347,6 +348,40 @@ export async function receivePoLines(input: {
 
   if (!lines) return { ok: false, error: 'PO lines not found' }
 
+  // Which market/build this PO replenishes → decides whether receipts lift the
+  // NZ or the AU opening-stock figure on the demand view.
+  const { data: po } = await supabase
+    .from('purchase_orders')
+    .select('po_number, market')
+    .eq('id', input.po_id)
+    .maybeSingle() as { data: { po_number: string; market: string | null } | null }
+  const poMarket: 'NZ' | 'AU' = po?.market === 'AU' ? 'AU' : 'NZ'
+  const openCol = poMarket === 'AU' ? 'opening_stock_override_au' : 'opening_stock_override'
+
+  // Current opening figures + display UoM for the ingredients/packaging on this
+  // PO, so we can convert the received qty into the demand view's unit and add it.
+  const ingIds = Array.from(new Set(lines.filter((l) => l.ingredient_id).map((l) => l.ingredient_id as string)))
+  const pakIds = Array.from(new Set(lines.filter((l) => l.packaging_id).map((l) => l.packaging_id as string)))
+
+  const { data: ingInfo } = ingIds.length
+    ? await supabase.from('ingredients')
+        .select('id, unit_of_measure, opening_stock_override, opening_stock_override_au')
+        .in('id', ingIds) as { data: Array<{ id: string; unit_of_measure: string | null; opening_stock_override: number | null; opening_stock_override_au: number | null }> | null }
+    : { data: [] as Array<{ id: string; unit_of_measure: string | null; opening_stock_override: number | null; opening_stock_override_au: number | null }> }
+  const { data: pakInfo } = pakIds.length
+    ? await supabase.from('packaging')
+        .select('id, unit_of_measure, opening_stock_override, opening_stock_override_au')
+        .in('id', pakIds) as { data: Array<{ id: string; unit_of_measure: string | null; opening_stock_override: number | null; opening_stock_override_au: number | null }> | null }
+    : { data: [] as Array<{ id: string; unit_of_measure: string | null; opening_stock_override: number | null; opening_stock_override_au: number | null }> }
+
+  const ingById = new Map((ingInfo ?? []).map((i) => [i.id, i]))
+  const pakById = new Map((pakInfo ?? []).map((p) => [p.id, p]))
+
+  // Accumulate received qty (in each item's own display UoM) so multiple lines
+  // for the same item roll up into a single opening-stock bump.
+  const ingBump = new Map<string, number>()
+  const pakBump = new Map<string, number>()
+
   for (const r of input.receipts) {
     if (r.receiving_now <= 0) continue
     const line = lines.find((l) => l.id === r.line_id)
@@ -393,6 +428,22 @@ export async function receivePoLines(input: {
           created_by:             profile?.id ?? null,
         } as never)
       if (mvErr) return { ok: false, error: `Stock movement failed: ${mvErr.message}` }
+
+      // Lift the demand view's opening-stock figure by what we just received.
+      // Convert the PO line's UoM into the item's display UoM the same way the
+      // demand report does (only grams need converting; everything else passes
+      // through). Received stock drops out of "arrivals" once quantity_received
+      // rises, so this is where it must reappear — as on-hand opening stock.
+      const lineUom = (line.unit_of_measure ?? '').trim().toLowerCase()
+      if (line.ingredient_id) {
+        const itemUom = ingById.get(line.ingredient_id)?.unit_of_measure ?? null
+        const qty = lineUom === 'g' ? convertGramsToIngredientUom(actualReceiving, itemUom) : actualReceiving
+        ingBump.set(line.ingredient_id, (ingBump.get(line.ingredient_id) ?? 0) + qty)
+      } else if (line.packaging_id) {
+        const itemUom = pakById.get(line.packaging_id)?.unit_of_measure ?? null
+        const qty = lineUom === 'g' ? convertGramsToIngredientUom(actualReceiving, itemUom) : actualReceiving
+        pakBump.set(line.packaging_id, (pakBump.get(line.packaging_id) ?? 0) + qty)
+      }
     }
   }
 
@@ -409,6 +460,33 @@ export async function receivePoLines(input: {
     await supabase.from('purchase_orders').update({ status: nextStatus }).eq('id', input.po_id)
   }
 
+  // Apply the opening-stock bumps for everything received in this call, and
+  // append an audit row per item (mirrors the manual opening-stock edit path).
+  const receiptNote = `Received on ${po?.po_number ?? 'PO'}`
+  for (const [ingredientId, qty] of Array.from(ingBump.entries())) {
+    if (qty <= 0) continue
+    const prev = (poMarket === 'AU' ? ingById.get(ingredientId)?.opening_stock_override_au : ingById.get(ingredientId)?.opening_stock_override) ?? null
+    const newVal = (prev ?? 0) + qty
+    const { error: upErr } = await supabase.from('ingredients').update({ [openCol]: newVal }).eq('id', ingredientId)
+    if (upErr) return { ok: false, error: `Opening stock update failed: ${upErr.message}` }
+    await supabase.from('ingredient_opening_stock_history').insert({
+      ingredient_id: ingredientId, previous_value: prev, new_value: newVal,
+      note: receiptNote, market: poMarket, changed_by: profile?.id ?? null,
+    } as never)
+  }
+  for (const [packagingId, qty] of Array.from(pakBump.entries())) {
+    if (qty <= 0) continue
+    const prev = (poMarket === 'AU' ? pakById.get(packagingId)?.opening_stock_override_au : pakById.get(packagingId)?.opening_stock_override) ?? null
+    const newVal = (prev ?? 0) + qty
+    const { error: upErr } = await supabase.from('packaging').update({ [openCol]: newVal }).eq('id', packagingId)
+    if (upErr) return { ok: false, error: `Opening stock update failed: ${upErr.message}` }
+    await supabase.from('packaging_opening_stock_history').insert({
+      packaging_id: packagingId, previous_value: prev, new_value: newVal,
+      note: receiptNote, market: poMarket, changed_by: profile?.id ?? null,
+    } as never)
+  }
+
+  revalidatePath('/packaging/demand')
   revalidatePath('/purchase-orders')
   revalidatePath(`/purchase-orders/${input.po_id}`)
   revalidatePath('/ingredients/demand')
