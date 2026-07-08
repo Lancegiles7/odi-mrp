@@ -81,17 +81,28 @@ export async function importBvaActuals(formData: FormData): Promise<{
     const idBySku = new Map((prods ?? []).map((p) => [p.sku_code, p.id]))
 
     const unmatchedSkus: string[] = []
-    const paRows: Array<{ product_id: string; year_month: string; channel: string; units: number }> = []
+    // Accumulate by (product_id, channel): several legacy FG SKUs can map to the
+    // same system product (e.g. legacy ODIMEAL → Meal Booster), so their units
+    // must be SUMMED into one row. Emitting two rows with the same conflict key
+    // in one upsert is what triggers Postgres's "ON CONFLICT DO UPDATE command
+    // cannot affect row a second time" error.
+    const paByKey = new Map<string, { product_id: string; channel: string; units: number }>()
     const addChannel = (map: Record<string, number>, channel: string) => {
       for (const [fgSku, units] of Object.entries(map)) {
         const id = idBySku.get(toSystemSku(fgSku))
         if (!id) { unmatchedSkus.push(fgSku); continue }
-        paRows.push({ product_id: id, year_month: yearMonth, channel, units })
+        const key = `${id}|${channel}`
+        const existing = paByKey.get(key)
+        if (existing) existing.units += units
+        else paByKey.set(key, { product_id: id, channel, units })
       }
     }
     addChannel(pp.d2c, 'nz_d2c')
     addChannel(pp.retail, 'nz_retail')
     addChannel(pp.samples, 'nz_samples')
+
+    const paRows: Array<{ product_id: string; year_month: string; channel: string; units: number }> =
+      Array.from(paByKey.values()).map((r) => ({ product_id: r.product_id, year_month: yearMonth, channel: r.channel, units: r.units }))
 
     let productsMatched = 0
     if (paRows.length > 0) {
