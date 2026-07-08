@@ -159,7 +159,11 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     if (!ln.ingredient_id) continue
     const po = poById.get(ln.purchase_order_id)
     if (!po?.expected_delivery_date) continue
-    const monthKey = po.expected_delivery_date.slice(0, 7) + '-01'  // 'YYYY-MM-01'
+    // An open PO whose delivery date has already passed is still stock we're
+    // owed, so pull it into the first planning month rather than dropping it.
+    // POs due beyond the end of the window are still skipped.
+    const rawMonth = po.expected_delivery_date.slice(0, 7) + '-01'  // 'YYYY-MM-01'
+    const monthKey = rawMonth < months[0] ? months[0] : rawMonth
     if (!months.includes(monthKey)) continue
 
     const remaining = Math.max(0, Number(ln.quantity_ordered) - Number(ln.quantity_received))

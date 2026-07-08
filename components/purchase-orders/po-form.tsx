@@ -472,7 +472,7 @@ export function POForm(props: POFormProps) {
                     <th className="text-left px-3 py-2 font-medium w-[110px]">Type</th>
                     <th className="text-left px-3 py-2 font-medium">Item</th>
                     <th className="text-left px-3 py-2 font-medium w-[120px]">Supplier code</th>
-                    <th className="text-right px-3 py-2 font-medium w-[80px]">Qty</th>
+                    <th className="text-right px-3 py-2 font-medium w-[110px]">Qty</th>
                     <th className="text-left px-3 py-2 font-medium w-[60px]">UoM</th>
                     <th className="text-right px-3 py-2 font-medium w-[80px]">Pack size</th>
                     <th className="text-right px-3 py-2 font-medium w-[100px]">Unit price</th>
