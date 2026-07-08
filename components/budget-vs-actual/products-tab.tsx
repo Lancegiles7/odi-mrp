@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { CountedEomInput } from './counted-eom-input'
 import { ActualCellInput, OpeningCellInput } from './actual-cell-input'
 import { varBadgeClass, type ProductRow } from '@/lib/budget-vs-actual'
@@ -54,12 +54,14 @@ export function ProductsTab({
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      {isYtd && (
-        <div className="px-4 py-2.5 bg-emerald-50/60 border-b border-emerald-100 text-xs text-emerald-900 flex items-center gap-2 flex-wrap">
-          <span className="font-semibold">Year to date{ytdLabel ? ` · ${ytdLabel}` : ''}</span>
-          <span className="text-emerald-800/80">Cumulative sales &amp; budget per product. Opening is the FY-start figure; stock closes at the latest month. Figures are read-only here — switch to <em>This month</em> to edit.</span>
+      <div className="relative flex items-center justify-between gap-3 px-4 py-2 border-b border-gray-100">
+        <div className="text-xs text-gray-500 min-w-0">
+          {isYtd
+            ? <span><span className="font-semibold text-emerald-800">Year to date{ytdLabel ? ` · ${ytdLabel}` : ''}</span> — cumulative sales &amp; budget; opening is the FY-start figure, stock closes at the latest month. Read-only — switch to <em>This month</em> to edit.</span>
+            : <span className="text-gray-400">Monthly figures — editable.</span>}
         </div>
-      )}
+        <VarianceKey />
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs" style={{ minWidth: 2000 }}>
           <thead>
@@ -132,7 +134,7 @@ export function ProductsTab({
         <span className="ml-1 px-1.5 py-0.5 rounded bg-emerald-50/40">Actual sales channels</span>
         <span className="ml-1 px-1.5 py-0.5 rounded bg-purple-50/60">Actual samples</span>
         <span className="ml-1 px-1.5 py-0.5 rounded bg-amber-50/40">Calculated</span>
-        <span className="ml-3 text-gray-400">Variance bands: 0–10% none · 10–25% amber · &gt;25% red. Pipefill (budget) is compared against samples (actual).</span>
+        <span className="ml-3 text-gray-400">Pipefill (budget) is compared against samples (actual). Variance colour key: top-right of the table.</span>
       </div>
     </div>
   )
@@ -231,5 +233,45 @@ function VarBadge({ actual, budget }: { actual: number; budget: number }) {
     <span className={`inline-block px-1.5 py-0.5 rounded font-medium ${varBadgeClass(actual, budget)}`}>
       {sign}{diff.toLocaleString()}{pct != null ? ` (${sign}${pct.toFixed(0)}%)` : ''}
     </span>
+  )
+}
+
+function KeySwatch({ className }: { className: string }) {
+  return <span className={`mt-0.5 w-3.5 h-3.5 rounded border border-black/5 shrink-0 ${className}`} />
+}
+
+/** Click-to-open key explaining what the variance badge colours mean. */
+function VarianceKey() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-600 hover:text-gray-900 border border-gray-300 rounded px-2 py-1 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300"
+      >
+        <span className="w-3.5 h-3.5 rounded-full border border-gray-400 inline-flex items-center justify-center text-[9px] leading-none italic font-serif">i</span>
+        Variance colours
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className="absolute right-0 top-full mt-1 z-40 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-3.5 text-left">
+            <div className="text-xs font-semibold text-gray-800 mb-2.5">What the variance colours mean</div>
+            <ul className="space-y-2 text-[11px] text-gray-700">
+              <li className="flex items-start gap-2"><KeySwatch className="bg-gray-100" /><span><b className="text-gray-800">On target</b> — within 10% of budget, over or under.</span></li>
+              <li className="flex items-start gap-2"><KeySwatch className="bg-emerald-100" /><span><b className="text-gray-800">Beat budget</b> — more than 10% above (deeper green over 25%).</span></li>
+              <li className="flex items-start gap-2"><KeySwatch className="bg-amber-100" /><span><b className="text-gray-800">Under budget</b> — 10–25% short.</span></li>
+              <li className="flex items-start gap-2"><KeySwatch className="bg-rose-100" /><span><b className="text-gray-800">Well under</b> — more than 25% short.</span></li>
+            </ul>
+            <div className="mt-2.5 pt-2.5 border-t border-gray-100 text-[10px] text-gray-500 leading-relaxed">
+              Percentage is (actual − budget) ÷ budget. Coming in over budget is never amber or red.
+              <b className="text-gray-600"> Var sales</b> counts retail + D2C; <b className="text-gray-600">Var total</b> also includes samples.
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
