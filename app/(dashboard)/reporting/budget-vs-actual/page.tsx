@@ -17,7 +17,7 @@ import { MonthSelector } from '@/components/budget-vs-actual/month-selector'
 export const metadata: Metadata = { title: 'Budget vs Actual' }
 
 interface PageProps {
-  searchParams: { fy?: string; month?: string; tab?: string; scope?: string; prorata?: string }
+  searchParams: { fy?: string; month?: string; tab?: string; scope?: string; prorata?: string; pscope?: string }
 }
 
 export default async function BudgetVsActualPage({ searchParams }: PageProps) {
@@ -34,6 +34,9 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
 
   const monthIdx = months.indexOf(month)
   const prevMonth = monthIdx > 0 ? months[monthIdx - 1] : null
+
+  // Products tab can show one month or the cumulative Apr→selected-month roll-up.
+  const productScope: 'month' | 'ytd' = searchParams.pscope === 'ytd' ? 'ytd' : 'month'
 
   // ── Fetch everything in parallel ───────────────────────────
   const [
@@ -210,9 +213,55 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
     counted_eom:       stockThisByEntity.get(p.id)?.counted ?? null,
   }))
 
-  // Map: product_id → total_out (used to derive ingredient/packaging consumption)
+  // Map: product_id → total_out (used to derive ingredient/packaging consumption).
+  // Always the SELECTED MONTH — ingredient/packaging demand is monthly regardless
+  // of the products-tab YTD toggle.
   const productTotals: Record<string, number> = {}
   for (const r of productRows) productTotals[r.product_id] = r.total_out
+
+  // ── Products YTD: cumulative Apr→selected month, only when the tab's YTD scope
+  // is on and there's more than one month in range. Sales/budget sum; opening is
+  // the FY-start opening and counted EOM is the selected month's (point-in-time),
+  // so opening − Σ shipped still reconciles across the period. ─────────────────
+  let productRowsForTab = productRows
+  let productYtdLabel: string | null = null
+  if (tab === 'products' && productScope === 'ytd' && monthIdx > 0) {
+    const [{ data: ytdActuals }, { data: ytdBudget }, { data: fyStartCounts }] = await Promise.all([
+      supabase.from('product_actuals')
+        .select('product_id, channel, units')
+        .gte('year_month', months[0]).lte('year_month', month) as { data: Array<{ product_id: string; channel: Channel; units: number }> | null },
+      supabase.from('bva_budget_snapshots')
+        .select('product_id, channel, units')
+        .gte('year_month', months[0]).lte('year_month', month) as { data: Array<{ product_id: string; channel: Channel; units: number }> | null },
+      supabase.from('monthly_stock_counts')
+        .select('entity_type, entity_id, opening_soh')
+        .eq('year_month', months[0]) as { data: Array<{ entity_type: string; entity_id: string; opening_soh: number | null }> | null },
+    ])
+    const sumByChannel = (src: Array<{ product_id: string; channel: Channel; units: number }> | null) => {
+      const m = new Map<string, Partial<Record<Channel, number>>>()
+      for (const r of src ?? []) {
+        const e = m.get(r.product_id) ?? {}
+        e[r.channel] = (e[r.channel] ?? 0) + Number(r.units)
+        m.set(r.product_id, e)
+      }
+      return m
+    }
+    const ytdChannels        = sumByChannel(ytdActuals)
+    const ytdBudgetByProduct = sumByChannel(ytdBudget)
+    const fyOpeningByProduct = new Map<string, number | null>()
+    for (const s of fyStartCounts ?? []) {
+      if (s.entity_type === 'product') fyOpeningByProduct.set(s.entity_id, s.opening_soh)
+    }
+    productRowsForTab = (products ?? []).map((p) => computeProductRow({
+      product:           { id: p.id, sku_code: p.sku_code, name: p.name, product_type: p.product_type },
+      opening:           fyOpeningByProduct.get(p.id) ?? p.current_soh,
+      budget_by_channel: ytdBudgetByProduct.get(p.id) ?? {},
+      channels:          ytdChannels.get(p.id) ?? {},
+      receipts:          0,
+      counted_eom:       stockThisByEntity.get(p.id)?.counted ?? null,
+    }))
+    productYtdLabel = `${shortMonth(months[0])} – ${shortMonth(month)}`
+  }
 
   return (
     <div className="space-y-5">
@@ -227,6 +276,18 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
         </div>
         {tab !== 'summary' && (
           <div className="flex gap-2 flex-wrap items-end">
+            {tab === 'products' && (
+              <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs self-end">
+                <Link href={`/reporting/budget-vs-actual?fy=${fyStart}&month=${month}&tab=products`}
+                  className={`px-3 py-1.5 font-medium ${productScope === 'month' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>
+                  This month
+                </Link>
+                <Link href={`/reporting/budget-vs-actual?fy=${fyStart}&month=${month}&tab=products&pscope=ytd`}
+                  className={`px-3 py-1.5 font-medium border-l border-gray-300 ${productScope === 'ytd' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>
+                  Year to date
+                </Link>
+              </div>
+            )}
             <MonthSelector fyStart={fyStart} month={month} months={months} tab={tab} />
             {!isLocked && <UploadActualsButton year_month={month} isFyStart={isFyStart} />}
             <LockMonthButton year_month={month} isLocked={isLocked} isAdmin={isAdmin} />
@@ -262,9 +323,11 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
 
       {tab === 'products' && (
         <ProductsTab
-          rows={productRows}
+          rows={productRowsForTab}
           year_month={month}
           isLocked={isLocked}
+          scope={productScope}
+          ytdLabel={productYtdLabel}
         />
       )}
 

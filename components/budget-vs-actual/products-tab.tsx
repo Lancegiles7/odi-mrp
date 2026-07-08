@@ -31,10 +31,12 @@ function sumRows(rows: ProductRow[]) {
 }
 
 export function ProductsTab({
-  rows, year_month, isLocked,
+  rows, year_month, isLocked, scope = 'month', ytdLabel = null,
 }: {
   rows: ProductRow[]; year_month: string; isLocked: boolean
+  scope?: 'month' | 'ytd'; ytdLabel?: string | null
 }) {
+  const isYtd = scope === 'ytd'
   // Group rows by product group, in PRODUCT_GROUPS order; unknown groups last.
   const order = PRODUCT_GROUPS.map((g) => g.value as string)
   const grouped = new Map<string, ProductRow[]>()
@@ -52,6 +54,12 @@ export function ProductsTab({
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      {isYtd && (
+        <div className="px-4 py-2.5 bg-emerald-50/60 border-b border-emerald-100 text-xs text-emerald-900 flex items-center gap-2 flex-wrap">
+          <span className="font-semibold">Year to date{ytdLabel ? ` · ${ytdLabel}` : ''}</span>
+          <span className="text-emerald-800/80">Cumulative sales &amp; budget per product. Opening is the FY-start figure; stock closes at the latest month. Figures are read-only here — switch to <em>This month</em> to edit.</span>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-xs" style={{ minWidth: 2000 }}>
           <thead>
@@ -69,7 +77,7 @@ export function ProductsTab({
             </tr>
             <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
               <th className="text-left px-3 py-2 sticky left-0 bg-gray-50 w-[320px] min-w-[320px] max-w-[320px] z-20">Product</th>
-              <th className="text-right px-2 py-2 w-[80px] sticky left-[320px] bg-gray-50 z-20 border-r-2 border-gray-300" title="Opening SOH for the month">Open</th>
+              <th className="text-right px-2 py-2 w-[80px] sticky left-[320px] bg-gray-50 z-20 border-r-2 border-gray-300" title={isYtd ? 'Opening SOH at the FY start' : 'Opening SOH for the month'}>{isYtd ? 'Open (FY)' : 'Open'}</th>
               <th className="text-right px-2 py-2 w-[80px] bg-blue-50/40">Bud</th>
               <th className="text-right px-2 py-2 w-[80px] bg-emerald-50/40">Act</th>
               <th className="text-right px-2 py-2 w-[80px] bg-blue-50/40">Bud</th>
@@ -105,7 +113,7 @@ export function ProductsTab({
                       {label} <span className="ml-1 normal-case font-normal text-gray-400">{groupRows.length}</span>
                     </td>
                   </tr>
-                  {groupRows.map((r) => <ProductTr key={r.product_id} r={r} year_month={year_month} isLocked={isLocked} />)}
+                  {groupRows.map((r) => <ProductTr key={r.product_id} r={r} year_month={year_month} isLocked={isLocked} isYtd={isYtd} />)}
                   <SummaryRow label={`${label} — subtotal`} s={sumRows(groupRows)} subtle />
                 </Fragment>
               )
@@ -130,7 +138,7 @@ export function ProductsTab({
   )
 }
 
-function ProductTr({ r, year_month, isLocked }: { r: ProductRow; year_month: string; isLocked: boolean }) {
+function ProductTr({ r, year_month, isLocked, isYtd }: { r: ProductRow; year_month: string; isLocked: boolean; isYtd: boolean }) {
   const noActuals = r.total_out === 0 && r.budget_total === 0
   return (
     <tr className="group border-b border-gray-100 hover:bg-gray-50">
@@ -139,19 +147,24 @@ function ProductTr({ r, year_month, isLocked }: { r: ProductRow; year_month: str
         <div className="text-[10px] font-mono text-gray-500">{r.sku}</div>
       </td>
       <td className="px-1 py-1 text-right tabular-nums sticky left-[320px] bg-white group-hover:bg-gray-50 z-10 border-r-2 border-gray-300">
-        <OpeningCellInput entity_id={r.product_id} year_month={year_month} initial={r.opening} isLocked={isLocked} />
+        {isYtd
+          ? <span className="px-1 text-gray-700">{r.opening != null ? r.opening.toLocaleString() : <span className="text-gray-300">—</span>}</span>
+          : <OpeningCellInput entity_id={r.product_id} year_month={year_month} initial={r.opening} isLocked={isLocked} />}
       </td>
       <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40">{cellOrDash(r.budget_by_channel.nz_retail)}</td>
-      <td className="px-1 py-1 bg-emerald-50/40">
-        <ActualCellInput product_id={r.product_id} year_month={year_month} channel="nz_retail" initial={r.channels.nz_retail} isLocked={isLocked} />
+      <td className={isYtd ? 'px-2 py-2 text-right tabular-nums bg-emerald-50/40' : 'px-1 py-1 bg-emerald-50/40'}>
+        {isYtd ? cellOrDash(r.channels.nz_retail)
+          : <ActualCellInput product_id={r.product_id} year_month={year_month} channel="nz_retail" initial={r.channels.nz_retail} isLocked={isLocked} />}
       </td>
       <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40">{cellOrDash(r.budget_by_channel.nz_d2c)}</td>
-      <td className="px-1 py-1 bg-emerald-50/40">
-        <ActualCellInput product_id={r.product_id} year_month={year_month} channel="nz_d2c" initial={r.channels.nz_d2c} isLocked={isLocked} />
+      <td className={isYtd ? 'px-2 py-2 text-right tabular-nums bg-emerald-50/40' : 'px-1 py-1 bg-emerald-50/40'}>
+        {isYtd ? cellOrDash(r.channels.nz_d2c)
+          : <ActualCellInput product_id={r.product_id} year_month={year_month} channel="nz_d2c" initial={r.channels.nz_d2c} isLocked={isLocked} />}
       </td>
       <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40">{cellOrDash(r.budget_by_channel.nz_samples)}</td>
-      <td className="px-1 py-1 bg-purple-50/60">
-        <ActualCellInput product_id={r.product_id} year_month={year_month} channel="nz_samples" initial={r.channels.nz_samples} isLocked={isLocked} />
+      <td className={isYtd ? 'px-2 py-2 text-right tabular-nums bg-purple-50/60' : 'px-1 py-1 bg-purple-50/60'}>
+        {isYtd ? cellOrDash(r.channels.nz_samples)
+          : <ActualCellInput product_id={r.product_id} year_month={year_month} channel="nz_samples" initial={r.channels.nz_samples} isLocked={isLocked} />}
       </td>
       <td className="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
       <td className="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
@@ -168,8 +181,10 @@ function ProductTr({ r, year_month, isLocked }: { r: ProductRow; year_month: str
       <td className="px-2 py-2 text-right tabular-nums bg-amber-50/40 font-medium">
         {r.calc_eom != null ? r.calc_eom.toLocaleString() : <span className="text-gray-300">—</span>}
       </td>
-      <td className="px-2 py-2">
-        <CountedEomInput entity_type="product" entity_id={r.product_id} year_month={year_month} initial={r.counted_eom} isLocked={isLocked} />
+      <td className="px-2 py-2 text-right tabular-nums">
+        {isYtd
+          ? (r.counted_eom != null ? r.counted_eom.toLocaleString() : <span className="text-gray-300">—</span>)
+          : <CountedEomInput entity_type="product" entity_id={r.product_id} year_month={year_month} initial={r.counted_eom} isLocked={isLocked} />}
       </td>
       <td className="px-2 py-2 text-right tabular-nums">
         {r.stock_variance != null
