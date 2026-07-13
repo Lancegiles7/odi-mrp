@@ -50,7 +50,7 @@ export function StockMovementsTable({
                 </th>
               )}
               {forecastMonths.length > 0 && (
-                <th colSpan={forecastMonths.length * 3} className="sticky top-0 z-30 h-7 px-2 text-center text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50/70 border-b border-gray-200 border-l-2 border-amber-300">
+                <th colSpan={forecastMonths.length * 3} className="sticky top-0 z-30 h-7 px-2 text-center text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border-b border-gray-200 border-l-2 border-amber-300">
                   Forecast · plan vs demand
                 </th>
               )}
@@ -82,9 +82,9 @@ export function StockMovementsTable({
               ))}
               {forecastMonths.map((m, i) => (
                 <Fragment key={m}>
-                  <th className={`sticky top-14 z-30 h-6 text-right px-1.5 font-medium text-emerald-700 bg-amber-50/60 ${i === 0 ? 'border-l-2 border-amber-300' : 'border-l border-gray-200'}`}>Prod</th>
-                  <th className="sticky top-14 z-30 h-6 text-right px-1.5 font-medium text-blue-700 bg-amber-50/60">Demand</th>
-                  <th className="sticky top-14 z-30 h-6 text-right px-1.5 font-semibold text-gray-700 bg-amber-50/60 border-r border-gray-200">EOM</th>
+                  <th className={`sticky top-14 z-30 h-6 text-right px-1.5 font-medium text-emerald-700 bg-amber-50 ${i === 0 ? 'border-l-2 border-amber-300' : 'border-l border-gray-200'}`}>Prod</th>
+                  <th className="sticky top-14 z-30 h-6 text-right px-1.5 font-medium text-blue-700 bg-amber-50">Demand</th>
+                  <th className="sticky top-14 z-30 h-6 text-right px-1.5 font-semibold text-gray-700 bg-amber-50 border-r border-gray-200">EOM</th>
                 </Fragment>
               ))}
             </tr>
