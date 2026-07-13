@@ -23,6 +23,7 @@ const REVAL = '/reporting/budget-vs-actual'
 export async function importBvaActuals(formData: FormData): Promise<{
   ok: boolean; error?: string; wrote?: Record<string, number>
   productsMatched?: number; unmatchedSkus?: string[]; unmatchedRetail?: string[]
+  writeoffsImported?: number; writeoffUnits?: number
 }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -107,6 +108,8 @@ export async function importBvaActuals(formData: FormData): Promise<{
       Array.from(paByKey.values()).map((r) => ({ product_id: r.product_id, year_month: yearMonth, channel: r.channel, units: r.units }))
 
     let productsMatched = 0
+    let writeoffsImported = 0
+    let writeoffUnits = 0
     if (paRows.length > 0) {
       const { error: paErr } = await supabase.from('product_actuals')
         .upsert(paRows as never, { onConflict: 'product_id,year_month,channel' })
@@ -155,6 +158,8 @@ export async function importBvaActuals(formData: FormData): Promise<{
         const { error: woErr } = await supabase.from('product_writeoffs')
           .upsert(woUpserts as never, { onConflict: 'product_id,year_month' })
         if (woErr) return { ok: false, error: `Write-off save failed: ${woErr.message}` }
+        writeoffsImported = woUpserts.length
+        writeoffUnits = woUpserts.reduce((s, u) => s + u.units, 0)
       }
     }
 
@@ -165,6 +170,8 @@ export async function importBvaActuals(formData: FormData): Promise<{
       productsMatched,
       unmatchedSkus: Array.from(new Set(unmatchedSkus)),
       unmatchedRetail: pp.unmatchedRetail,
+      writeoffsImported,
+      writeoffUnits,
     }
   } catch (e) {
     return { ok: false, error: `Could not read the files: ${(e as Error).message}` }

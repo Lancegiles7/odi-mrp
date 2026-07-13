@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useRef, useTransition } from 'react'
+import { Fragment, useState, useRef, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { CountedEomInput } from './counted-eom-input'
 import { ActualCellInput, OpeningCellInput } from './actual-cell-input'
@@ -272,6 +272,14 @@ function WriteoffCell({
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
+
+  // Re-sync the shown value when the row's data changes (e.g. after an import
+  // or month switch) — the cell persists across refreshes, so without this the
+  // input keeps its stale value even though the totals update.
+  useEffect(() => {
+    setUnitsVal(units ? String(units) : '')
+    setCommentVal(comment ?? '')
+  }, [units, comment, year_month, product_id])
 
   const hasComment = (comment ?? '').trim().length > 0
 

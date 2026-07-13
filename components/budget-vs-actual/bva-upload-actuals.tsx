@@ -70,6 +70,12 @@ export function BvaUploadActuals({ months, defaultMonth }: { months: MonthOpt[];
                   <div className="text-gray-700 pt-1 border-t border-emerald-100">
                     {done.productsMatched ?? 0} products matched (Products / Ingredients / Packaging tabs updated)
                   </div>
+                  {!!done.writeoffsImported && (
+                    <div className="text-gray-700">
+                      {done.writeoffsImported} write-off {done.writeoffsImported === 1 ? 'entry' : 'entries'} saved
+                      {done.writeoffUnits ? ` (${done.writeoffUnits.toLocaleString()} units)` : ''} — see the Products tab
+                    </div>
+                  )}
                   {!!done.unmatchedSkus?.length && (
                     <div className="text-amber-700">⚠ Unmatched SKUs (ignored): {done.unmatchedSkus.join(', ')}</div>
                   )}
