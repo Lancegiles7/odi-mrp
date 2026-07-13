@@ -38,7 +38,7 @@ export function StockMovementsTable({
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
       <div className="overflow-auto max-h-[calc(100vh-210px)]">
-        <table className="text-xs tabular-nums" style={{ minWidth }}>
+        <table className="text-xs tabular-nums border-separate border-spacing-0" style={{ minWidth }}>
           <thead>
             {/* Zone row (sticky top, h-7 = 28px) */}
             <tr>
@@ -100,7 +100,7 @@ export function StockMovementsTable({
               const gLabel = key === '__other__' ? 'Other' : (PRODUCT_GROUP_LABELS[key] ?? key)
               return (
                 <Fragment key={key}>
-                  <tr className="bg-gray-100/80 border-y border-gray-200">
+                  <tr className="bg-gray-100/80 [&>td]:border-y [&>td]:border-gray-200">
                     <td colSpan={totalCols} className="px-3 py-1.5 sticky left-0 bg-gray-100/80 z-10 text-[11px] font-semibold uppercase tracking-wider text-gray-600">
                       {gLabel} <span className="ml-1 normal-case font-normal text-gray-400">{groupRows.length}</span>
                     </td>
@@ -132,7 +132,7 @@ export function StockMovementsTable({
 
 function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMonths: string[]; forecastMonths: string[] }) {
   return (
-    <tr className="group border-b border-gray-100 hover:bg-gray-50">
+    <tr className="group hover:bg-gray-50 [&>td]:border-b [&>td]:border-gray-100">
       <td className="px-3 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10">
         <div className="font-medium text-gray-900 truncate max-w-[224px]">{r.name}</div>
         <div className="text-[10px] font-mono text-gray-500">{r.sku}</div>
@@ -174,7 +174,7 @@ function SubtotalRow({
     rows.reduce((s, r) => s + (r.actual[m]?.[k] ?? 0), 0)
   const sumF = (m: string, k: 'produced' | 'demand' | 'eom') =>
     rows.reduce((s, r) => s + (r.forecast[m]?.[k] ?? 0), 0)
-  const bg = grand ? 'bg-gray-100 border-t-2 border-gray-300 text-[12px]' : 'bg-gray-50 border-t border-gray-200 text-[11px]'
+  const bg = grand ? 'bg-gray-100 [&>td]:border-t-2 [&>td]:border-gray-300 text-[12px]' : 'bg-gray-50 [&>td]:border-t [&>td]:border-gray-200 text-[11px]'
 
   return (
     <tr className={`${bg} font-semibold text-gray-700`}>
