@@ -37,54 +37,54 @@ export function StockMovementsTable({
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[calc(100vh-210px)]">
         <table className="text-xs tabular-nums" style={{ minWidth }}>
           <thead>
-            {/* Zone row */}
+            {/* Zone row (sticky top, h-7 = 28px) */}
             <tr>
-              <th className="sticky left-0 bg-gray-50 z-20" />
-              <th className="sticky left-[240px] bg-gray-50 z-20 border-r-2 border-gray-300" />
+              <th className="sticky left-0 top-0 z-40 bg-gray-50 h-7" />
+              <th className="sticky left-[240px] top-0 z-40 bg-gray-50 border-r-2 border-gray-300 h-7" />
               {actualMonths.length > 0 && (
-                <th colSpan={actualMonths.length * 4} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border-b border-gray-200">
+                <th colSpan={actualMonths.length * 4} className="sticky top-0 z-30 h-7 px-2 text-center text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border-b border-gray-200">
                   Actual · real movements
                 </th>
               )}
               {forecastMonths.length > 0 && (
-                <th colSpan={forecastMonths.length * 3} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50/70 border-b border-gray-200 border-l-2 border-amber-300">
+                <th colSpan={forecastMonths.length * 3} className="sticky top-0 z-30 h-7 px-2 text-center text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50/70 border-b border-gray-200 border-l-2 border-amber-300">
                   Forecast · plan vs demand
                 </th>
               )}
             </tr>
-            {/* Month row */}
+            {/* Month row (sticky at 28px, h-7) */}
             <tr className="text-[10px] uppercase tracking-wider text-gray-600">
-              <th className="text-left px-3 py-1.5 sticky left-0 bg-gray-100 z-20 w-[240px] min-w-[240px]">Product</th>
-              <th className="text-right px-2 py-1.5 sticky left-[240px] bg-gray-100 z-20 border-r-2 border-gray-300 w-[70px]">Open</th>
+              <th className="text-left px-3 sticky left-0 top-7 z-40 bg-gray-100 w-[240px] min-w-[240px] h-7">Product</th>
+              <th className="text-right px-2 sticky left-[240px] top-7 z-40 bg-gray-100 border-r-2 border-gray-300 w-[70px] h-7">Open</th>
               {actualMonths.map((m) => (
-                <th key={m} colSpan={4} className="px-2 py-1.5 text-center font-semibold bg-gray-100 border-l border-gray-200">{label(m)}</th>
+                <th key={m} colSpan={4} className="sticky top-7 z-30 h-7 px-2 text-center font-semibold bg-gray-100 border-l border-gray-200">{label(m)}</th>
               ))}
               {forecastMonths.map((m, i) => (
-                <th key={m} colSpan={3} className={`px-2 py-1.5 text-center font-semibold bg-amber-50/50 ${i === 0 ? 'border-l-2 border-amber-300' : 'border-l border-gray-200'}`}>
+                <th key={m} colSpan={3} className={`sticky top-7 z-30 h-7 px-2 text-center font-semibold bg-amber-50 ${i === 0 ? 'border-l-2 border-amber-300' : 'border-l border-gray-200'}`}>
                   {label(m)} <span className="text-amber-600 normal-case">· fc</span>
                 </th>
               ))}
             </tr>
-            {/* Column row */}
+            {/* Column row (sticky at 56px, h-6 = 24px) */}
             <tr className="text-[9px] uppercase tracking-wide text-gray-500">
-              <th className="sticky left-0 bg-gray-50 z-20" />
-              <th className="sticky left-[240px] bg-gray-50 z-20 border-r-2 border-gray-300" />
+              <th className="sticky left-0 top-14 z-40 bg-gray-50 h-6" />
+              <th className="sticky left-[240px] top-14 z-40 bg-gray-50 border-r-2 border-gray-300 h-6" />
               {actualMonths.map((m) => (
                 <Fragment key={m}>
-                  <th className="text-right px-1.5 py-1 font-medium text-emerald-700 border-l border-gray-200">In</th>
-                  <th className="text-right px-1.5 py-1 font-medium text-blue-700">Out</th>
-                  <th className="text-right px-1.5 py-1 font-medium text-rose-700">W/off</th>
-                  <th className="text-right px-1.5 py-1 font-semibold text-gray-700 bg-gray-50 border-r border-gray-200">EOM</th>
+                  <th className="sticky top-14 z-30 h-6 text-right px-1.5 font-medium text-emerald-700 bg-white border-l border-gray-200">In</th>
+                  <th className="sticky top-14 z-30 h-6 text-right px-1.5 font-medium text-blue-700 bg-white">Out</th>
+                  <th className="sticky top-14 z-30 h-6 text-right px-1.5 font-medium text-rose-700 bg-white">W/off</th>
+                  <th className="sticky top-14 z-30 h-6 text-right px-1.5 font-semibold text-gray-700 bg-gray-50 border-r border-gray-200">EOM</th>
                 </Fragment>
               ))}
               {forecastMonths.map((m, i) => (
                 <Fragment key={m}>
-                  <th className={`text-right px-1.5 py-1 font-medium text-emerald-700 ${i === 0 ? 'border-l-2 border-amber-300' : 'border-l border-gray-200'}`}>Prod</th>
-                  <th className="text-right px-1.5 py-1 font-medium text-blue-700">Demand</th>
-                  <th className="text-right px-1.5 py-1 font-semibold text-gray-700 bg-amber-50/40 border-r border-gray-200">EOM</th>
+                  <th className={`sticky top-14 z-30 h-6 text-right px-1.5 font-medium text-emerald-700 bg-amber-50/60 ${i === 0 ? 'border-l-2 border-amber-300' : 'border-l border-gray-200'}`}>Prod</th>
+                  <th className="sticky top-14 z-30 h-6 text-right px-1.5 font-medium text-blue-700 bg-amber-50/60">Demand</th>
+                  <th className="sticky top-14 z-30 h-6 text-right px-1.5 font-semibold text-gray-700 bg-amber-50/60 border-r border-gray-200">EOM</th>
                 </Fragment>
               ))}
             </tr>
