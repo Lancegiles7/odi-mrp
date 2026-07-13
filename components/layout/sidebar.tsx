@@ -75,7 +75,6 @@ const NAV_GROUPS = [
   {
     label: 'Inventory',
     items: [
-      { name: 'Stock Levels',    href: '/inventory' },
       { name: 'Stock Movements', href: '/stock-movements' },
     ],
   },
