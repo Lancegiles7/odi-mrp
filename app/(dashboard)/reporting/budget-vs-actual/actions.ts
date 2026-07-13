@@ -9,6 +9,7 @@ import { fyMonths, fyStartFor } from '@/lib/budget-vs-actual'
 import {
   d2cFromShopify, retailFromUpstock, samplesFromSheet,
   actualsToFigureLines, sampleSheetName, perProductUnits, toSystemSku,
+  writeoffsFromTracker,
 } from '@/lib/bva-import'
 
 const REVAL = '/reporting/budget-vs-actual'
@@ -38,7 +39,8 @@ export async function importBvaActuals(formData: FormData): Promise<{
   const shopify = formData.get('shopify') as File | null
   const upstock = formData.get('upstock') as File | null
   const samples = formData.get('samples') as File | null
-  if (!shopify && !upstock && !samples) return { ok: false, error: 'Attach at least one export file' }
+  const writeoffs = formData.get('writeoffs') as File | null
+  if (!shopify && !upstock && !samples && !writeoffs) return { ok: false, error: 'Attach at least one file' }
 
   // raw:true keeps CSV date/number columns as their original strings — otherwise
   // SheetJS coerces "2026-06-26 …" into an Excel serial and month matching fails.
@@ -110,6 +112,50 @@ export async function importBvaActuals(formData: FormData): Promise<{
         .upsert(paRows as never, { onConflict: 'product_id,year_month,channel' })
       if (paErr) return { ok: false, error: `Per-product save failed: ${paErr.message}` }
       productsMatched = new Set(paRows.map((r) => r.product_id)).size
+    }
+
+    // ── Write-offs — wide "Stock Write off Tracker" sheet. Multi-month: each
+    // row carries its own Date (month name), so one upload fills every month in
+    // the sheet. Reason = "Category — Notes". Skips locked months. ────────────
+    if (writeoffs && writeoffs.size > 0) {
+      const wb = XLSX.read(await writeoffs.arrayBuffer(), { type: 'array', raw: true })
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' }) as unknown[][]
+      const fyStartStr = fyStartFor(new Date(yearMonth + 'T00:00:00Z'))
+      const fyMs = fyMonths(fyStartStr)
+      const monthByNum = new Map<number, string>(fyMs.map((m) => [Number(m.slice(5, 7)), m]))
+      const parsed = writeoffsFromTracker(aoa, monthByNum)
+
+      const woSystem = Array.from(new Set(parsed.map((r) => toSystemSku(r.fg))))
+      const { data: woProds } = woSystem.length
+        ? await supabase.from('products').select('id, sku_code').in('sku_code', woSystem) as { data: Array<{ id: string; sku_code: string }> | null }
+        : { data: [] as Array<{ id: string; sku_code: string }> }
+      const woIdBySku = new Map((woProds ?? []).map((p) => [p.sku_code, p.id]))
+
+      // Don't overwrite months that are locked.
+      const { data: woLocks } = await supabase.from('month_locks').select('year_month')
+        .gte('year_month', fyMs[0]).lte('year_month', fyMs[11]) as { data: Array<{ year_month: string }> | null }
+      const lockedSet = new Set((woLocks ?? []).map((l) => String(l.year_month).slice(0, 10)))
+
+      // Accumulate by (product, month): sum units, join distinct reasons.
+      const woAcc = new Map<string, { product_id: string; year_month: string; units: number; reasons: string[] }>()
+      for (const r of parsed) {
+        const id = woIdBySku.get(toSystemSku(r.fg))
+        if (!id) { unmatchedSkus.push(r.fg); continue }
+        if (lockedSet.has(r.year_month)) continue
+        const key = `${id}|${r.year_month}`
+        const e = woAcc.get(key) ?? { product_id: id, year_month: r.year_month, units: 0, reasons: [] }
+        e.units += r.units
+        if (r.reason && !e.reasons.includes(r.reason)) e.reasons.push(r.reason)
+        woAcc.set(key, e)
+      }
+      const woUpserts = Array.from(woAcc.values()).map((e) => ({
+        product_id: e.product_id, year_month: e.year_month, units: e.units, comment: e.reasons.join('; ') || null,
+      }))
+      if (woUpserts.length > 0) {
+        const { error: woErr } = await supabase.from('product_writeoffs')
+          .upsert(woUpserts as never, { onConflict: 'product_id,year_month' })
+        if (woErr) return { ok: false, error: `Write-off save failed: ${woErr.message}` }
+      }
     }
 
     revalidatePath(REVAL)
@@ -307,6 +353,51 @@ export async function setProductActual(input: {
       units:      input.units,
       created_by: createdBy,
     }, { onConflict: 'product_id,year_month,channel' })
+    if (error) return { ok: false, error: error.message }
+  }
+
+  revalidatePath(REVAL)
+  return { ok: true }
+}
+
+// ============================================================
+// setProductWriteoff — units written off + reason, per product/month.
+// Upserts both together so the inline cell and the reason popover never
+// clobber each other (the caller sends the current value of both).
+// Zero units AND no comment clears the row.
+// ============================================================
+export async function setProductWriteoff(input: {
+  product_id: string
+  year_month: string
+  units:      number | null
+  comment:    string | null
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+  const createdBy = profile?.id ?? null
+
+  const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', input.year_month).maybeSingle()
+  if (lock) return { ok: false, error: 'Month is locked.' }
+
+  const units   = input.units != null && Number.isFinite(input.units) ? input.units : 0
+  const comment = input.comment?.trim() || null
+
+  if (units === 0 && !comment) {
+    const { error } = await supabase.from('product_writeoffs').delete()
+      .eq('product_id', input.product_id)
+      .eq('year_month', input.year_month)
+    if (error) return { ok: false, error: error.message }
+  } else {
+    const { error } = await supabase.from('product_writeoffs').upsert({
+      product_id: input.product_id,
+      year_month: input.year_month,
+      units,
+      comment,
+      created_by: createdBy,
+    } as never, { onConflict: 'product_id,year_month' })
     if (error) return { ok: false, error: error.message }
   }
 

@@ -107,15 +107,27 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
   const isLocked   = !!monthLock
   const isFyStart  = month === months[0]
 
-  // ── Summary figures (bva_figures) for the whole FY + FY locks ──
-  const [{ data: figRows }, { data: fyLocks }] = await Promise.all([
+  // ── Summary figures (bva_figures) for the whole FY + FY locks + write-offs ──
+  const [{ data: figRows }, { data: fyLocks }, { data: writeoffFy }] = await Promise.all([
     supabase.from('bva_figures')
       .select('year_month, line_key, budget, actual')
       .gte('year_month', months[0]).lte('year_month', months[11]) as { data: Array<{ year_month: string; line_key: string; budget: number | null; actual: number | null }> | null },
     supabase.from('month_locks')
       .select('year_month')
       .gte('year_month', months[0]).lte('year_month', months[11]) as { data: Array<{ year_month: string }> | null },
+    supabase.from('product_writeoffs')
+      .select('product_id, year_month, units, comment')
+      .gte('year_month', months[0]).lte('year_month', months[11]) as { data: Array<{ product_id: string; year_month: string; units: number; comment: string | null }> | null },
   ])
+
+  // Write-offs indexed by month → product, plus a whole-FY-by-month total for the Summary line.
+  const writeoffByMonthProduct = new Map<string, Map<string, { units: number; comment: string | null }>>()
+  for (const w of writeoffFy ?? []) {
+    const mk = ymKey(w.year_month)!
+    if (!writeoffByMonthProduct.has(mk)) writeoffByMonthProduct.set(mk, new Map())
+    writeoffByMonthProduct.get(mk)!.set(w.product_id, { units: Number(w.units), comment: w.comment })
+  }
+  const writeoffThisMonth = writeoffByMonthProduct.get(month) ?? new Map<string, { units: number; comment: string | null }>()
 
   const lockedSet = new Set((fyLocks ?? []).map((l) => ymKey(l.year_month)!))
   // figures indexed by month → line_key (plain objects to keep iteration simple)
@@ -167,6 +179,14 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
     }
   }
 
+  // Total units written off for the Summary scope (whole YTD, or the one month).
+  const writeoffSummaryMonths = scope === 'ytd' ? months : [scope]
+  let writeoffSummaryUnits = 0
+  for (const m of writeoffSummaryMonths) {
+    const mm = writeoffByMonthProduct.get(m)
+    if (mm) for (const w of Array.from(mm.values())) writeoffSummaryUnits += w.units
+  }
+
   // ── Build product opening map: this month's opening_soh, else current_soh, else prev month's effective EOM ──
   const stockThisByEntity = new Map<string, { opening: number | null; counted: number | null }>()
   for (const s of stockCountsThis ?? []) {
@@ -211,6 +231,8 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
     channels:          channelsByProduct.get(p.id) ?? {},
     receipts:          0,   // TODO Phase 2: fold in PO receipts via stock_movements
     counted_eom:       stockThisByEntity.get(p.id)?.counted ?? null,
+    writeoff:          writeoffThisMonth.get(p.id)?.units ?? 0,
+    writeoff_comment:  writeoffThisMonth.get(p.id)?.comment ?? null,
   }))
 
   // Map: product_id → total_out (used to derive ingredient/packaging consumption).
@@ -252,6 +274,18 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
     for (const s of fyStartCounts ?? []) {
       if (s.entity_type === 'product') fyOpeningByProduct.set(s.entity_id, s.opening_soh)
     }
+    // Sum write-offs Apr→selected month; collect distinct reasons for display.
+    const ytdWriteoff = new Map<string, { units: number; comments: string[] }>()
+    for (const m of months.slice(0, monthIdx + 1)) {
+      const mm = writeoffByMonthProduct.get(m)
+      if (!mm) continue
+      for (const [pid, w] of Array.from(mm.entries())) {
+        const e = ytdWriteoff.get(pid) ?? { units: 0, comments: [] }
+        e.units += w.units
+        if (w.comment && !e.comments.includes(w.comment)) e.comments.push(w.comment)
+        ytdWriteoff.set(pid, e)
+      }
+    }
     productRowsForTab = (products ?? []).map((p) => computeProductRow({
       product:           { id: p.id, sku_code: p.sku_code, name: p.name, product_type: p.product_type },
       opening:           fyOpeningByProduct.get(p.id) ?? p.current_soh,
@@ -259,6 +293,8 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
       channels:          ytdChannels.get(p.id) ?? {},
       receipts:          0,
       counted_eom:       stockThisByEntity.get(p.id)?.counted ?? null,
+      writeoff:          ytdWriteoff.get(p.id)?.units ?? 0,
+      writeoff_comment:  ytdWriteoff.get(p.id)?.comments.join('; ') || null,
     }))
     productYtdLabel = `${shortMonth(months[0])} – ${shortMonth(month)}`
   }
@@ -315,6 +351,7 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
           scope={scope}
           months={summaryMonths}
           figures={summaryFigures}
+          writeoffUnits={writeoffSummaryUnits}
           proRata={proRata}
           proRataOn={proRataOn}
           isCurrentMonthScope={isCurrentMonthScope}

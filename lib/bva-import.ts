@@ -285,6 +285,46 @@ export function perProductUnits(shopify: Row[], upstock: Row[], samplesAoa: unkn
   return { d2c, retail, samples, unmatchedRetail: Array.from(unmatched) }
 }
 
+const MONTH_NUM: Record<string, number> = {
+  january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4,
+  may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8,
+  september: 9, sep: 9, sept: 9, october: 10, oct: 10, november: 11, nov: 11,
+  december: 12, dec: 12,
+}
+
+/**
+ * Parse the wide "Stock Write off Tracker" sheet into per-row write-offs.
+ * Layout: [Date(month name), SKU, Category, Notes, …one column per product].
+ * The quantity sits in the product's own column, so units = sum of the numeric
+ * quantity columns (cols 4+) for that row. Each row's month is mapped to a FY
+ * month key via `monthByNum` (month number → 'YYYY-MM-01'), so one upload can
+ * cover several months. Non-data rows (title, headers, unit-cost) are skipped.
+ */
+export function writeoffsFromTracker(
+  aoa: unknown[][],
+  monthByNum: Map<number, string>,
+): Array<{ year_month: string; fg: string; units: number; reason: string }> {
+  const out: Array<{ year_month: string; fg: string; units: number; reason: string }> = []
+  for (const row of aoa) {
+    if (!row || row.length < 5) continue
+    const mNum = MONTH_NUM[str(row[0]).toLowerCase()]
+    if (!mNum) continue                                   // not a data row
+    const ym = monthByNum.get(mNum)
+    if (!ym) continue                                     // month outside this FY
+    const fg = str(row[1])
+    if (!fg.toUpperCase().startsWith('FG-')) continue     // needs a real SKU
+    let units = 0
+    for (let c = 4; c < row.length; c++) {
+      const v = Number(str(row[c]).replace(/[, ]/g, ''))
+      if (Number.isFinite(v)) units += v
+    }
+    if (units <= 0) continue
+    const reason = [str(row[2]), str(row[3])].filter(Boolean).join(' — ')  // Category — Notes
+    out.push({ year_month: ym, fg, units, reason })
+  }
+  return out
+}
+
 /** "2026-07-01" → "July 2026" (sample tracker sheet name). */
 export function sampleSheetName(yearMonth: string): string {
   const [y, m] = yearMonth.split('-').map(Number)

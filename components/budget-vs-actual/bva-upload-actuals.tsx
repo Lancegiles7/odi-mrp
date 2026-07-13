@@ -54,6 +54,7 @@ export function BvaUploadActuals({ months, defaultMonth }: { months: MonthOpt[];
               <FileField name="shopify" label="D2C · Shopify orders export" hint=".csv" />
               <FileField name="upstock" label="Retail · Upstock orders export" hint=".csv · pouches counted ×6" />
               <FileField name="samples" label="Samples · tracker" hint=".xlsx · reads the month sheet's MONTHLY TOTAL" />
+              <FileField name="writeoffs" label="Write-offs · tracker (optional)" hint=".xlsx · Stock Write off Tracker · fills every month in the sheet" />
 
               {error && <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">{error}</div>}
 

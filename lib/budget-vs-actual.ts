@@ -199,6 +199,10 @@ export interface ProductRow {
   channels: Record<Channel, number>
   total_out: number
   total_sales: number   // (retail + d2c) NZ + AU
+  /** Units written off this period (non-sales stock loss). Reduces calc EOM. */
+  writeoff: number
+  /** Reason for the write-off (free text). */
+  writeoff_comment: string | null
   receipts: number
   calc_eom: number | null
   counted_eom: number | null
@@ -228,15 +232,21 @@ export function computeProductRow(input: {
   channels:  Partial<Record<Channel, number>>
   receipts:  number
   counted_eom: number | null
+  writeoff?: number
+  writeoff_comment?: string | null
 }): ProductRow {
   const budgetFull   = fillChannels(input.budget_by_channel)
   const channelsFull = fillChannels(input.channels)
+  const writeoff     = input.writeoff ?? 0
 
   const budget_total = Object.values(budgetFull).reduce((s, v) => s + v, 0)
   const budget_sales = SALES_CHANNELS.reduce((s, c) => s + budgetFull[c], 0)
   const total_out    = Object.values(channelsFull).reduce((s, v) => s + v, 0)
   const total_sales  = SALES_CHANNELS.reduce((s, c) => s + channelsFull[c], 0)
-  const calc_eom     = input.opening != null ? input.opening + input.receipts - total_out : null
+  // Write-offs are stock leaving for a non-sales reason: they don't touch
+  // total_out (which drives ingredient/packaging consumption) but they DO
+  // reduce the calculated closing stock.
+  const calc_eom     = input.opening != null ? input.opening + input.receipts - total_out - writeoff : null
   const effective_eom = input.counted_eom ?? calc_eom
   const stock_variance = input.counted_eom != null && calc_eom != null
     ? input.counted_eom - calc_eom
@@ -254,6 +264,8 @@ export function computeProductRow(input: {
     channels:   channelsFull,
     total_out,
     total_sales,
+    writeoff,
+    writeoff_comment: input.writeoff_comment ?? null,
     receipts:   input.receipts,
     calc_eom,
     counted_eom: input.counted_eom,

@@ -1,9 +1,11 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useRef, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { CountedEomInput } from './counted-eom-input'
 import { ActualCellInput, OpeningCellInput } from './actual-cell-input'
 import { varBadgeClass, type ProductRow } from '@/lib/budget-vs-actual'
+import { setProductWriteoff } from '@/app/(dashboard)/reporting/budget-vs-actual/actions'
 import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
 
 type Sums = ReturnType<typeof sumRows>
@@ -20,13 +22,14 @@ function sumRows(rows: ProductRow[]) {
       retail:      acc.retail      + r.channels.nz_retail,
       d2c:         acc.d2c         + r.channels.nz_d2c,
       samples:     acc.samples     + r.channels.nz_samples,
+      writeoff:    acc.writeoff    + (r.writeoff ?? 0),
       total_out:   acc.total_out   + r.total_out,
       total_sales: acc.total_sales + r.total_sales,
       calc_eom:    acc.calc_eom    + (r.calc_eom ?? 0),
       counted_eom: acc.counted_eom + (r.counted_eom ?? 0),
     }),
     { opening: 0, bud_retail: 0, bud_d2c: 0, bud_samples: 0, bud_total: 0, bud_sales: 0,
-      retail: 0, d2c: 0, samples: 0, total_out: 0, total_sales: 0, calc_eom: 0, counted_eom: 0 },
+      retail: 0, d2c: 0, samples: 0, writeoff: 0, total_out: 0, total_sales: 0, calc_eom: 0, counted_eom: 0 },
   )
 }
 
@@ -72,6 +75,7 @@ export function ProductsTab({
               <th colSpan={2} className="px-2 py-1 text-center border-r border-gray-200 bg-emerald-50/40">NZ Retail</th>
               <th colSpan={2} className="px-2 py-1 text-center border-r border-gray-200 bg-emerald-50/40">NZ D2C</th>
               <th colSpan={2} className="px-2 py-1 text-center border-r border-gray-200 bg-purple-50/60">NZ Pipefill / Samples</th>
+              <th className="px-2 py-1 text-center border-r border-gray-200 bg-rose-50/60">Write-off</th>
               <th colSpan={2} className="px-2 py-1 text-center border-r border-gray-200 bg-gray-100 text-gray-400">AU (soon)</th>
               <th colSpan={2} className="px-2 py-1 text-center border-r border-gray-200 bg-emerald-50">Total</th>
               <th colSpan={2} className="px-2 py-1 text-center border-r border-gray-200">Variance</th>
@@ -86,6 +90,7 @@ export function ProductsTab({
               <th className="text-right px-2 py-2 w-[80px] bg-emerald-50/40">Act</th>
               <th className="text-right px-2 py-2 w-[80px] bg-blue-50/40" title="Budget pipefill (covers samples + buffer)">Bud</th>
               <th className="text-right px-2 py-2 w-[80px] bg-purple-50/60">Act</th>
+              <th className="text-right px-2 py-2 w-[110px] bg-rose-50/60" title="Units written off — click ✎ to add the reason">Units · why</th>
               <th className="text-right px-2 py-2 w-[80px] bg-gray-100 text-gray-400">Bud</th>
               <th className="text-right px-2 py-2 w-[80px] bg-gray-100 text-gray-400">Act</th>
               <th className="text-right px-2 py-2 w-[90px] bg-blue-50/40">Bud total</th>
@@ -100,7 +105,7 @@ export function ProductsTab({
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={17} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={18} className="px-4 py-8 text-center text-sm text-gray-500">
                   No products yet. Add products under <em>Planning → Products / BOMs</em>.
                 </td>
               </tr>
@@ -111,7 +116,7 @@ export function ProductsTab({
               return (
                 <Fragment key={key}>
                   <tr className="bg-gray-100/80 border-y border-gray-200">
-                    <td colSpan={17} className="px-3 py-1.5 sticky left-0 bg-gray-100/80 z-10 text-[11px] font-semibold uppercase tracking-wider text-gray-600">
+                    <td colSpan={18} className="px-3 py-1.5 sticky left-0 bg-gray-100/80 z-10 text-[11px] font-semibold uppercase tracking-wider text-gray-600">
                       {label} <span className="ml-1 normal-case font-normal text-gray-400">{groupRows.length}</span>
                     </td>
                   </tr>
@@ -168,6 +173,13 @@ function ProductTr({ r, year_month, isLocked, isYtd }: { r: ProductRow; year_mon
         {isYtd ? cellOrDash(r.channels.nz_samples)
           : <ActualCellInput product_id={r.product_id} year_month={year_month} channel="nz_samples" initial={r.channels.nz_samples} isLocked={isLocked} />}
       </td>
+      <td className={isYtd ? 'px-2 py-2 bg-rose-50/60' : 'px-1 py-1 bg-rose-50/60'}>
+        <WriteoffCell
+          product_id={r.product_id} year_month={year_month}
+          units={r.writeoff} comment={r.writeoff_comment} name={r.name}
+          isLocked={isLocked} readOnly={isYtd}
+        />
+      </td>
       <td className="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
       <td className="px-2 py-2 text-right tabular-nums bg-gray-50 text-gray-300">—</td>
       <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40 font-medium">{r.budget_total > 0 ? r.budget_total.toLocaleString() : <span className="text-gray-300">—</span>}</td>
@@ -209,6 +221,7 @@ function SummaryRow({ label, s, subtle = false }: { label: string; s: Sums; subt
       <td className="px-2 py-2 text-right tabular-nums bg-emerald-50/40 font-semibold">{s.d2c.toLocaleString()}</td>
       <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40 font-semibold">{s.bud_samples.toLocaleString()}</td>
       <td className="px-2 py-2 text-right tabular-nums bg-purple-50/60 font-semibold">{s.samples.toLocaleString()}</td>
+      <td className="px-2 py-2 text-right tabular-nums bg-rose-50/60 font-semibold">{s.writeoff > 0 ? s.writeoff.toLocaleString() : <span className="text-gray-300">—</span>}</td>
       <td colSpan={2} className="px-2 py-2 text-right tabular-nums bg-gray-100 text-gray-300">—</td>
       <td className="px-2 py-2 text-right tabular-nums bg-blue-50/40 font-semibold">{s.bud_total.toLocaleString()}</td>
       <td className="px-2 py-2 text-right tabular-nums bg-emerald-50 font-semibold">{s.total_out.toLocaleString()}</td>
@@ -238,6 +251,101 @@ function VarBadge({ actual, budget }: { actual: number; budget: number }) {
 
 function KeySwatch({ className }: { className: string }) {
   return <span className={`mt-0.5 w-3.5 h-3.5 rounded border border-black/5 shrink-0 ${className}`} />
+}
+
+/**
+ * Write-off cell: units input + a ✎ popover for the reason. Units and reason
+ * are always saved together so neither clobbers the other. Read-only in YTD
+ * (shows the cumulative units and reasons).
+ */
+function WriteoffCell({
+  product_id, year_month, units, comment, name, isLocked, readOnly,
+}: {
+  product_id: string; year_month: string; units: number; comment: string | null
+  name: string; isLocked: boolean; readOnly: boolean
+}) {
+  const router = useRouter()
+  const [unitsVal, setUnitsVal] = useState<string>(units ? String(units) : '')
+  const [commentVal, setCommentVal] = useState<string>(comment ?? '')
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
+  const [pending, start] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  const hasComment = (comment ?? '').trim().length > 0
+
+  function persist(nextUnits: string, nextComment: string) {
+    if (isLocked || readOnly) return
+    const u = nextUnits.trim() === '' ? 0 : Number(nextUnits)
+    if (!Number.isFinite(u)) { setError('Invalid'); return }
+    if ((u || 0) === (units || 0) && nextComment.trim() === (comment ?? '').trim()) return  // no change
+    setError(null)
+    start(async () => {
+      const res = await setProductWriteoff({ product_id, year_month, units: u, comment: nextComment.trim() || null })
+      if (!res.ok) { setError(res.error ?? 'Save failed'); return }
+      router.refresh()
+    })
+  }
+
+  function openPopover() {
+    const r = btnRef.current?.getBoundingClientRect()
+    if (r) setPos({ top: r.bottom + 4, left: Math.max(8, r.right - 272) })
+    setOpen(true)
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      {readOnly
+        ? <span className="text-right tabular-nums text-rose-800 font-medium px-1">{units > 0 ? units.toLocaleString() : <span className="text-gray-300">—</span>}</span>
+        : <input
+            type="number" step="any" min={0}
+            value={unitsVal}
+            onChange={(e) => setUnitsVal(e.target.value)}
+            onBlur={() => persist(unitsVal, commentVal)}
+            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+            disabled={isLocked || pending}
+            placeholder={isLocked ? '—' : '0'}
+            className={`w-14 text-right text-xs border rounded px-1.5 py-1 tabular-nums ${error ? 'border-red-300 bg-red-50' : 'border-gray-200'} ${isLocked ? 'bg-gray-50 text-gray-400' : 'bg-white'}`}
+          />}
+      {(!readOnly || hasComment) && (
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={() => (open ? setOpen(false) : openPopover())}
+          title={hasComment ? 'View / edit reason' : 'Add reason'}
+          aria-label={hasComment ? 'View or edit write-off reason' : 'Add write-off reason'}
+          className={`relative w-5 h-5 shrink-0 rounded border inline-flex items-center justify-center text-[10px] ${hasComment ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-700'}`}
+        >
+          ✎{hasComment && <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-rose-500" />}
+        </button>
+      )}
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden="true" />
+          <div style={{ position: 'fixed', top: pos.top, left: pos.left }}
+            className="z-50 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-left">
+            <div className="text-[11px] font-semibold text-gray-700 mb-1.5">Why written off — {name}</div>
+            <textarea
+              value={commentVal}
+              onChange={(e) => setCommentVal(e.target.value)}
+              disabled={readOnly || isLocked}
+              placeholder={readOnly ? 'No reason recorded.' : 'e.g. Damaged in transit — insurance claim lodged'}
+              className="w-full text-xs border border-gray-200 rounded p-2 min-h-[64px] resize-y disabled:bg-gray-50 disabled:text-gray-600"
+            />
+            <div className="flex justify-end gap-2 mt-2">
+              <button type="button" onClick={() => setOpen(false)} className="text-[11px] font-medium px-2.5 py-1 rounded border border-gray-200 hover:bg-gray-50">Close</button>
+              {!readOnly && !isLocked && (
+                <button type="button" onClick={() => { persist(unitsVal, commentVal); setOpen(false) }}
+                  className="text-[11px] font-medium px-2.5 py-1 rounded bg-gray-900 text-white hover:bg-gray-800">Save</button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+      {error && <span className="text-[9px] text-red-600">{error}</span>}
+    </div>
+  )
 }
 
 /** Click-to-open key explaining what the variance badge colours mean. */

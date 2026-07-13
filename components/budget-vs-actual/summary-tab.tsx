@@ -14,6 +14,7 @@ interface Props {
   scope: string            // 'ytd' or a month key (YYYY-MM-01)
   months: MonthOpt[]
   figures: FigureMap       // aggregated for the active scope (budget already pro-rated if applicable)
+  writeoffUnits: number    // total units written off across the active scope
   proRata: { factor: number; daysElapsed: number; daysInMonth: number } | null
   proRataOn: boolean
   isCurrentMonthScope: boolean
@@ -23,7 +24,7 @@ function f(map: FigureMap, key: string) {
   return map[key] ?? { budget: null, actual: null }
 }
 
-export function SummaryTab({ fyStart, scope, months, figures, proRata, proRataOn, isCurrentMonthScope }: Props) {
+export function SummaryTab({ fyStart, scope, months, figures, writeoffUnits, proRata, proRataOn, isCurrentMonthScope }: Props) {
   const router = useRouter()
   function go(nextScope: string, prorata = proRataOn) {
     const p = new URLSearchParams({ fy: fyStart, tab: 'summary', scope: nextScope })
@@ -93,6 +94,11 @@ export function SummaryTab({ fyStart, scope, months, figures, proRata, proRataOn
         subtitle="Indicative — budget from the FY27 Units tab; actual grouped from Shopify + Upstock (retail pouches ×6). Cross-channel SKU mapping not yet applied."
       >
         {SUMMARY_GROUPS.map((g) => <Row key={g.key} label={g.label} pair={f(figures, g.key)} />)}
+      </Panel>
+
+      {/* Write-offs */}
+      <Panel title="Write-offs" subtitle="Units of finished product written off — reasons are recorded per product on the Products tab.">
+        <Row label="Units written off" pair={{ budget: null, actual: writeoffUnits }} strong />
       </Panel>
     </div>
   )
