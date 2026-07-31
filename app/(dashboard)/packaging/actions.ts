@@ -429,6 +429,7 @@ export async function setPackagingProducts(input: {
   packaging_id: string
   rows: Array<{
     product_id: string
+    market?: 'NZ' | 'AU'
     entry_mode?: EntryMode
     entry_value?: number
     quantity_per_unit?: number
@@ -461,6 +462,7 @@ export async function setPackagingProducts(input: {
     .map((x) => ({
       product_id:        x.row.product_id,
       packaging_id:      input.packaging_id,
+      market:            x.row.market === 'AU' ? 'AU' : 'NZ',
       quantity_per_unit: x.qty,
       entry_mode:        x.mode,
       entry_value:       x.value,
@@ -478,8 +480,11 @@ export async function setPackagingProducts(input: {
     ...(priorLinks ?? []).map((l) => l.product_id),
     ...inserts.map((r) => r.product_id),
   ])
+  // Recompute both builds — a packaging link can belong to the NZ or AU BOM,
+  // and each writes to its own cost column (packaging / packaging_au).
   for (const pid of productIds) {
-    await recomputeProductPackagingCost(supabase, pid)
+    await recomputeProductPackagingCost(supabase, pid, 'NZ')
+    await recomputeProductPackagingCost(supabase, pid, 'AU')
   }
 
   revalidatePath(`/packaging/${input.packaging_id}`)

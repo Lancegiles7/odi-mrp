@@ -14,6 +14,7 @@ interface ProductOption {
 
 interface BomRow {
   product_id: string
+  market: 'NZ' | 'AU'
   entry_mode: EntryMode
   entry_value: number
   include_in_cost: boolean
@@ -49,7 +50,7 @@ export function PackagingProductsBom({ packagingId, packagingName, loadedCostNzd
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { product_id: '', entry_mode: 'per_pack', entry_value: 1, include_in_cost: true, notes: null }])
+    setRows((prev) => [...prev, { product_id: '', market: 'NZ', entry_mode: 'per_pack', entry_value: 1, include_in_cost: true, notes: null }])
   }
 
   function removeRow(idx: number) {
@@ -61,11 +62,12 @@ export function PackagingProductsBom({ packagingId, packagingName, loadedCostNzd
     const seen = new Set<string>()
     for (const r of rows) {
       if (!r.product_id) continue
-      if (seen.has(r.product_id)) {
-        setError('Each product can only appear once. Combine the rows.')
+      const key = `${r.product_id}|${r.market}`
+      if (seen.has(key)) {
+        setError('Each product can only appear once per build (NZ / AU). Combine the rows.')
         return
       }
-      seen.add(r.product_id)
+      seen.add(key)
     }
     start(async () => {
       const filtered = rows.filter((r) => r.product_id && r.entry_value > 0)
@@ -73,6 +75,7 @@ export function PackagingProductsBom({ packagingId, packagingName, loadedCostNzd
         packaging_id: packagingId,
         rows: filtered.map((r) => ({
           product_id:      r.product_id,
+          market:          r.market,
           entry_mode:      r.entry_mode,
           entry_value:     r.entry_value,
           include_in_cost: r.include_in_cost,
@@ -103,6 +106,7 @@ export function PackagingProductsBom({ packagingId, packagingName, loadedCostNzd
         <thead>
           <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
             <th className="text-left px-3 py-2">Product</th>
+            <th className="text-left px-3 py-2 w-[90px]" title="Which build this link belongs to — NZ (Brand Nation) or AU (VMC)">Build</th>
             <th className="text-right px-3 py-2 w-[80px]">Qty</th>
             <th className="text-left px-3 py-2 w-[180px]">Mode</th>
             <th className="text-center px-3 py-2 w-[80px]" title="Include this packaging in the product's BOM cost calculation">In&nbsp;cost?</th>
@@ -112,7 +116,7 @@ export function PackagingProductsBom({ packagingId, packagingName, loadedCostNzd
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-3 py-4 text-center text-xs text-gray-400">
+              <td colSpan={6} className="px-3 py-4 text-center text-xs text-gray-400">
                 Not on any product&rsquo;s BOM yet. Click &ldquo;Add product&rdquo; to link one.
               </td>
             </tr>
@@ -141,6 +145,19 @@ export function PackagingProductsBom({ packagingId, packagingName, loadedCostNzd
                       Open product →
                     </Link>
                   )}
+                </td>
+                <td className="px-3 py-1.5">
+                  <select
+                    value={r.market}
+                    onChange={(e) => update(i, { market: e.target.value as 'NZ' | 'AU' })}
+                    title="NZ = Brand Nation build · AU = VMC build"
+                    className={`w-full text-xs font-semibold border rounded px-1.5 py-1 ${
+                      r.market === 'AU' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-indigo-200 bg-indigo-50 text-indigo-800'
+                    }`}
+                  >
+                    <option value="NZ">NZ</option>
+                    <option value="AU">AU</option>
+                  </select>
                 </td>
                 <td className="px-3 py-1.5">
                   <input
