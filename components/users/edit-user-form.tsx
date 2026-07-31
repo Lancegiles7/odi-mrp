@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateUser, resendInvite, hardDeleteUser } from '@/app/(dashboard)/settings/users/actions'
+import { updateUser, resendInvite, hardDeleteUser, setUserPassword } from '@/app/(dashboard)/settings/users/actions'
 import { UserAvatar } from '@/components/users/user-avatar'
 import { ROLES } from '@/lib/constants'
 
@@ -60,10 +60,33 @@ export function EditUserForm({
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [error,   setError]   = useState<string | null>(initialError)
+  const [error,   setError]   = useState<string | null>(initialError ?? null)
   const [info,    setInfo]    = useState<string | null>(savedAt ? 'Saved.' : null)
 
   const isSelf = userId === currentUserId
+  const [tempPw, setTempPw] = useState('')
+
+  function genPassword(): string {
+    // Readable random password (no ambiguous chars) with a digit + symbol so
+    // it satisfies common strength policies.
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+    const arr = new Uint32Array(12)
+    window.crypto.getRandomValues(arr)
+    let out = ''
+    for (let i = 0; i < arr.length; i++) out += chars[arr[i] % chars.length]
+    return `${out}-7x`
+  }
+
+  function onSetPassword() {
+    const pw = tempPw.trim()
+    if (pw.length < 8) { setError('Password must be at least 8 characters.'); setInfo(null); return }
+    setError(null); setInfo(null)
+    start(async () => {
+      const res = await setUserPassword(userId, pw)
+      if (!res.ok) { setError(res.error ?? 'Failed to set password'); return }
+      setInfo(`Temporary password set for ${initial.full_name}. Share it with them — they sign in at the login page with their email + this password, then can change it.`)
+    })
+  }
 
   function onSave(formData: FormData) {
     setError(null); setInfo(null)
@@ -180,13 +203,6 @@ export function EditUserForm({
           <span className="text-gray-400">— inactive users can&rsquo;t sign in but their history is preserved</span>
         </label>
 
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-xs text-red-700 whitespace-pre-line">{error}</div>
-        )}
-        {info && !error && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md text-xs text-emerald-800">{info}</div>
-        )}
-
         <div className="flex justify-between pt-3 border-t border-gray-100">
           {initial.invite_pending ? (
             <button
@@ -210,6 +226,49 @@ export function EditUserForm({
           </div>
         </div>
       </form>
+
+      {/* Shared feedback for the profile form + the password / danger actions. */}
+      {error && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-xs text-red-700 whitespace-pre-line">{error}</div>
+      )}
+      {info && !error && (
+        <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-md text-xs text-emerald-800">{info}</div>
+      )}
+
+      {/* Set a temporary password — bypasses the invite email entirely. */}
+      <div className="mt-6 pt-4 border-t border-gray-100">
+        <div className="text-xs font-semibold text-gray-700 mb-1">Set a temporary password</div>
+        <p className="text-[11px] text-gray-500 mb-3">
+          Skips the invite email. Sets a password and confirms the account so they can sign in at the login page straight away — then change it once they&rsquo;re in.
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            value={tempPw}
+            onChange={(e) => setTempPw(e.target.value)}
+            placeholder="At least 8 characters"
+            autoComplete="off"
+            spellCheck={false}
+            className="border border-gray-300 rounded-md px-2 py-1.5 text-sm font-mono w-60"
+          />
+          <button
+            type="button"
+            onClick={() => setTempPw(genPassword())}
+            className="px-2.5 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Generate
+          </button>
+          <button
+            type="button"
+            onClick={onSetPassword}
+            disabled={pending || tempPw.trim().length < 8}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-700 rounded-md hover:bg-emerald-800 disabled:opacity-50"
+          >
+            {pending ? 'Setting…' : 'Set password'}
+          </button>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-2">Copy the password before you leave this page — it isn&rsquo;t stored anywhere to read back.</p>
+      </div>
 
       {/* Danger zone — only for other users */}
       {!isSelf && (
