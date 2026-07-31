@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { POForm } from '@/components/purchase-orders/po-form'
 import { ReceiptHistory } from '@/components/purchase-orders/receipt-history'
+import { CorrectReceipts } from '@/components/purchase-orders/correct-receipts'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
 import { getAppSettings } from '@/lib/settings'
 
@@ -28,11 +29,11 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         notes: string | null; market: string | null; external_notes: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
-      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes, supplier_code, supplier_pack_size')
+      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, quantity_received, unit_cost, unit_of_measure, notes, supplier_code, supplier_pack_size')
       .eq('purchase_order_id', params.id)
       .order('created_at') as unknown as Promise<{ data: Array<{
         id: string; ingredient_id: string | null; product_id: string | null; packaging_id: string | null;
-        description: string | null; quantity_ordered: number; unit_cost: number | null;
+        description: string | null; quantity_ordered: number; quantity_received: number; unit_cost: number | null;
         unit_of_measure: string; notes: string | null; supplier_code: string | null; supplier_pack_size: number | null;
       }> | null }>,
     supabase.from('suppliers')
@@ -68,6 +69,33 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
 
   const settings = await getAppSettings()
   const fxRate = Number(settings.fx_rates?.AUD) || 1.2
+
+  // Correction tool: which lines already moved warehouse stock (ingredient /
+  // packaging receipts) — those are locked from adjustment.
+  const lineIdList = (lines ?? []).map((l) => l.id)
+  const { data: recMoves } = await supabase
+    .from('stock_movements').select('purchase_order_line_id')
+    .in('purchase_order_line_id', lineIdList.length ? lineIdList : ['00000000-0000-0000-0000-000000000000']) as
+    { data: Array<{ purchase_order_line_id: string | null }> | null }
+  const movedLines = new Set((recMoves ?? []).map((m) => m.purchase_order_line_id))
+
+  const ingById  = new Map((ingredients ?? []).map((i) => [i.id, i]))
+  const prodById = new Map((products ?? []).map((p) => [p.id, p]))
+  const pakById  = new Map((packaging ?? []).map((p) => [p.id, p]))
+  const correctionRows = (lines ?? []).map((l) => {
+    const item = l.ingredient_id ? ingById.get(l.ingredient_id)
+      : l.product_id ? prodById.get(l.product_id)
+      : l.packaging_id ? pakById.get(l.packaging_id) : null
+    return {
+      line_id:  l.id,
+      label:    item?.name ?? l.description ?? '—',
+      sku:      item?.sku_code ?? null,
+      ordered:  Number(l.quantity_ordered),
+      received: Number(l.quantity_received ?? 0),
+      locked:   movedLines.has(l.id),
+    }
+  })
+  const showCorrect = ['submitted', 'partially_received', 'received'].includes(po.status)
 
   const initialLines: POLineInput[] = (lines ?? []).map((l) => ({
     id: l.id,
@@ -115,6 +143,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       issuers={issuers ?? []}
       companies={companies ?? []}
       />
+      {showCorrect && <CorrectReceipts poId={po.id} rows={correctionRows} />}
       <ReceiptHistory poId={po.id} />
     </div>
   )
