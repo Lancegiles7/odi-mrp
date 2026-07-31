@@ -173,6 +173,36 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean; error
 }
 
 // ────────────────────────────────────────────────────────────
+// Set a temporary password (admin) — bypasses the invite email.
+// Sets the password on the user's auth record AND confirms their email,
+// so an invited-but-never-verified user can sign in immediately at
+// /login. Share the temp password out-of-band; they can change it after
+// signing in.
+// ────────────────────────────────────────────────────────────
+export async function setUserPassword(
+  userId: string,
+  password: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin()
+  if (!userId) return { ok: false, error: 'Missing user id' }
+  const pw = (password ?? '').trim()
+  if (pw.length < 8) return { ok: false, error: 'Password must be at least 8 characters.' }
+
+  let admin
+  try { admin = createAdminClient() }
+  catch (e) { return { ok: false, error: (e as Error).message } }
+
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    password:      pw,
+    email_confirm: true,   // confirm the account so an un-verified invite can sign in
+  })
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath(`/settings/users/${userId}`)
+  return { ok: true }
+}
+
+// ────────────────────────────────────────────────────────────
 // Hard-delete a user (only if no records reference them)
 // ────────────────────────────────────────────────────────────
 const TABLES_WITH_CREATED_BY = [
