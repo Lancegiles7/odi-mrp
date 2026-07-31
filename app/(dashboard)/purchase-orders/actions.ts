@@ -494,6 +494,70 @@ export async function receivePoLines(input: {
 }
 
 // ============================================================
+// Correct received quantities — fix a mis-keyed receipt in-app,
+// without a manual DB reset. Product / 'other' lines can be set to any
+// value 0..ordered (they don't move inventory). Ingredient / packaging
+// lines that already created a stock movement are LOCKED here — those
+// have adjusted on-hand stock, so they're left untouched and reported
+// back (reverse via a stock adjustment instead). Recomputes PO status
+// so the Receive screen reopens if anything drops below ordered.
+// ============================================================
+export async function correctReceivedQuantities(input: {
+  po_id: string
+  corrections: Array<{ line_id: string; quantity_received: number }>
+}): Promise<{ ok: boolean; error?: string; skipped?: string[] }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not_authenticated' }
+
+  const { data: lines } = await supabase
+    .from('purchase_order_lines')
+    .select('id, ingredient_id, packaging_id, product_id, description, quantity_ordered')
+    .eq('purchase_order_id', input.po_id) as { data: Array<{
+      id: string; ingredient_id: string | null; packaging_id: string | null; product_id: string | null;
+      description: string | null; quantity_ordered: number
+    }> | null }
+  if (!lines) return { ok: false, error: 'PO lines not found' }
+
+  // Lines that already moved inventory can't be corrected from here.
+  const lineIds = lines.map((l) => l.id)
+  const { data: movements } = await supabase
+    .from('stock_movements')
+    .select('purchase_order_line_id')
+    .in('purchase_order_line_id', lineIds.length ? lineIds : ['00000000-0000-0000-0000-000000000000']) as
+    { data: Array<{ purchase_order_line_id: string | null }> | null }
+  const moved = new Set((movements ?? []).map((m) => m.purchase_order_line_id))
+
+  const skipped: string[] = []
+  for (const c of input.corrections) {
+    const line = lines.find((l) => l.id === c.line_id)
+    if (!line) continue
+    if (moved.has(line.id)) { skipped.push(line.description ?? line.id); continue }
+    const qty = Math.max(0, Math.min(Number(line.quantity_ordered), Math.round(Number(c.quantity_received) || 0)))
+    const { error } = await supabase
+      .from('purchase_order_lines').update({ quantity_received: qty }).eq('id', line.id)
+    if (error) return { ok: false, error: error.message }
+  }
+
+  // Recompute status from the corrected quantities.
+  const { data: refreshed } = await supabase
+    .from('purchase_order_lines')
+    .select('quantity_ordered, quantity_received')
+    .eq('purchase_order_id', input.po_id) as { data: Array<{ quantity_ordered: number; quantity_received: number }> | null }
+  if (refreshed && refreshed.length) {
+    const allFull    = refreshed.every((l) => Number(l.quantity_received) >= Number(l.quantity_ordered))
+    const anyPartial = refreshed.some((l) => Number(l.quantity_received) > 0)
+    const nextStatus: POStatus = allFull ? 'received' : anyPartial ? 'partially_received' : 'submitted'
+    await supabase.from('purchase_orders').update({ status: nextStatus }).eq('id', input.po_id)
+  }
+
+  revalidatePath(`/purchase-orders/${input.po_id}`)
+  revalidatePath('/purchase-orders')
+  revalidatePath(`/purchase-orders/${input.po_id}/receive`)
+  return { ok: true, skipped: skipped.length ? skipped : undefined }
+}
+
+// ============================================================
 // Receipt COA (Certificate of Analysis) attachments
 // Files live in the private `receipt-docs` Storage bucket; the path +
 // filename are recorded on the stock_movements row at receipt time.
