@@ -30,7 +30,7 @@ export default async function ProductPrintPage({ params }: PageProps) {
         boms (
           id, version, is_active, notes, market,
           bom_items (
-            id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
+            id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order,
             ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
           )
         )
@@ -235,10 +235,10 @@ export default async function ProductPrintPage({ params }: PageProps) {
                     )}
                   </td>
                   <td className="px-2 py-1.5 font-mono text-[10px] text-gray-600 align-top">{item.ingredients.sku_code}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums align-top">{calc.is_count ? `${item.quantity_g} ea` : item.quantity_g}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums align-top">{calc.is_count ? `${item.quantity_g} (${calc.unit_in_kg} ea)` : item.quantity_g}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums align-top">{calc.is_count ? '—' : calc.unit_in_kg.toFixed(4)}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums align-top">{calc.is_count ? '—' : `${(calc.percentage * 100).toFixed(1)}%`}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums align-top">{calc.is_count ? '—' : calc.serve_amount.toFixed(2)}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums align-top">{product.size_g ? `${(calc.percentage * 100).toFixed(1)}%` : '—'}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums align-top">{product.size_g ? calc.serve_amount.toFixed(2) : '—'}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums align-top">{formatCurrency(calc.price_per_kg)}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums font-medium align-top">{formatCurrency(calc.price_per_unit * (1 + Number(product.wastage_pct ?? 0)))}</td>
                 </tr>

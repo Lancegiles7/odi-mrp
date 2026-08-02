@@ -34,19 +34,28 @@ export function lineWetGrams(item: BomItemWithIngredient): number {
   return Number(item.wet_quantity_g ?? item.quantity_g) || 0
 }
 
-// Count-based units (each pouch / unit / case …) are priced per unit and the
-// BOM quantity is a unit count, not grams. Weight units (kg/g) are priced per
-// kg and the BOM quantity is grams.
+// Count-based units (each pouch / unit / case …) are priced per unit. Such a
+// line carries a unit COUNT in unit_quantity, which drives its cost — while
+// quantity_g still holds the item's real grams so it counts toward the recipe
+// weight (e.g. a noodle block: 62.5 g of the pack, but bought & priced per unit).
+// Weight units (kg/g) are priced per kg and cost on grams; unit_quantity is null.
 const COUNT_UOMS = new Set(['each', 'unit', 'case', 'box', 'bag', 'pallet'])
 export function isCountUom(uom: string | null | undefined): boolean {
   return COUNT_UOMS.has((uom ?? '').trim().toLowerCase())
 }
 
-// Cost of a quantity at a per-unit-of-measure price. For count items the price
-// is per unit and qty is a unit count (no /1000); for weight items the price is
-// per kg and qty is grams.
-function costAtUom(qty: number, perUom: number, uom: string | null | undefined): number {
-  return isCountUom(uom) ? round2(qty * perUom) : round2((qty / 1000) * perUom)
+// The unit count a count-priced line costs & procures on. Defaults to 1 unit so
+// a count line without an explicit count still costs one unit rather than zero.
+export function lineUnits(item: BomItemWithIngredient): number {
+  return Number(item.unit_quantity ?? 1) || 0
+}
+
+// Cost of one BOM line at a given per-unit-of-measure price. Count items cost
+// unit_quantity × per-unit price; weight items cost grams ÷ 1000 × per-kg price.
+function costLine(item: BomItemWithIngredient, perUom: number): number {
+  return isCountUom(item.ingredients.unit_of_measure)
+    ? round2(lineUnits(item) * perUom)
+    : round2((lineWetGrams(item) / 1000) * perUom)
 }
 
 // Per-line price for a BOM item — costed on the wet input (no wastage here;
@@ -56,7 +65,7 @@ export function calcLinePrice(item: BomItemWithIngredient): number {
     item.price_override ??
     item.ingredients.total_loaded_cost ??
     0
-  return costAtUom(lineWetGrams(item), perUom, item.ingredients.unit_of_measure)
+  return costLine(item, perUom)
 }
 
 // Australian per-line price for a dual-made product (AUD). Uses the
@@ -69,12 +78,13 @@ export function calcLinePriceAu(item: BomItemWithIngredient, fxRate: number): nu
   const auPerUom =
     item.ingredients.total_loaded_cost_au ??
     (fxRate > 0 ? nzPerUom / fxRate : nzPerUom)
-  return costAtUom(lineWetGrams(item), auPerUom, item.ingredients.unit_of_measure)
+  return costLine(item, auPerUom)
 }
 
-// Derived display values for each BOM row. Cost is on wet grams; % of weight
-// stays on the dry composition (what's in the sold pack). Count items (each /
-// unit) carry a unit count instead of grams — % of weight doesn't apply.
+// Derived display values for each BOM row. Cost is on the unit count for
+// count-priced lines, else on wet grams. % of weight now applies to every line
+// with real grams (a count item's grams count toward the pack), so recipes that
+// include a per-unit component still total to 100%.
 export function calcBomLineValues(
   item: BomItemWithIngredient,
   sizeG: number,
@@ -85,10 +95,10 @@ export function calcBomLineValues(
   const wetG          = lineWetGrams(item)
   // For count items unit_in_kg holds the unit count (so unit_in_kg × per-unit
   // price still yields the line cost); for weight items it's kg.
-  const unitInKg      = isCount ? round4(wetG) : round4(wetG / 1000)
-  const pct           = !isCount && sizeG > 0 ? round4(item.quantity_g / sizeG) : 0
-  const serveAmt      = !isCount && sizeG > 0 ? round2((item.quantity_g / sizeG) * servingSize) : 0
-  const pricePerUnit  = costAtUom(wetG, perUom, item.ingredients.unit_of_measure)
+  const unitInKg      = isCount ? round4(lineUnits(item)) : round4(wetG / 1000)
+  const pct           = sizeG > 0 ? round4(item.quantity_g / sizeG) : 0
+  const serveAmt      = sizeG > 0 ? round2((item.quantity_g / sizeG) * servingSize) : 0
+  const pricePerUnit  = costLine(item, perUom)
 
   return {
     unit_in_kg:     unitInKg,

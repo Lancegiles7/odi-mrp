@@ -9,7 +9,14 @@
  *   - If the ingredient UOM is kg → divide by 1000 to report in kg.
  *   - Otherwise → report in grams (or the ingredient's native count).
  * Liquid/each UOMs are displayed as-is; a conversion table can be added later.
+ *
+ * Count-priced ingredients (each/unit/case…) are the exception: they procure on
+ * bom_items.unit_quantity (a unit count), NOT grams — grams on those lines are
+ * only the recipe weight. So a noodle block ordered per unit contributes 1 unit
+ * per product, even though it weighs 62.5 g in the pack.
  */
+
+import { isCountUom } from './costing'
 
 // ============================================================
 // Inputs
@@ -39,6 +46,8 @@ export interface IngredientDemandInput {
     ingredient_id: string
     quantity_g: number
     wet_quantity_g?: number | null
+    /** Count-priced lines (each/unit/case…) procure on this unit count, not grams. */
+    unit_quantity?: number | null
   }>>
 
   /** products keyed by id (non-deleted only). size_g / wet_weight_g drive the
@@ -125,14 +134,15 @@ export interface SupplierGroup {
  */
 export function convertGramsToIngredientUom(grams: number, uom: string | null): number {
   const u = (uom ?? '').trim().toLowerCase()
-  if (u === 'each' || u === 'l' || u === 'ml') return grams
+  // Count-priced (each/unit/case…) and liquid units pass through unchanged.
+  if (isCountUom(uom) || u === 'l' || u === 'ml') return grams
   return grams / 1000
 }
 
 /** Short label for the ingredient's demand unit. */
 export function demandUnitLabel(uom: string | null): string {
   const u = (uom ?? '').trim().toLowerCase()
-  if (u === 'each') return 'each'
+  if (isCountUom(uom)) return u === 'each' ? 'each' : 'units'
   if (u === 'l')    return 'L'
   if (u === 'ml')   return 'mL'
   // Weight-based (and unset) all display as kg
@@ -211,13 +221,20 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
       const row = rowsByIngredient.get(item.ingredient_id)
       if (!row) continue  // ingredient deleted / not loaded
 
+      // Count-priced ingredients procure on their unit count (default 1 unit);
+      // weight ingredients procure on the WET input where set (freeze-dried),
+      // else the dry grams. Either way, lifted by the product's contingency %.
+      const isCount = isCountUom(row.ingredient.unit_of_measure)
+      const perUnit = isCount
+        ? (Number(item.unit_quantity ?? 1) || 0) * wastage
+        : (Number(item.wet_quantity_g ?? item.quantity_g) || 0) * wastage
+
       const perProduct = {
         id: product.id,
         sku_code: product.sku_code,
         name: label ? `${product.name} ${label}` : product.name,
-        // Order the WET input where set (freeze-dried), else the dry quantity,
-        // lifted by the product's contingency %.
-        gramsPerUnit: (Number(item.wet_quantity_g ?? item.quantity_g) || 0) * wastage,
+        // Per product: units for count items, grams for weight items.
+        gramsPerUnit: perUnit,
         demandByMonth: new Map<string, number>(months.map((m) => [m, 0])),
         totalDemand: 0,
       }
@@ -226,8 +243,9 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
       for (const m of months) {
         const units = unitsMap.get(m)?.get(productId) ?? 0
         if (!units) continue
-        const grams = units * perProduct.gramsPerUnit
-        const qty = convertGramsToIngredientUom(grams, row.ingredient.unit_of_measure)
+        const raw = units * perUnit
+        // Count items are already in units; weight items convert grams → kg/etc.
+        const qty = isCount ? raw : convertGramsToIngredientUom(raw, row.ingredient.unit_of_measure)
         perProduct.demandByMonth.set(m, qty)
         perProduct.totalDemand += qty
         row.demandByMonth.set(m, (row.demandByMonth.get(m) ?? 0) + qty)

@@ -71,6 +71,7 @@ export interface BomItemInput {
   ingredient_id: string
   quantity_g: number
   wet_quantity_g?: number | null
+  unit_quantity?: number | null
   price_override?: number | null
   notes?: string | null
   sort_order: number
@@ -315,6 +316,7 @@ export async function saveBomItems(
         ingredient_id:  item.ingredient_id,
         quantity_g:     item.quantity_g,
         wet_quantity_g: item.wet_quantity_g ?? null,
+        unit_quantity:  item.unit_quantity ?? null,
         uom:            'g',
         price_override: item.price_override ?? null,
         notes:          item.notes ?? null,
@@ -360,7 +362,7 @@ export async function addAuBuild(productId: string): Promise<{ ok: boolean; erro
   if (nzBom) {
     const { data: srcItems } = await supabase
       .from('bom_items')
-      .select('ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order')
+      .select('ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order')
       .eq('bom_id', nzBom.id) as { data: Array<Record<string, unknown>> | null }
     if (srcItems && srcItems.length > 0) {
       const { error: copyErr } = await supabase

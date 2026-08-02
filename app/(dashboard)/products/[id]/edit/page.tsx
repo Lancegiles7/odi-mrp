@@ -38,7 +38,7 @@ export default async function EditProductPage({ params, searchParams }: PageProp
         boms (
           id, version, is_active, market,
           bom_items (
-            id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
+            id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order,
             ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
           )
         )

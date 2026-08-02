@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import type { BomItemWithIngredient, Ingredient } from '@/lib/types/database.types'
-import { calcBomLineValues } from '@/lib/costing'
+import { calcBomLineValues, isCountUom } from '@/lib/costing'
 import { saveBomItems } from '@/app/(dashboard)/products/actions'
 import { formatCurrency } from '@/lib/utils'
 
@@ -11,8 +11,9 @@ interface EditorRow {
   ingredient_id: string
   ingredient_name: string
   ingredient_sku: string
-  quantity_g: number | ''          // dry g (pack composition)
+  quantity_g: number | ''          // dry g (pack composition / recipe weight)
   wet_quantity_g: number | ''      // wet input g (freeze-dried); blank = same as dry
+  unit_quantity: number | ''       // count for per-unit ingredients (drives cost); '' for weight items
   price_override: number | '' | null
   notes: string
   sort_order: number
@@ -41,6 +42,7 @@ function makeRow(item?: BomItemWithIngredient, idx?: number): EditorRow {
       ingredient_sku: item.ingredients.sku_code,
       quantity_g: item.quantity_g,
       wet_quantity_g: item.wet_quantity_g ?? '',
+      unit_quantity: item.unit_quantity ?? '',
       price_override: item.price_override ?? '',
       notes: item.notes ?? '',
       sort_order: item.sort_order,
@@ -56,6 +58,7 @@ function makeRow(item?: BomItemWithIngredient, idx?: number): EditorRow {
     ingredient_sku: '',
     quantity_g: '',
     wet_quantity_g: '',
+    unit_quantity: '',
     price_override: '',
     notes: '',
     sort_order: idx ?? 0,
@@ -76,6 +79,7 @@ function calcRow(row: EditorRow, sizeG: number, servingSize: number) {
       ingredient_id: row.ingredient_id,
       quantity_g: qty,
       wet_quantity_g: row.wet_quantity_g === '' ? null : Number(row.wet_quantity_g),
+      unit_quantity: row.unit_quantity === '' ? null : Number(row.unit_quantity),
       price_override: (row.price_override !== '' && row.price_override !== null) ? Number(row.price_override) : null,
       ingredients: {
         id: row.ingredient_id,
@@ -123,6 +127,7 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
       updateRow(key, { ingredient_id: '', ingredient_name: '', ingredient_sku: '', is_organic: true, total_loaded_cost: null })
       return
     }
+    const nowCount = isCountUom(ing.unit_of_measure)
     updateRow(key, {
       ingredient_id: ing.id,
       ingredient_name: ing.name,
@@ -130,6 +135,8 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
       is_organic: ing.is_organic,
       total_loaded_cost: ing.total_loaded_cost,
       unit_of_measure: ing.unit_of_measure,
+      // Per-unit ingredient: default to 1 unit; weight ingredient: clear any count.
+      unit_quantity: nowCount ? 1 : '',
     })
   }
 
@@ -142,6 +149,7 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
           ingredient_id: r.ingredient_id,
           quantity_g: Number(r.quantity_g),
           wet_quantity_g: r.wet_quantity_g === '' ? null : Number(r.wet_quantity_g),
+          unit_quantity: isCountUom(r.unit_of_measure) && r.unit_quantity !== '' ? Number(r.unit_quantity) : null,
           price_override: (r.price_override !== '' && r.price_override !== null) ? Number(r.price_override) : null,
           notes: r.notes || null,
           sort_order: i,
@@ -182,6 +190,7 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
               <th className="text-left px-3 py-2 font-medium text-gray-600 w-[260px]">Ingredient</th>
               <th className="text-right px-3 py-2 font-medium text-gray-600 w-24">Dry g</th>
               <th className="text-right px-3 py-2 font-medium text-blue-600 w-24">Wet g</th>
+              <th className="text-right px-3 py-2 font-medium text-indigo-600 w-20">Units</th>
               <th className="text-right px-3 py-2 font-medium text-gray-600 w-20">%</th>
               <th className="text-right px-3 py-2 font-medium text-gray-600 w-24">$/kg</th>
               <th className="text-right px-3 py-2 font-medium text-gray-600 w-24">Override</th>
@@ -193,6 +202,7 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
           <tbody className="divide-y divide-gray-100">
             {rows.map((row) => {
               const calc = calcRow(row, sizeG, servingSize)
+              const isCount = isCountUom(row.unit_of_measure)
               return (
                 <tr key={row.key} className="group">
                   {/* Ingredient select */}
@@ -224,7 +234,7 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
                     />
                   </td>
 
-                  {/* Wet g (input — drives cost & procurement; blank = same as dry) */}
+                  {/* Wet g (input — drives cost & procurement for weight items; blank = same as dry) */}
                   <td className="px-2 py-1.5">
                     <input
                       type="number"
@@ -232,9 +242,27 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
                       step="0.01"
                       value={row.wet_quantity_g}
                       onChange={(e) => updateRow(row.key, { wet_quantity_g: e.target.value === '' ? '' : Number(e.target.value) })}
-                      placeholder={row.quantity_g === '' ? '—' : '= dry'}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder={isCount ? 'n/a' : (row.quantity_g === '' ? '—' : '= dry')}
+                      disabled={isCount}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-300"
                     />
+                  </td>
+
+                  {/* Units — count for per-unit ingredients; drives cost. Grams stay for weight. */}
+                  <td className="px-2 py-1.5">
+                    {isCount ? (
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={row.unit_quantity}
+                        onChange={(e) => updateRow(row.key, { unit_quantity: e.target.value === '' ? '' : Number(e.target.value) })}
+                        placeholder="1"
+                        className="w-full px-2 py-1 border border-indigo-300 bg-indigo-50 text-indigo-800 font-medium rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    ) : (
+                      <div className="text-right text-gray-300">—</div>
+                    )}
                   </td>
 
                   {/* % of pack */}
@@ -242,10 +270,10 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
                     {calc ? `${(calc.percentage * 100).toFixed(1)}%` : <span className="text-gray-300">—</span>}
                   </td>
 
-                  {/* $/kg from ingredient */}
+                  {/* Rate from ingredient — $/kg for weight, $/ea for per-unit */}
                   <td className="px-3 py-1.5 text-right text-gray-500 tabular-nums">
                     {row.total_loaded_cost != null
-                      ? formatCurrency(row.total_loaded_cost)
+                      ? <>{formatCurrency(row.total_loaded_cost)}{isCount && <span className="text-[10px] text-gray-400"> /ea</span>}</>
                       : <span className="text-gray-300">—</span>}
                   </td>
 
@@ -307,6 +335,7 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
               <td className="px-3 py-2 text-right font-semibold text-blue-700 tabular-nums text-sm">
                 {totalWetG > 0 ? totalWetG.toFixed(2) : '—'}
               </td>
+              <td />
               <td className="px-3 py-2 text-right font-semibold text-gray-900 tabular-nums text-sm">
                 {sizeG > 0 ? `${(totalPct * 100).toFixed(1)}%` : '—'}
               </td>
@@ -318,7 +347,7 @@ export function BomEditor({ bomId, initialItems, ingredients, sizeG, servingSize
             </tr>
             {sizeG > 0 && Math.abs(totalQtyG - sizeG) > 0.01 && (
               <tr>
-                <td colSpan={9} className="px-3 py-1 text-[11px] text-amber-700 bg-amber-50">
+                <td colSpan={10} className="px-3 py-1 text-[11px] text-amber-700 bg-amber-50">
                   Dry weight {totalQtyG.toFixed(2)} g doesn&apos;t match product size {sizeG} g
                   {totalQtyG < sizeG ? ` (${(sizeG - totalQtyG).toFixed(2)} g under)` : ` (${(totalQtyG - sizeG).toFixed(2)} g over)`}
                 </td>

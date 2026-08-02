@@ -98,8 +98,8 @@ export async function loadIngredientStrip(sb: SB, months: string[], first: strin
       sb.from('ingredients').select('id, sku_code, name, unit_of_measure, supplier_id, opening_stock_override, is_active').eq('is_active', true)),
     all<Array<{ id: string; name: string }>>(sb.from('suppliers').select('id, name')),
     all<Array<{ id: string; product_id: string; is_active: boolean; market: string | null }>>(sb.from('boms').select('id, product_id, is_active, market').eq('is_active', true)),
-    all<Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null }>>(
-      sb.from('bom_items').select('bom_id, ingredient_id, quantity_g, wet_quantity_g')),
+    all<Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null; unit_quantity: number | null }>>(
+      sb.from('bom_items').select('bom_id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity')),
     all<Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null }>>(
       sb.from('purchase_orders').select('id, po_number, status, expected_delivery_date').eq('market', 'NZ').in('status', ['submitted', 'partially_received']).not('expected_delivery_date', 'is', null)),
     all<Array<{ purchase_order_id: string; ingredient_id: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string }>>(
@@ -112,10 +112,10 @@ export async function loadIngredientStrip(sb: SB, months: string[], first: strin
   // lives on the demand pages). Picking NZ avoids an AU BOM winning last-write.
   const activeBomByProduct = new Map<string, string>()
   for (const b of boms ?? []) if ((b.market ?? 'NZ') !== 'AU') activeBomByProduct.set(b.product_id, b.id)
-  const bomItemsByBom = new Map<string, Array<{ ingredient_id: string; quantity_g: number; wet_quantity_g: number | null }>>()
+  const bomItemsByBom = new Map<string, Array<{ ingredient_id: string; quantity_g: number; wet_quantity_g: number | null; unit_quantity: number | null }>>()
   for (const it of bomItems ?? []) {
     if (!bomItemsByBom.has(it.bom_id)) bomItemsByBom.set(it.bom_id, [])
-    bomItemsByBom.get(it.bom_id)!.push({ ingredient_id: it.ingredient_id, quantity_g: it.quantity_g, wet_quantity_g: it.wet_quantity_g })
+    bomItemsByBom.get(it.bom_id)!.push({ ingredient_id: it.ingredient_id, quantity_g: it.quantity_g, wet_quantity_g: it.wet_quantity_g, unit_quantity: it.unit_quantity })
   }
 
   const poById = new Map((openPos ?? []).map((p) => [p.id, p]))
@@ -225,7 +225,7 @@ export async function loadGpByGroup(sb: SB, settings: SettingsSnapshot): Promise
       toll_currency, margin_currency, other_currency, freight_nz_currency, freight_au_currency,
       apply_fx, wastage_pct, manufacturer_au,
       boms ( is_active, market, bom_items (
-        id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
+        id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order,
         ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
       ))
     `).eq('is_active', true).is('deleted_at', null))
