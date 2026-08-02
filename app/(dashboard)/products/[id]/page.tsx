@@ -32,7 +32,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         boms (
           id, version, is_active, notes, market,
           bom_items (
-            id, ingredient_id, quantity_g, wet_quantity_g, uom, price_override, notes, sort_order,
+            id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order,
             ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
           )
         )
@@ -287,11 +287,14 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                         )}
                       </td>
                       <td className="px-5 py-2.5 font-mono text-xs text-gray-600">{item.ingredients.sku_code}</td>
-                      <td className="px-5 py-2.5 text-right">{calc.is_count ? <>{item.quantity_g} <span className="text-[10px] text-gray-400">ea</span></> : item.quantity_g}</td>
+                      <td className="px-5 py-2.5 text-right">
+                        {item.quantity_g}
+                        {calc.is_count && <span className="ml-1 text-[10px] text-indigo-500">· {calc.unit_in_kg} unit{calc.unit_in_kg === 1 ? '' : 's'}</span>}
+                      </td>
                       <td className="px-5 py-2.5 text-right text-blue-700 tabular-nums">{calc.is_count ? <span className="text-gray-300">—</span> : Number(item.wet_quantity_g ?? item.quantity_g)}</td>
-                      <td className="px-5 py-2.5 text-right">{calc.is_count ? <span className="text-gray-300">—</span> : `${(calc.percentage * 100).toFixed(1)}%`}</td>
-                      <td className="px-5 py-2.5 text-right">{calc.is_count ? <span className="text-gray-300">—</span> : calc.serve_amount.toFixed(2)}</td>
-                      <td className="px-5 py-2.5 text-right tabular-nums">{sym}{nativePerKg.toFixed(2)} <span className="text-[10px] text-gray-400">{cur}{calc.is_count ? '/ea' : ''}</span></td>
+                      <td className="px-5 py-2.5 text-right">{product.size_g ? `${(calc.percentage * 100).toFixed(1)}%` : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-5 py-2.5 text-right">{product.size_g ? calc.serve_amount.toFixed(2) : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-5 py-2.5 text-right tabular-nums">{sym}{nativePerKg.toFixed(2)} <span className="text-[10px] text-gray-400">{cur}{calc.is_count ? '/ea' : '/kg'}</span></td>
                       <td className="px-5 py-2.5 text-right font-medium tabular-nums">{sym}{nativePerUnit.toFixed(2)}</td>
                     </tr>
                   )

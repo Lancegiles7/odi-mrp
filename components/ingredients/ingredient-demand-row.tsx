@@ -7,6 +7,7 @@ import {
   getIngredientOpeningStockHistory,
 } from '@/app/(dashboard)/ingredients/demand/actions'
 import { demandUnitLabel, monthShortfallStates, monthRunningBalances, monthShortAmounts } from '@/lib/ingredient-demand'
+import { isCountUom } from '@/lib/costing'
 import type { IngredientRow as IngredientRowData } from '@/lib/ingredient-demand'
 import { OpeningStockHistoryPopover } from '@/components/inventory/opening-stock-popover'
 import { CellCommentPopover } from '@/components/inventory/cell-comment-popover'
@@ -217,7 +218,7 @@ export function IngredientDemandRow({ row, months, commentedCells, openingHistor
                   <Link href={`/products/${p.id}`} className="text-gray-700 hover:underline truncate">
                     {p.name}
                   </Link>
-                  <span className="text-gray-400 text-[10px] flex-shrink-0">· {Number(p.gramsPerUnit.toFixed(2))} g/unit</span>
+                  <span className="text-gray-400 text-[10px] flex-shrink-0">· {Number(p.gramsPerUnit.toFixed(2))} {isCountUom(row.ingredient.unit_of_measure) ? `${unit}/unit` : 'g/unit'}</span>
                 </div>
               </td>
               <td className="px-3 py-1.5 text-right text-gray-400 tabular-nums">—</td>

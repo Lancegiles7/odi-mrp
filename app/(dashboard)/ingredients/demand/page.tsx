@@ -69,7 +69,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       .select('id, product_id, is_active, market')
       .eq('is_active', true) as unknown as Promise<{ data: Array<{ id: string; product_id: string; is_active: boolean; market: string | null }> | null }>,
     supabase.from('bom_items')
-      .select('bom_id, ingredient_id, quantity_g, wet_quantity_g') as unknown as Promise<{ data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null }> | null }>,
+      .select('bom_id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity') as unknown as Promise<{ data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null; unit_quantity: number | null }> | null }>,
     fetchAllRows<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }>((from, to) =>
       supabase.from('demand_forecasts')
         .select('product_id, year_month, channel, units, is_edited')
@@ -98,10 +98,10 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     else activeBomByProduct.set(b.product_id, b.id)
   }
 
-  const bomItemsByBom = new Map<string, Array<{ ingredient_id: string; quantity_g: number; wet_quantity_g: number | null }>>()
+  const bomItemsByBom = new Map<string, Array<{ ingredient_id: string; quantity_g: number; wet_quantity_g: number | null; unit_quantity: number | null }>>()
   for (const it of bomItems ?? []) {
     if (!bomItemsByBom.has(it.bom_id)) bomItemsByBom.set(it.bom_id, [])
-    bomItemsByBom.get(it.bom_id)!.push({ ingredient_id: it.ingredient_id, quantity_g: it.quantity_g, wet_quantity_g: it.wet_quantity_g })
+    bomItemsByBom.get(it.bom_id)!.push({ ingredient_id: it.ingredient_id, quantity_g: it.quantity_g, wet_quantity_g: it.wet_quantity_g, unit_quantity: it.unit_quantity })
   }
 
   // ── Source units, split by market for dual builds ──────────

@@ -499,6 +499,7 @@ export type Database = {
           ingredient_id: string
           quantity_g: number
           wet_quantity_g: number | null
+          unit_quantity: number | null
           uom: string
           price_override: number | null
           notes: string | null
@@ -512,6 +513,7 @@ export type Database = {
           ingredient_id: string
           quantity_g: number
           wet_quantity_g?: number | null
+          unit_quantity?: number | null
           uom?: string
           price_override?: number | null
           notes?: string | null
@@ -525,6 +527,7 @@ export type Database = {
           ingredient_id?: string
           quantity_g?: number
           wet_quantity_g?: number | null
+          unit_quantity?: number | null
           uom?: string
           price_override?: number | null
           notes?: string | null
