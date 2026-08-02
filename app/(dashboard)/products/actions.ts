@@ -53,6 +53,7 @@ export interface ProductFormData {
   wastage_pct_input?: string
   manufacturer?: string
   manufacturer_au?: string
+  manufacture_market?: string
   toll_au?: string
   opening_stock_override?: string
   // Original Order baseline (migration 018)
@@ -166,6 +167,8 @@ function buildProductPayload(data: ProductFormData) {
     wastage_pct:     wastagePct,
     manufacturer:    data.manufacturer?.trim() || null,
     manufacturer_au: data.manufacturer_au?.trim() || null,
+    manufacture_market: (['NZ','AU','BOTH'] as const).includes(data.manufacture_market as 'NZ'|'AU'|'BOTH')
+      ? (data.manufacture_market as 'NZ'|'AU'|'BOTH') : 'NZ',
     opening_stock_override: parseNum(data.opening_stock_override),
     is_active:       true,
     original_order_qty:    parseNum(data.original_order_qty),
@@ -206,6 +209,7 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     wastage_pct_input: formData.get('wastage_pct_input') as string,
     manufacturer:      formData.get('manufacturer') as string,
     manufacturer_au:   formData.get('manufacturer_au') as string,
+    manufacture_market: formData.get('manufacture_market') as string,
     opening_stock_override: formData.get('opening_stock_override') as string,
     original_order_qty:    formData.get('original_order_qty') as string,
     original_order_date:   formData.get('original_order_date') as string,

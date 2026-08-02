@@ -110,7 +110,12 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
           <h1 className="mt-2 text-2xl font-semibold text-gray-900">{product.name}</h1>
           <div className="mt-1 flex items-center gap-2 text-xs">
             {typeLabel && <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">{typeLabel}</span>}
-            {summary.is_dual_manufacture && (
+            {summary.au_made && (
+              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-800">
+                Made in Australia · {product.manufacturer_au ?? product.manufacturer ?? 'VMC'}
+              </span>
+            )}
+            {summary.is_dual_manufacture && !summary.au_made && (
               <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700">
                 Dual build · {product.manufacturer ?? 'NZ'} + {product.manufacturer_au ?? 'VMC'}
               </span>
@@ -191,14 +196,16 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             rrp={product.rrp}
             gp={summary.gp_nz} gpAmount={summary.gp_nz_amount}
             cost={summary.nz_grand_total} cos={summary.cos_nz}
-            maker={product.manufacturer}
+            maker={summary.au_made ? (product.manufacturer_au ?? product.manufacturer) : product.manufacturer}
+            tag={summary.au_made ? '= A$ × FX' : undefined}
           />
           <MarketCard
             name="Australia" currency="AUD" headerClass="bg-[#1e3a5f]" sym="A$"
             rrp={product.rrp_au ?? product.rrp}
             gp={summary.gp_au} gpAmount={summary.gp_au_amount}
             cost={summary.au_grand_total} cos={summary.cos_au}
-            maker={summary.is_dual_manufacture ? product.manufacturer_au : product.manufacturer}
+            maker={(summary.is_dual_manufacture || summary.au_made) ? product.manufacturer_au ?? product.manufacturer : product.manufacturer}
+            tag={summary.au_made ? 'source' : undefined}
           />
         </div>
 
@@ -220,7 +227,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         freightAu={Number(product.freight_au ?? product.freight) || 0} freightAuCurrency={product.freight_au_currency ?? 'NZD'}
         rrpExNz={summary.rrp_ex_gst_nz}
         rrpExAu={summary.rrp_ex_gst_au}
-        isDual={summary.is_dual_manufacture}
+        isDual={summary.is_dual_manufacture || summary.au_made}
         auIngredientTotal={summary.au_ingredient_total}
         auToll={summary.au_toll}
         manufacturerNz={product.manufacturer}
@@ -414,17 +421,19 @@ function LineItem({ label, value }: { label: string; value: number | null }) {
 
 // Per-market cost card: RRP (inc GST) → GP (% · $) → Cost ($ · %).
 function MarketCard({
-  name, currency, headerClass, sym, rrp, gp, gpAmount, cost, cos, maker,
+  name, currency, headerClass, sym, rrp, gp, gpAmount, cost, cos, maker, tag,
 }: {
   name: string; currency: string; headerClass: string; sym: string
   rrp: number | null; gp: number | null; gpAmount: number | null
-  cost: number; cos: number | null; maker?: string | null
+  cost: number; cos: number | null; maker?: string | null; tag?: string
 }) {
   const money = (v: number) => `${sym}${Number(v).toFixed(2)}`
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <div className={`${headerClass} text-white px-3.5 py-2 text-sm font-semibold flex items-baseline justify-between`}>
-        <span>{name} <span className="text-xs text-white/50 font-normal">{currency}</span></span>
+        <span>{name} <span className="text-xs text-white/50 font-normal">{currency}</span>
+          {tag && <span className="ml-1.5 text-[10px] uppercase tracking-wide bg-white/20 rounded px-1.5 py-0.5 align-middle">{tag}</span>}
+        </span>
         {maker && <span className="text-[11px] text-white/70 font-normal">{maker}</span>}
       </div>
       <div className="p-3.5">

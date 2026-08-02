@@ -143,6 +143,7 @@ export function calcProductCostSummary(
     | 'apply_fx'
     | 'wastage_pct'
     | 'manufacturer_au'
+    | 'manufacture_market'
     | 'toll_au'
   >,
   bomItems: BomItemWithIngredient[],
@@ -197,21 +198,28 @@ export function calcProductCostSummary(
   const freightNzCur = product.freight_nz_currency ?? 'NZD'
   const freightAuCur = product.freight_au_currency ?? 'NZD'
 
-  // Dual-manufacture: when manufacturer_au is set the product is made
-  // separately in Australia (VMC), so the AU build has its own ingredient
-  // landed costs and its own toll (AUD) — it is NOT just the NZ build ÷ FX.
-  // When manufacturer_au is blank, isDual is false and every AU figure below
-  // collapses to "NZ converted at FX" — i.e. exactly the previous behaviour.
+  // Manufacture market drives which currency the build is authoritative in:
+  //   NZ   — Brand Nation build in NZD; AUD = NZD ÷ FX (the default, unchanged).
+  //   AU   — VMC build in AUD (AU landed costs + VMC toll); NZD = AUD × FX.
+  //   BOTH — dual: a real NZ build and a real AU build, side by side.
+  // Fallback for rows without the column yet: 'BOTH' if an AU manufacturer is
+  // set, else 'NZ' — i.e. exactly the previous behaviour.
   const isDual = !!(product.manufacturer_au && String(product.manufacturer_au).trim())
+  const mkt    = (product.manufacture_market as 'NZ' | 'AU' | 'BOTH' | null | undefined)
+                 ?? (isDual ? 'BOTH' : 'NZ')
+  const auMade = mkt === 'AU'
+  // Build the real AUD figures (AU landed costs / VMC toll / AU packaging) for a
+  // dual OR an AU-made product; a plain NZ product just converts its NZ build.
+  const useAuBuild = isDual || auMade
 
   // AU build's recipe: its own market='AU' BOM when present, else the NZ recipe
-  // priced at AU ingredient costs (Phase 1 fallback).
+  // priced at AU ingredient costs (Phase 1 fallback / the AU-made single recipe).
   const auItems = auBomItems && auBomItems.length > 0 ? auBomItems : bomItems
 
-  // AU ingredient total (AUD). Dual: cost each AU line on its AU landed cost
-  // (ingredient.total_loaded_cost_au, else NZ ÷ FX), then apply the same
-  // wastage + serving scaling. Non-dual: the NZ total simply converted.
-  const auIngredientTotal = isDual
+  // AU ingredient total (AUD). Real AU build: cost each AU line on its AU landed
+  // cost (ingredient.total_loaded_cost_au, else NZ ÷ FX), then apply the same
+  // wastage + serving scaling. Plain NZ: the NZ total simply converted.
+  const auIngredientTotal = useAuBuild
     ? round2(
         auItems.reduce((sum, item) => sum + calcLinePriceAu(item, fxRate), 0) *
           (1 + wastagePct) *
@@ -219,33 +227,21 @@ export function calcProductCostSummary(
       )
     : round2(toAud(ingredientTotal, 'NZD'))
 
-  // AU packaging cost (NZD rollup, converted to AUD below). Dual: the AU build's
-  // own packaging where it has any, else the NZ packaging. Non-dual: NZ.
-  const auPackaging = isDual
+  // AU packaging cost (NZD rollup, converted to AUD below). Real AU build: the
+  // AU build's own packaging where it has any, else the NZ packaging. Plain NZ: NZ.
+  const auPackaging = useAuBuild
     ? Number(product.packaging_au ?? product.packaging ?? 0)
     : packaging
 
-  // AU toll (AUD). Dual: VMC's own toll where entered, else the NZ toll
-  // converted (sensible auto-fill). Non-dual: the NZ toll converted.
-  const auTollAmount = isDual
+  // AU toll (AUD). Real AU build: VMC's own toll where entered, else the NZ toll
+  // converted (sensible auto-fill). Plain NZ: the NZ toll converted.
+  const auTollAmount = useAuBuild
     ? (Number(product.toll_au) > 0 ? Number(product.toll_au) : toAud(toll, tollCur))
     : toAud(toll, tollCur)
 
-  // NZ total — every line expressed in NZD (uses NZ freight). Always the
-  // Brand Nation / NZ build.
-  const nzGrandTotal = round2(
-    ingredientTotal +
-    packaging +
-    toNzd(toll,      tollCur) +
-    toNzd(margin,    marginCur) +
-    toNzd(other,     otherCur) +
-    toNzd(freightNz, freightNzCur),
-  )
-
-  // AU total — every line expressed in AUD (uses AU freight). For dual-made
-  // products this is VMC's real build (AU ingredient costs + VMC toll);
-  // otherwise it's the NZ build converted, computed per-line because each
-  // input carries its own native currency.
+  // AU total — every line expressed in AUD (uses AU freight). For AU-made / dual
+  // products this is VMC's real build (AU ingredient costs + VMC toll); for a
+  // plain NZ product it's the NZ build converted.
   const auGrandTotal = round2(
     auIngredientTotal +
     toAud(auPackaging,     'NZD') +
@@ -255,7 +251,22 @@ export function calcProductCostSummary(
     toAud(freightAu, freightAuCur),
   )
 
-  // base_cost mirrors the NZ figure (NZD), as it always has.
+  // NZ total (NZD). For an AU-made product the NZD figure is the real AUD build
+  // × FX — so NZD reporting & margin still work, just derived from the AUD cost.
+  // Otherwise it's the Brand Nation NZ build (every line expressed in NZD).
+  const nzGrandTotal = auMade
+    ? round2(auGrandTotal * fxRate)
+    : round2(
+        ingredientTotal +
+        packaging +
+        toNzd(toll,      tollCur) +
+        toNzd(margin,    marginCur) +
+        toNzd(other,     otherCur) +
+        toNzd(freightNz, freightNzCur),
+      )
+
+  // base_cost mirrors the NZ figure (NZD), as it always has — for an AU-made
+  // product that's the AUD build converted, which is the right NZD cost.
   const baseCost = nzGrandTotal
 
   // NZ retail price (NZD) and AU retail price (AUD). rrp_au falls back to the
@@ -292,6 +303,8 @@ export function calcProductCostSummary(
     gp_nz_amount:            gpNzAmount,
     gp_au_amount:            gpAuAmount,
     is_dual_manufacture:     isDual,
+    manufacture_market:      mkt,
+    au_made:                 auMade,
     au_ingredient_total:     auIngredientTotal,
     au_toll:                 round2(auTollAmount),
     // Back-compat aliases — default to NZ view so old UI keeps working

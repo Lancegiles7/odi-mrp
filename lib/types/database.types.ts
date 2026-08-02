@@ -131,6 +131,7 @@ export type Database = {
           wastage_pct: number
           manufacturer: string | null
           manufacturer_au: string | null
+          manufacture_market: string
           toll_au: number | null
           opening_stock_override: number | null
           is_active: boolean
@@ -172,6 +173,7 @@ export type Database = {
           wastage_pct?: number
           manufacturer?: string | null
           manufacturer_au?: string | null
+          manufacture_market?: string
           toll_au?: number | null
           opening_stock_override?: number | null
           is_active?: boolean
@@ -213,6 +215,7 @@ export type Database = {
           wastage_pct?: number
           manufacturer?: string | null
           manufacturer_au?: string | null
+          manufacture_market?: string
           toll_au?: number | null
           opening_stock_override?: number | null
           is_active?: boolean
@@ -1001,6 +1004,8 @@ export interface ProductCostSummary {
   gp_nz_amount: number | null         // rrp_ex_gst_nz - nz_grand_total (dollars)
   gp_au_amount: number | null         // rrp_ex_gst_au - au_grand_total (dollars)
   is_dual_manufacture: boolean        // true when made separately in AU (manufacturer_au set)
+  manufacture_market: 'NZ' | 'AU' | 'BOTH'  // where it's made; AU = built in AUD, NZD = AUD × FX
+  au_made: boolean                    // manufacture_market === 'AU' (VMC-only, AUD is the source)
   au_ingredient_total: number         // AU ingredient cost (AUD) — dual: AU landed costs; else NZ ÷ FX
   au_toll: number                     // AU toll (AUD) — dual: VMC toll; else NZ toll converted
   /** @deprecated use nz_grand_total */

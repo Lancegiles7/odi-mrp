@@ -223,7 +223,7 @@ export async function loadGpByGroup(sb: SB, settings: SettingsSnapshot): Promise
       id, product_type, size_g, serving_size, wet_weight_g, rrp, rrp_au,
       packaging, toll, toll_au, margin, other, freight, freight_nz, freight_au,
       toll_currency, margin_currency, other_currency, freight_nz_currency, freight_au_currency,
-      apply_fx, wastage_pct, manufacturer_au,
+      apply_fx, wastage_pct, manufacturer_au, manufacture_market,
       boms ( is_active, market, bom_items (
         id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order,
         ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )

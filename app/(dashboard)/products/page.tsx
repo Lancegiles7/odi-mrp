@@ -40,6 +40,7 @@ type ProductRow = {
   apply_fx: boolean
   wastage_pct: number
   manufacturer_au: string | null
+  manufacture_market: string
   is_active: boolean
   boms: Array<{
     id: string
@@ -74,7 +75,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         id, sku_code, name, product_type, size_g, serving_size, wet_weight_g, rrp, rrp_au,
         packaging, toll, toll_au, margin, other, freight, freight_nz, freight_au,
         toll_currency, margin_currency, other_currency, freight_nz_currency, freight_au_currency,
-        apply_fx, wastage_pct, manufacturer_au, is_active,
+        apply_fx, wastage_pct, manufacturer_au, manufacture_market, is_active,
         boms (
           id, is_active, market,
           bom_items (

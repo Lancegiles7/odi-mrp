@@ -201,6 +201,22 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
               />
             </Field>
 
+            <Field id="manufacture_market" label="Made in">
+              <select
+                id="manufacture_market"
+                name="manufacture_market"
+                defaultValue={product?.manufacture_market ?? 'NZ'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
+              >
+                <option value="NZ">New Zealand (Brand Nation)</option>
+                <option value="AU">Australia only (VMC)</option>
+                <option value="BOTH">Both (dual build)</option>
+              </select>
+              <p className="mt-1 text-[11px] text-gray-400">
+                Australia = built in AUD (VMC toll, AU packaging &amp; ingredient costs); the NZD figure is that cost × FX, so NZD reporting still works.
+              </p>
+            </Field>
+
             <Field id="manufacturer" label="Manufacturer — NZ">
               <input
                 id="manufacturer"
