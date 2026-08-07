@@ -136,8 +136,10 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         // is entered; NZ-made products start blank (planned in manually).
         productionByMonth: byMonth((m) => {
           const planned = prodIdxAu.get(p.id)?.get(m)
-          if (planned != null) return planned
-          return dual ? getCountryTotal(demandIdx, p.id, m, 'AUS') : 0
+          // Dual products default to make-to-demand where nothing real is planned
+          // (missing OR a leftover zero seed row); NZ-made stay at the saved value.
+          if (planned) return planned
+          return dual ? getCountryTotal(demandIdx, p.id, m, 'AUS') : (planned ?? 0)
         }),
         showTag: true,
       })

@@ -135,10 +135,23 @@ function buildRow(
   }
 }
 
+/** First month a product has any AU activity (production, demand, receipt, etc.). */
+function firstActivityMonth(pid: string, maps: MarketMaps, months: string[]): string | null {
+  for (const m of months) {
+    if (
+      at(maps.inbound, pid, m) || at(maps.outbound, pid, m) || at(maps.writeoff, pid, m) ||
+      at(maps.produced, pid, m) || at(maps.demand, pid, m) ||
+      (maps.openPo?.get(pid)?.get(m)?.length ?? 0) > 0
+    ) return m
+  }
+  return null
+}
+
 /**
  * Two stacked rows per product — NZ then AUS. A product's pair is included when
- * EITHER market has activity; the AUS row spans the grid but is blank before
- * auStartMonth (AU demand begins then).
+ * EITHER market has activity. The AUS row starts at its first real AU activity
+ * (e.g. an August pre-launch build shows; earlier months roll into opening),
+ * falling back to auStartMonth when there's none.
  */
 export function buildStockLedger(input: {
   products: Array<{ id: string; sku_code: string; name: string; product_type: string | null }>
@@ -148,10 +161,12 @@ export function buildStockLedger(input: {
   au: MarketMaps
   auStartMonth: string
 }): StockRow[] {
+  const allMonths = [...input.actualMonths, ...input.forecastMonths]
   const out: StockRow[] = []
   for (const p of input.products) {
     const nz = buildRow(p, 'NZ', input.nz, input.actualMonths, input.forecastMonths, null)
-    const au = buildRow(p, 'AU', input.au, input.actualMonths, input.forecastMonths, input.auStartMonth)
+    const auStart = firstActivityMonth(p.id, input.au, allMonths) ?? input.auStartMonth
+    const au = buildRow(p, 'AU', input.au, input.actualMonths, input.forecastMonths, auStart)
     if (nz.hasActivity || au.hasActivity) { out.push(nz); out.push(au) }
   }
   return out
