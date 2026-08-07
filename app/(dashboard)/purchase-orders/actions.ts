@@ -310,10 +310,11 @@ export async function deletePurchaseOrder(id: string): Promise<{ ok: boolean; er
 // ============================================================
 export async function receivePoLines(input: {
   po_id: string
-  received_date?: string           // ISO yyyy-mm-dd the stock physically arrived
+  received_date?: string           // fallback ISO yyyy-mm-dd if a line omits its own
   receipts: Array<{
     line_id: string
     receiving_now: number
+    received_date?: string         // ISO yyyy-mm-dd the stock physically arrived (per line)
     invoice_unit_cost: number | null
     note: string | null
     lot_number?: string | null
@@ -360,10 +361,10 @@ export async function receivePoLines(input: {
   const openCol = poMarket === 'AU' ? 'opening_stock_override_au' : 'opening_stock_override'
 
   // The date stock physically arrived — drives the Stock Movements month.
-  // Use the user-entered date (validated yyyy-mm-dd); fall back to today.
-  const receiptIso = /^\d{4}-\d{2}-\d{2}$/.test(input.received_date ?? '')
-    ? (input.received_date as string)
-    : new Date().toISOString().slice(0, 10)
+  // Per line (split deliveries differ); fall back to the PO-level date, else today.
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const isoDate = (v?: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v ?? '') ? (v as string) : null)
+  const poReceiptIso = isoDate(input.received_date) ?? todayIso
 
   // Current opening figures + display UoM for the ingredients/packaging on this
   // PO, so we can convert the received qty into the demand view's unit and add it.
@@ -460,6 +461,7 @@ export async function receivePoLines(input: {
     // if this Stock-Movements log fails, never block the receive — just record
     // the problem so it can be backfilled.
     if (line.product_id) {
+      const receiptIso = isoDate(r.received_date) ?? poReceiptIso
       const { error: fgErr } = await supabase.from('finished_goods_receipts').insert({
         product_id:             line.product_id,
         received_month:         `${receiptIso.slice(0, 7)}-01`,
