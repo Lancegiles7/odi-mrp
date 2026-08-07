@@ -313,7 +313,7 @@ export async function receivePoLines(input: {
   received_date?: string           // fallback ISO yyyy-mm-dd if a line omits its own
   receipts: Array<{
     line_id: string
-    receiving_now: number
+    received: number               // the TOTAL received for this line (edit-in-place, not a delta)
     received_date?: string         // ISO yyyy-mm-dd the stock physically arrived (per line)
     invoice_unit_cost: number | null
     note: string | null
@@ -391,26 +391,27 @@ export async function receivePoLines(input: {
   const pakBump = new Map<string, number>()
 
   for (const r of input.receipts) {
-    if (r.receiving_now <= 0) continue
     const line = lines.find((l) => l.id === r.line_id)
     if (!line) continue
 
-    // Over-delivery allowed: received may exceed ordered (suppliers sometimes
-    // ship more than the PO). No cap on the ordered quantity here.
-    const newReceived = Number(line.quantity_received) + Number(r.receiving_now)
-    const actualReceiving = newReceived - Number(line.quantity_received)
-    if (actualReceiving <= 0) continue
+    // Edit-in-place: `received` is the TOTAL now on the line, not a delta.
+    // delta drives inventory movements (may be negative when correcting down).
+    // Over-delivery is allowed — no cap at the ordered quantity.
+    const received = Math.max(0, Number(r.received) || 0)
+    const delta = received - Number(line.quantity_received)
+    if (delta === 0) continue
 
-    // Update PO line — qty + optional note. Do NOT overwrite unit_cost
-    // (keep it as the agreed PO price for receipt comparisons).
-    const updates: Record<string, unknown> = { quantity_received: newReceived }
+    const receiptIso = isoDate(r.received_date) ?? poReceiptIso
+
+    // Update the PO line total (+ optional note). unit_cost stays the agreed price.
+    const updates: Record<string, unknown> = { quantity_received: received }
     if (r.note?.trim()) updates.notes = r.note.trim()
     const { error: lineErr } = await supabase
       .from('purchase_order_lines').update(updates).eq('id', r.line_id)
     if (lineErr) return { ok: false, error: lineErr.message }
 
-    // Stock movement — for ingredient OR packaging lines. Product / 'other'
-    // lines don't increment inventory.
+    // Stock movement — ingredient / packaging lines only (products don't touch
+    // ingredient inventory). Positive delta = received; negative = correction down.
     if (line.ingredient_id || line.packaging_id) {
       const invoiceCost = (r.invoice_unit_cost != null && Number.isFinite(r.invoice_unit_cost) && r.invoice_unit_cost >= 0)
         ? r.invoice_unit_cost
@@ -421,58 +422,55 @@ export async function receivePoLines(input: {
           ingredient_id:          line.ingredient_id,
           packaging_id:           line.packaging_id,
           location_id:            mainLoc.id,
-          movement_type:          'purchase_received',
-          quantity:               actualReceiving,
+          movement_type:          delta > 0 ? 'purchase_received' : 'correction',
+          quantity:               delta,
           unit_of_measure:        line.unit_of_measure,
           reference_type:         'purchase_order',
           purchase_order_line_id: line.id,
           unit_cost:              invoiceCost,
           notes:                  r.note?.trim() ?? '',
-          lot_number:             r.lot_number?.trim() || null,
-          expiry_date:            r.expiry_date?.trim() || null,
-          coa_file_path:          r.coa_file_path?.trim() || null,
-          coa_file_name:          r.coa_file_name?.trim() || null,
+          lot_number:             delta > 0 ? (r.lot_number?.trim() || null) : null,
+          expiry_date:            delta > 0 ? (r.expiry_date?.trim() || null) : null,
+          coa_file_path:          delta > 0 ? (r.coa_file_path?.trim() || null) : null,
+          coa_file_name:          delta > 0 ? (r.coa_file_name?.trim() || null) : null,
           created_by:             profile?.id ?? null,
         } as never)
       if (mvErr) return { ok: false, error: `Stock movement failed: ${mvErr.message}` }
 
-      // Lift the demand view's opening-stock figure by what we just received.
-      // Convert the PO line's UoM into the item's display UoM the same way the
-      // demand report does (only grams need converting; everything else passes
-      // through). Received stock drops out of "arrivals" once quantity_received
-      // rises, so this is where it must reappear — as on-hand opening stock.
+      // Adjust the demand view's opening-stock figure by the delta (signed).
       const lineUom = (line.unit_of_measure ?? '').trim().toLowerCase()
       if (line.ingredient_id) {
         const itemUom = ingById.get(line.ingredient_id)?.unit_of_measure ?? null
-        const qty = lineUom === 'g' ? convertGramsToIngredientUom(actualReceiving, itemUom) : actualReceiving
+        const qty = lineUom === 'g' ? convertGramsToIngredientUom(delta, itemUom) : delta
         ingBump.set(line.ingredient_id, (ingBump.get(line.ingredient_id) ?? 0) + qty)
       } else if (line.packaging_id) {
         const itemUom = pakById.get(line.packaging_id)?.unit_of_measure ?? null
-        const qty = lineUom === 'g' ? convertGramsToIngredientUom(actualReceiving, itemUom) : actualReceiving
+        const qty = lineUom === 'g' ? convertGramsToIngredientUom(delta, itemUom) : delta
         pakBump.set(line.packaging_id, (pakBump.get(line.packaging_id) ?? 0) + qty)
       }
     }
 
-    // Finished-goods product line — log the arrival so it shows in Stock
-    // Movements, tagged with this PO. Product lines don't move ingredient /
-    // packaging inventory, so there's no stock_movement for them above.
-    // NON-FATAL: the physical receipt (quantity_received above) is what matters;
-    // if this Stock-Movements log fails, never block the receive — just record
-    // the problem so it can be backfilled.
+    // Finished-goods product line — reconcile its Stock Movements receipt to the
+    // new total (one po_receipt row per line, dated the line's received date), so
+    // editing the amount never double- or under-counts. NON-FATAL: never block
+    // the receipt if this logging fails.
     if (line.product_id) {
-      const receiptIso = isoDate(r.received_date) ?? poReceiptIso
-      const { error: fgErr } = await supabase.from('finished_goods_receipts').insert({
-        product_id:             line.product_id,
-        received_month:         `${receiptIso.slice(0, 7)}-01`,
-        received_date:          receiptIso,
-        units:                  actualReceiving,
-        source:                 'po_receipt',
-        po_number:              po?.po_number ?? null,
-        purchase_order_line_id: line.id,
-        market:                 poMarket,
-        created_by:             profile?.id ?? null,
-      } as never)
-      if (fgErr) console.error(`[receivePoLines] Stock-Movements receipt log failed for line ${line.id}: ${fgErr.message}`)
+      await supabase.from('finished_goods_receipts')
+        .delete().eq('purchase_order_line_id', line.id).eq('source', 'po_receipt')
+      if (received > 0) {
+        const { error: fgErr } = await supabase.from('finished_goods_receipts').insert({
+          product_id:             line.product_id,
+          received_month:         `${receiptIso.slice(0, 7)}-01`,
+          received_date:          receiptIso,
+          units:                  received,
+          source:                 'po_receipt',
+          po_number:              po?.po_number ?? null,
+          purchase_order_line_id: line.id,
+          market:                 poMarket,
+          created_by:             profile?.id ?? null,
+        } as never)
+        if (fgErr) console.error(`[receivePoLines] Stock-Movements receipt log failed for line ${line.id}: ${fgErr.message}`)
+      }
     }
   }
 
