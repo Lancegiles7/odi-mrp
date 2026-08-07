@@ -132,15 +132,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         key: `${p.id}:AU`, product: p, market: 'AU', maker: p.manufacturer_au?.trim() || p.manufacturer, canEditOpening: false,
         opening: 0,
         forecastByMonth:  byMonth((m) => getCountryTotal(demandIdx, p.id, m, 'AUS')),
-        // Dual-made products default AU production to make-to-demand until a plan
-        // is entered; NZ-made products start blank (planned in manually).
-        productionByMonth: byMonth((m) => {
-          const planned = prodIdxAu.get(p.id)?.get(m)
-          // Dual products default to make-to-demand where nothing real is planned
-          // (missing OR a leftover zero seed row); NZ-made stay at the saved value.
-          if (planned) return planned
-          return dual ? getCountryTotal(demandIdx, p.id, m, 'AUS') : (planned ?? 0)
-        }),
+        // AU production is only what's been planned — no make-to-demand default.
+        productionByMonth: byMonth((m) => getProductionCell(prodIdxAu, p.id, m)),
         showTag: true,
       })
     }
