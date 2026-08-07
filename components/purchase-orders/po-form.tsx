@@ -284,12 +284,12 @@ export function POForm(props: POFormProps) {
               ⤓ View / print PDF
             </Link>
           )}
-          {props.mode === 'edit' && isSubmitted && (
+          {props.mode === 'edit' && (isSubmitted || props.status === 'received') && (
             <Link
               href={`/purchase-orders/${props.poId}/receive`}
               className="px-3 py-1.5 text-xs bg-emerald-700 text-white rounded-md hover:bg-emerald-800"
             >
-              📦 Receive items
+              {props.status === 'received' ? '📦 Edit receipt' : '📦 Receive items'}
             </Link>
           )}
         </div>
