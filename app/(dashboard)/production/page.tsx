@@ -5,15 +5,15 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import {
   rollingMonths, indexDemand, indexProduction,
-  getGrandTotal, getCountryTotal, getProductionCell, resolveOpeningStock, monthLabel, calcRollingBalance,
+  getGrandTotal, getCountryTotal, getProductionCell, monthLabel, calcRollingBalance,
 } from '@/lib/demand'
+import { loadStockLedger, closingStockAt } from '@/lib/stock-movements-data'
 import { getPlanningAnchor } from '@/lib/settings'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
-import { getProductOpeningStockSummary } from '@/lib/opening-stock-summary'
 import type { DemandForecast, ProductionPlan } from '@/lib/types/database.types'
 
 export const metadata: Metadata = { title: 'Production schedule' }
@@ -55,7 +55,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
-  const [{ data: products }, demand, { data: production }, { data: inventory }] = await Promise.all([
+  const [{ data: products }, demand, { data: production }, ledger] = await Promise.all([
     supabase
       .from('products')
       .select('id, sku_code, name, manufacturer, manufacturer_au, opening_stock_override, is_active')
@@ -77,9 +77,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       .select('product_id, year_month, units_planned, market')
       .gte('year_month', firstMonth)
       .lte('year_month', lastMonth) as unknown as Promise<{ data: Array<ProductionPlan & { market: string | null }> | null }>,
-    supabase
-      .from('inventory_balances')
-      .select('ingredient_id, quantity_on_hand') as unknown as Promise<{ data: Array<{ ingredient_id: string; quantity_on_hand: number }> | null }>,
+    loadStockLedger(),
   ])
 
   const allProducts = products ?? []
@@ -90,17 +88,14 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   const prodIdxNz = indexProduction(prodRows.filter((r) => (r.market ?? 'NZ') !== 'AU'))
   const prodIdxAu = indexProduction(prodRows.filter((r) => r.market === 'AU'))
 
-  // inventory_balances is keyed by ingredient_id — we don't currently have product-level stock.
-  // Placeholder lookup (empty) until product stock is wired. opening_stock_override still works.
-  const stockByProduct = new Map<string, number>()
-  for (const row of inventory ?? []) {
-    // No mapping today; left as a stub for when product-level stock is tracked.
-    stockByProduct.set(row.ingredient_id, row.quantity_on_hand)
-  }
-
-  function openingFor(p: ProductRow): number {
-    return resolveOpeningStock(p.opening_stock_override, stockByProduct.get(p.id))
-  }
+  // Opening stock is the closing (EOM) of the last closed month from Stock
+  // Movements — the single source of truth. No manual entry: as each month
+  // closes (actuals loaded), its EOM becomes the next opening automatically.
+  const closedMonth = ledger.actualThrough
+  const closedMonthLabel = closedMonth ? monthLabel(closedMonth) : null
+  const closing = closingStockAt(ledger.rows, closedMonth)
+  const openingFor = (p: ProductRow, market: 'NZ' | 'AU'): number =>
+    (market === 'AU' ? closing.get(p.id)?.AU : closing.get(p.id)?.NZ) ?? 0
 
   const byMonth = (fn: (m: string) => number): Record<string, number> => {
     const out: Record<string, number> = {}
@@ -121,8 +116,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     // by all-channel demand — exactly as before.
     const hasAu = dual || months.some((m) => getCountryTotal(demandIdx, p.id, m, 'AUS') > 0)
     lines.push({
-      key: `${p.id}:NZ`, product: p, market: 'NZ', maker: p.manufacturer, canEditOpening: true,
-      opening: openingFor(p),
+      key: `${p.id}:NZ`, product: p, market: 'NZ', maker: p.manufacturer, canEditOpening: false,
+      opening: openingFor(p, 'NZ'),
       forecastByMonth:  byMonth((m) => hasAu ? getCountryTotal(demandIdx, p.id, m, 'NZ') : getGrandTotal(demandIdx, p.id, m)),
       productionByMonth: byMonth((m) => getProductionCell(prodIdxNz, p.id, m)),
       showTag: hasAu,
@@ -130,7 +125,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     if (hasAu) {
       lines.push({
         key: `${p.id}:AU`, product: p, market: 'AU', maker: p.manufacturer_au?.trim() || p.manufacturer, canEditOpening: false,
-        opening: 0,
+        opening: openingFor(p, 'AU'),
         forecastByMonth:  byMonth((m) => getCountryTotal(demandIdx, p.id, m, 'AUS')),
         // AU production is only what's been planned — no make-to-demand default.
         productionByMonth: byMonth((m) => getProductionCell(prodIdxAu, p.id, m)),
@@ -158,13 +153,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   }
   const pageCounts = shortfallCountsFor(lines)
 
-  // Bulk-fetch (a) which (product, month) cells already have a comment,
-  // and (b) which products have any opening-stock edit history and/or
-  // comments — the latter drives the clock-button render on each row.
-  const [commentedCells, openingHistorySummary] = await Promise.all([
-    getCellsWithComments('product', allProducts.map((p) => p.id), firstMonth, lastMonth),
-    getProductOpeningStockSummary(allProducts.map((p) => p.id)),
-  ])
+  // Bulk-fetch which (product, month) cells already have a comment.
+  const commentedCells = await getCellsWithComments('product', allProducts.map((p) => p.id), firstMonth, lastMonth)
 
   // Build maker groups from lines. A dual product appears under both makers:
   // Brand Nation (its NZ line) and VMC (its AU line).
@@ -247,7 +237,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-50 border border-amber-200"></span> Amber — saved by this month&rsquo;s production</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-50 border border-red-200"></span> Red — short even with production</span>
           <span className="text-gray-300">·</span>
-          <span>Opening stock = manual override where set, else inventory on hand.</span>
+          <span>Opening stock = closing (EOM) of the last closed month from Stock Movements{closedMonthLabel ? ` (${closedMonthLabel})` : ''}.</span>
         </div>
 
         <MonthlyShortfallStrip months={months} totalsByMonth={pageCounts.totals} shortByMonth={pageCounts.shorts} />
@@ -290,7 +280,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                       <th className="text-left font-medium px-4 py-2 sticky left-0 bg-gray-50 z-10">Product</th>
                       <th className="text-right font-medium px-3 py-2">
                       Opening
-                      <span className="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
+                      <span className="block text-[9px] normal-case tracking-normal text-gray-400 font-normal">{closedMonthLabel ? `Stock Mvmts · ${closedMonthLabel}` : 'Stock Movements'}</span>
                     </th>
                       {monthHeaders}
                       <th className="text-right font-medium px-2 py-2 bg-gray-50 border-l border-gray-200">Total needed</th>
@@ -317,13 +307,11 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                           manufacturer={ln.maker}
                           isActive={ln.product.is_active}
                           openingStock={ln.opening}
-                          openingStockOverride={ln.canEditOpening ? ln.product.opening_stock_override : null}
-                          canEditOpening={ln.canEditOpening}
+                          openingSource={closedMonthLabel}
                           months={months}
                           forecastByMonth={ln.forecastByMonth}
                           productionByMonth={ln.productionByMonth}
                           commentedCells={commentedCells}
-                          openingHistory={openingHistorySummary.get(ln.product.id)}
                         />
                       )
                     })}
@@ -398,7 +386,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                 <th className="text-left font-medium px-3 py-2">Manufacturer</th>
                 <th className="text-right font-medium px-3 py-2">
                       Opening
-                      <span className="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
+                      <span className="block text-[9px] normal-case tracking-normal text-gray-400 font-normal">{closedMonthLabel ? `Stock Mvmts · ${closedMonthLabel}` : 'Stock Movements'}</span>
                     </th>
                 {monthHeaders}
                 <th className="text-right font-medium px-2 py-2 bg-gray-50 border-l border-gray-200">Total needed</th>
@@ -426,13 +414,11 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                     manufacturer={ln.maker}
                     isActive={ln.product.is_active}
                     openingStock={ln.opening}
-                    openingStockOverride={ln.canEditOpening ? ln.product.opening_stock_override : null}
-                    canEditOpening={ln.canEditOpening}
+                    openingSource={closedMonthLabel}
                     months={months}
                     forecastByMonth={ln.forecastByMonth}
                     productionByMonth={ln.productionByMonth}
                     commentedCells={commentedCells}
-                    openingHistory={openingHistorySummary.get(ln.product.id)}
                     showManufacturerChip
                   />
                 )
