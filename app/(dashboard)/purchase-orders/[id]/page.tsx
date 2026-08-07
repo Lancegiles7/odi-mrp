@@ -7,6 +7,9 @@ import { CorrectReceipts } from '@/components/purchase-orders/correct-receipts'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
 import { getAppSettings } from '@/lib/settings'
 
+// Always render live data so a just-saved receipt shows immediately.
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = { title: 'Purchase order' }
 
 interface PageProps {

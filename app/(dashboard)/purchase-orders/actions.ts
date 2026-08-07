@@ -395,10 +395,9 @@ export async function receivePoLines(input: {
     const line = lines.find((l) => l.id === r.line_id)
     if (!line) continue
 
-    const newReceived = Math.min(
-      Number(line.quantity_ordered),
-      Number(line.quantity_received) + Number(r.receiving_now),
-    )
+    // Over-delivery allowed: received may exceed ordered (suppliers sometimes
+    // ship more than the PO). No cap on the ordered quantity here.
+    const newReceived = Number(line.quantity_received) + Number(r.receiving_now)
     const actualReceiving = newReceived - Number(line.quantity_received)
     if (actualReceiving <= 0) continue
 
@@ -573,7 +572,8 @@ export async function correctReceivedQuantities(input: {
     const line = lines.find((l) => l.id === c.line_id)
     if (!line) continue
     if (moved.has(line.id)) { skipped.push(line.description ?? line.id); continue }
-    const qty = Math.max(0, Math.min(Number(line.quantity_ordered), Math.round(Number(c.quantity_received) || 0)))
+    // Over-delivery allowed — no cap at ordered (matches the receive flow).
+    const qty = Math.max(0, Math.round(Number(c.quantity_received) || 0))
     const { error } = await supabase
       .from('purchase_order_lines').update({ quantity_received: qty }).eq('id', line.id)
     if (error) return { ok: false, error: error.message }

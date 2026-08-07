@@ -91,7 +91,7 @@ export function CorrectReceipts({ poId, rows }: { poId: string; rows: Row[] }) {
                     </span>
                   ) : (
                     <input
-                      type="number" min={0} max={r.ordered}
+                      type="number" min={0}
                       value={vals[r.line_id] ?? 0}
                       onChange={(e) => setVal(r.line_id, e.target.value)}
                       className="w-24 text-right text-xs border border-gray-300 rounded px-1.5 py-1 tabular-nums"
