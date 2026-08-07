@@ -40,7 +40,9 @@ export default async function ReceivePoPage({ params }: PageProps) {
     .maybeSingle() as { data: POHeader | null }
 
   if (!po) notFound()
-  if (po.status !== 'submitted' && po.status !== 'partially_received') {
+  // Allow editing a received PO's quantities too (the receive screen is now the
+  // single edit surface). Only draft/cancelled POs can't be received against.
+  if (!['submitted', 'partially_received', 'received'].includes(po.status)) {
     redirect(`/purchase-orders/${params.id}`)
   }
 
