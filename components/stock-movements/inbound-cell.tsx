@@ -17,7 +17,7 @@ function fmtDate(iso: string | null): string {
  * and, when receipts are known, a hover tooltip listing each one with its PO ref.
  * Fixed-position tooltip so the scroll container can't clip it.
  */
-export function InboundCell({ value, receipts, toReceipt = [] }: { value: number; receipts: ReceiptDetail[]; toReceipt?: OpenPoDetail[] }) {
+export function InboundCell({ value, receipts, stillToReceipt = [], partialReceipt = [] }: { value: number; receipts: ReceiptDetail[]; stillToReceipt?: OpenPoDetail[]; partialReceipt?: OpenPoDetail[] }) {
   const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
   const has = receipts.length > 0
 
@@ -33,7 +33,8 @@ export function InboundCell({ value, receipts, toReceipt = [] }: { value: number
             : nf(value))
         : <span className="text-gray-300">—</span>}
       </span>
-      {toReceipt.length > 0 && <div><OpenPoChips items={toReceipt} kind="overdue" /></div>}
+      {stillToReceipt.length > 0 && <div><OpenPoChips items={stillToReceipt} kind="still" /></div>}
+      {partialReceipt.length > 0 && <div><OpenPoChips items={partialReceipt} kind="partial" /></div>}
 
       {tip && has && (
         <div

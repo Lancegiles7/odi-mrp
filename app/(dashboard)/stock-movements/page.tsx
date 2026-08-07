@@ -112,7 +112,7 @@ export default async function StockMovementsPage() {
       if (!openPo.has(l.product_id)) openPo.set(l.product_id, new Map())
       const bm = openPo.get(l.product_id)!
       if (!bm.has(month)) bm.set(month, [])
-      bm.get(month)!.push({ po: po.po_number, supplier: po.suppliers?.name ?? null, remaining, expected: po.expected_delivery_date })
+      bm.get(month)!.push({ po: po.po_number, supplier: po.suppliers?.name ?? null, remaining, expected: po.expected_delivery_date, partial: Number(l.quantity_received) > 0 })
     }
   }
 
