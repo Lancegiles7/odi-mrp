@@ -26,23 +26,26 @@ export interface OpenPoDetail {
   supplier: string | null
   remaining: number     // ordered − received
   expected: string | null   // ISO expected delivery date
+  partial: boolean      // some of the line has already been received
 }
 
 export interface ActualCell {
   inbound: number
   outbound: number     // sold + samples (BvA actuals)
   writeoff: number
-  eom: number          // predicted closing stock
-  receipts: ReceiptDetail[]   // breakdown behind `inbound` (for the hover)
-  toReceipt: OpenPoDetail[]   // open POs that were due this (closed) month — overdue
+  eom: number          // predicted closing stock — INCLUDES fully-open POs (stillToReceipt)
+  receipts: ReceiptDetail[]     // breakdown behind `inbound` (for the hover)
+  stillToReceipt: OpenPoDetail[] // fully-open POs (nothing received) — counted in eom
+  partialReceipt: OpenPoDetail[] // part-received PO lines — flagged only, not counted
 }
 
 export interface ForecastCell {
   produced: number     // production plan
   demand: number       // demand forecast
-  eom: number
+  eom: number          // INCLUDES fully-open POs (stillToReceipt)
   shortfall: boolean   // eom < 0
-  onOrder: OpenPoDetail[]   // open POs expected this (future) month
+  stillToReceipt: OpenPoDetail[] // fully-open POs — counted in eom
+  partialReceipt: OpenPoDetail[] // part-received PO lines — flagged only
   noPo: boolean             // planned production this month with no covering open PO
 }
 
@@ -86,25 +89,29 @@ export function buildStockLedger(input: {
       const inbound  = at(input.inbound, p.id, m)
       const outbound = at(input.outbound, p.id, m)
       const writeoff = at(input.writeoff, p.id, m)
-      eom = eom + inbound - outbound - writeoff
-      // Open POs due in a CLOSED month, still outstanding = overdue "to receipt".
-      const toReceipt = openByMonth?.get(m) ?? []
-      if (inbound || outbound || writeoff || toReceipt.length) activity = true
+      const open = openByMonth?.get(m) ?? []
+      const stillToReceipt = open.filter((o) => !o.partial)   // nothing received yet
+      const partialReceipt = open.filter((o) => o.partial)    // part-received, flag only
+      const expected = stillToReceipt.reduce((s, o) => s + o.remaining, 0)
+      // Fully-open POs count toward the projected stock (expected arrivals).
+      eom = eom + inbound + expected - outbound - writeoff
+      if (inbound || outbound || writeoff || open.length) activity = true
       const receipts = input.inboundReceipts?.get(p.id)?.get(m) ?? []
-      actual[m] = { inbound, outbound, writeoff, eom, receipts, toReceipt }
+      actual[m] = { inbound, outbound, writeoff, eom, receipts, stillToReceipt, partialReceipt }
     }
 
     const forecast: Record<string, ForecastCell> = {}
     for (const m of input.forecastMonths) {
       const produced = at(input.produced, p.id, m)
       const demand   = at(input.demand, p.id, m)
-      eom = eom + produced - demand
-      // Open POs expected in a FUTURE month = "on order". Planned production with
-      // no covering open PO that month = "no PO".
-      const onOrder = openByMonth?.get(m) ?? []
-      const noPo = produced > 0 && onOrder.length === 0
-      if (produced || demand || onOrder.length) activity = true
-      forecast[m] = { produced, demand, eom, shortfall: eom < 0, onOrder, noPo }
+      const open = openByMonth?.get(m) ?? []
+      const stillToReceipt = open.filter((o) => !o.partial)
+      const partialReceipt = open.filter((o) => o.partial)
+      const expected = stillToReceipt.reduce((s, o) => s + o.remaining, 0)
+      eom = eom + produced + expected - demand
+      const noPo = produced > 0 && open.length === 0
+      if (produced || demand || open.length) activity = true
+      forecast[m] = { produced, demand, eom, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo }
     }
 
     return {

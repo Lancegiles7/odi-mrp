@@ -141,10 +141,10 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
       </td>
       <td className="px-2 py-2 text-right sticky left-[240px] bg-white group-hover:bg-gray-50 z-10 border-r-2 border-gray-300 text-gray-500">{nf(r.opening)}</td>
       {actualMonths.map((m) => {
-        const c = r.actual[m] ?? { inbound: 0, outbound: 0, writeoff: 0, eom: 0, receipts: [], toReceipt: [] }
+        const c = r.actual[m] ?? { inbound: 0, outbound: 0, writeoff: 0, eom: 0, receipts: [], stillToReceipt: [], partialReceipt: [] }
         return (
           <Fragment key={m}>
-            <InboundCell value={c.inbound} receipts={c.receipts ?? []} toReceipt={c.toReceipt ?? []} />
+            <InboundCell value={c.inbound} receipts={c.receipts ?? []} stillToReceipt={c.stillToReceipt ?? []} partialReceipt={c.partialReceipt ?? []} />
             <td className="px-1.5 py-2 text-right text-blue-700">{cell(c.outbound)}</td>
             <td className="px-1.5 py-2 text-right text-rose-700">{cell(c.writeoff)}</td>
             <td className={`px-1.5 py-2 text-right font-semibold bg-gray-50/60 border-r border-gray-100 ${eomClass(c.eom)}`}>{nf(c.eom)}</td>
@@ -152,12 +152,13 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
         )
       })}
       {forecastMonths.map((m, i) => {
-        const c = r.forecast[m] ?? { produced: 0, demand: 0, eom: 0, shortfall: false, onOrder: [], noPo: false }
+        const c = r.forecast[m] ?? { produced: 0, demand: 0, eom: 0, shortfall: false, stillToReceipt: [], partialReceipt: [], noPo: false }
         return (
           <Fragment key={m}>
             <td className={`px-1.5 py-2 text-right text-emerald-700 bg-amber-50/20 ${i === 0 ? 'border-l-2 border-amber-200' : 'border-l border-gray-100'}`}>
               {cell(c.produced)}
-              {(c.onOrder?.length ?? 0) > 0 && <div><OpenPoChips items={c.onOrder} kind="onorder" /></div>}
+              {(c.stillToReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.stillToReceipt} kind="still" /></div>}
+              {(c.partialReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.partialReceipt} kind="partial" /></div>}
               {c.noPo && <div className="mt-0.5 text-[9px] font-bold px-1.5 rounded border bg-amber-50 text-amber-700 border-amber-200 inline-block">⚑ no PO</div>}
             </td>
             <td className="px-1.5 py-2 text-right text-blue-700 bg-amber-50/20">{cell(c.demand)}</td>
