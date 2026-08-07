@@ -40,6 +40,8 @@ interface ProdLine {
   opening: number
   forecastByMonth: Record<string, number>
   productionByMonth: Record<string, number>
+  /** True when the product is split into NZ + AU lines (show the market tag). */
+  showTag: boolean
 }
 
 interface PageProps {
@@ -113,18 +115,31 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   const lines: ProdLine[] = []
   for (const p of allProducts) {
     const dual = !!(p.manufacturer_au && p.manufacturer_au.trim())
+    // Split into NZ + AU lines whenever the product sells to Australia, so AU
+    // production can be planned per market. Dual products always split (their AU
+    // build is real); products with no AU demand stay a single NZ line driven
+    // by all-channel demand — exactly as before.
+    const hasAu = dual || months.some((m) => getCountryTotal(demandIdx, p.id, m, 'AUS') > 0)
     lines.push({
       key: `${p.id}:NZ`, product: p, market: 'NZ', maker: p.manufacturer, canEditOpening: true,
       opening: openingFor(p),
-      forecastByMonth:  byMonth((m) => dual ? getCountryTotal(demandIdx, p.id, m, 'NZ') : getGrandTotal(demandIdx, p.id, m)),
+      forecastByMonth:  byMonth((m) => hasAu ? getCountryTotal(demandIdx, p.id, m, 'NZ') : getGrandTotal(demandIdx, p.id, m)),
       productionByMonth: byMonth((m) => getProductionCell(prodIdxNz, p.id, m)),
+      showTag: hasAu,
     })
-    if (dual) {
+    if (hasAu) {
       lines.push({
-        key: `${p.id}:AU`, product: p, market: 'AU', maker: p.manufacturer_au, canEditOpening: false,
+        key: `${p.id}:AU`, product: p, market: 'AU', maker: p.manufacturer_au?.trim() || p.manufacturer, canEditOpening: false,
         opening: 0,
         forecastByMonth:  byMonth((m) => getCountryTotal(demandIdx, p.id, m, 'AUS')),
-        productionByMonth: byMonth((m) => getProductionCell(prodIdxAu, p.id, m)),
+        // Dual-made products default AU production to make-to-demand until a plan
+        // is entered; NZ-made products start blank (planned in manually).
+        productionByMonth: byMonth((m) => {
+          const planned = prodIdxAu.get(p.id)?.get(m)
+          if (planned != null) return planned
+          return dual ? getCountryTotal(demandIdx, p.id, m, 'AUS') : 0
+        }),
+        showTag: true,
       })
     }
   }
@@ -296,13 +311,12 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                   </thead>
                   <tbody>
                     {items.map((ln) => {
-                      const dual = !!(ln.product.manufacturer_au && ln.product.manufacturer_au.trim())
                       return (
                         <ProductionRow
                           key={ln.key}
                           productId={ln.product.id}
                           market={ln.market}
-                          marketTag={dual ? ln.market : undefined}
+                          marketTag={ln.showTag ? ln.market : undefined}
                           skuCode={ln.product.sku_code}
                           productName={ln.product.name}
                           manufacturer={ln.maker}
@@ -406,13 +420,12 @@ export default async function ProductionPage({ searchParams }: PageProps) {
             </thead>
             <tbody>
               {filtered.map((ln) => {
-                const dual = !!(ln.product.manufacturer_au && ln.product.manufacturer_au.trim())
                 return (
                   <ProductionRow
                     key={ln.key}
                     productId={ln.product.id}
                     market={ln.market}
-                    marketTag={dual ? ln.market : undefined}
+                    marketTag={ln.showTag ? ln.market : undefined}
                     skuCode={ln.product.sku_code}
                     productName={ln.product.name}
                     manufacturer={ln.maker}
