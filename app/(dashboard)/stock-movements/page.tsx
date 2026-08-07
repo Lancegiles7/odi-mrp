@@ -113,7 +113,9 @@ export default async function StockMovementsPage() {
     if (!producedAu.has(pid)) producedAu.set(pid, new Map())
     const pmm = producedAu.get(pid)!
     for (const [m, dem] of Array.from(mm.entries())) {
-      if (!pmm.has(m)) pmm.set(m, dem)   // only when neither plan nor receipt set it
+      // Fill when nothing is planned/received OR a leftover zero plan sits there
+      // (seed rows) — a real non-zero plan or receipt is kept as-is.
+      if (!pmm.get(m)) pmm.set(m, dem)
     }
   }
 
