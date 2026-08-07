@@ -88,13 +88,14 @@ function buildRow(
   startMonth: string | null,
 ): StockRow {
   const openByMonth = maps.openPo?.get(p.id)
-  const openingVal = maps.opening?.get(p.id) ?? 0
-  let eom = openingVal
-  let activity = openingVal !== 0
+  const baseOpening = maps.opening?.get(p.id) ?? 0
+  let eom = baseOpening
+  let carriedOpening = baseOpening   // balance carried into the first visible month
+  let activity = baseOpening !== 0
+  const visible = (m: string) => !startMonth || m >= startMonth
 
   const actual: Record<string, ActualCell> = {}
   for (const m of actualMonths) {
-    if (startMonth && m < startMonth) continue   // AU: blank before it starts
     const inbound  = at(maps.inbound, p.id, m)
     const outbound = at(maps.outbound, p.id, m)
     const writeoff = at(maps.writeoff, p.id, m)
@@ -104,13 +105,15 @@ function buildRow(
     const expected = stillToReceipt.reduce((s, o) => s + o.remaining, 0)
     eom = eom + inbound + expected - outbound - writeoff
     if (inbound || outbound || writeoff || open.length) activity = true
+    // Months before an AU row's start are rolled into its opening (stock built
+    // ahead of launch), not shown as their own cells.
+    if (!visible(m)) { carriedOpening = eom; continue }
     const receipts = maps.inboundReceipts?.get(p.id)?.get(m) ?? []
     actual[m] = { inbound, outbound, writeoff, eom, receipts, stillToReceipt, partialReceipt }
   }
 
   const forecast: Record<string, ForecastCell> = {}
   for (const m of forecastMonths) {
-    if (startMonth && m < startMonth) continue
     const produced = at(maps.produced, p.id, m)
     const demand   = at(maps.demand, p.id, m)
     const open = openByMonth?.get(m) ?? []
@@ -120,12 +123,15 @@ function buildRow(
     eom = eom + produced + expected - demand
     const noPo = produced > 0 && open.length === 0
     if (produced || demand || open.length) activity = true
+    if (!visible(m)) { carriedOpening = eom; continue }   // pre-launch build → opening
     forecast[m] = { produced, demand, eom, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo }
   }
 
   return {
     product_id: p.id, sku: p.sku_code, name: p.name, group: p.product_type ?? null,
-    market, startMonth, opening: openingVal, actual, forecast, hasActivity: activity,
+    market, startMonth,
+    opening: startMonth ? carriedOpening : baseOpening,
+    actual, forecast, hasActivity: activity,
   }
 }
 
