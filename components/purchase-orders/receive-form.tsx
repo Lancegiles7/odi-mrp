@@ -11,6 +11,8 @@ interface LineRow {
   sku: string | null
   quantity_ordered: number
   quantity_received: number
+  is_product: boolean                  // finished good — no lot/expiry/COA
+  saved_received_date: string | null   // ISO date already on record for this line
   unit_cost: number | null
   unit_of_measure: string
   notes: string
@@ -67,7 +69,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
       // current total so you can correct it.
       out[l.id] = {
         received:          l.quantity_received > 0 ? l.quantity_received : l.quantity_ordered,
-        received_date:     today,
+        received_date:     l.saved_received_date ?? today,
         invoice_unit_cost: l.unit_cost,
         lot_number:        '',
         expiry_date:       '',
@@ -123,9 +125,13 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
       return
     }
 
-    // Only send lines whose total actually changed (edit-in-place).
+    // Send lines whose total OR received-date changed (edit-in-place).
     const receipts = lines
-      .filter((l) => (state[l.id]?.received ?? 0) !== l.quantity_received)
+      .filter((l) => {
+        const s = state[l.id]
+        const initialDate = l.saved_received_date ?? today
+        return (s?.received ?? 0) !== l.quantity_received || (s?.received_date ?? '') !== initialDate
+      })
       .map((l) => ({
         line_id:           l.id,
         received:          state[l.id].received,
@@ -216,7 +222,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
               const received    = s.received ?? 0
               const isShort     = received < l.quantity_ordered
               const qtyOver     = received > l.quantity_ordered
-              const changed     = received !== l.quantity_received
+              const changed     = received !== l.quantity_received || (s.received_date ?? '') !== (l.saved_received_date ?? today)
               // Price drift vs PO line price
               const priceDrift = l.unit_cost != null && s.invoice_unit_cost != null
                 && Math.abs(s.invoice_unit_cost - l.unit_cost) > 0.001
@@ -278,14 +284,18 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
                     )}
                   </td>
                   <td className="px-3 py-2">
+                    {l.is_product ? <span className="text-gray-300">—</span> : (
                     <input
                       value={s.lot_number}
                       onChange={(e) => updateRow(l.id, { lot_number: e.target.value })}
                       placeholder="Lot / batch #"
                       className="w-28 text-xs border border-gray-200 rounded px-1.5 py-1 font-mono"
                     />
+                    )}
                   </td>
                   <td className="px-3 py-2">
+                    {l.is_product ? <span className="text-gray-300">—</span> : (
+                    <>
                     <input
                       type="date"
                       value={s.expiry_date}
@@ -295,8 +305,12 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
                     {expiryPast
                       ? <div className="text-[10px] text-red-700 mt-0.5">⚠ already expired</div>
                       : expirySoon && <div className="text-[10px] text-amber-800 mt-0.5">⚠ expires in ~{Math.max(0, Math.round((expDays ?? 0) / 7))} wks</div>}
+                    </>
+                    )}
                   </td>
                   <td className="px-3 py-2">
+                    {l.is_product ? <span className="text-gray-300">—</span> : (
+                    <>
                     <input
                       ref={(el) => { fileInputs.current[l.id] = el }}
                       type="file"
@@ -325,6 +339,8 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
                       >⤓ Attach COA</button>
                     )}
                     {s.coa_error && <div className="text-[10px] text-red-700 mt-0.5">{s.coa_error}</div>}
+                    </>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <input

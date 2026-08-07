@@ -70,6 +70,17 @@ export default async function ReceivePoPage({ params }: PageProps) {
   const ingMap  = new Map((ings  ?? []).map((i) => [i.id, i]))
   const prodMap = new Map((prods ?? []).map((p) => [p.id, p]))
 
+  // Saved received date per line (from the finished-goods receipt log) so the
+  // form shows the real date already on record instead of defaulting to today.
+  const lineIds = (lines ?? []).map((l) => l.id)
+  const { data: fgDates } = lineIds.length
+    ? await supabase.from('finished_goods_receipts')
+        .select('purchase_order_line_id, received_date')
+        .in('purchase_order_line_id', lineIds) as { data: Array<{ purchase_order_line_id: string | null; received_date: string | null }> | null }
+    : { data: [] as Array<{ purchase_order_line_id: string | null; received_date: string | null }> }
+  const dateByLine = new Map<string, string>()
+  for (const r of fgDates ?? []) if (r.purchase_order_line_id && r.received_date) dateByLine.set(r.purchase_order_line_id, r.received_date)
+
   const lineRows = (lines ?? []).map((l) => ({
     id: l.id,
     label:
@@ -82,6 +93,8 @@ export default async function ReceivePoPage({ params }: PageProps) {
                          null,
     quantity_ordered:  Number(l.quantity_ordered),
     quantity_received: Number(l.quantity_received),
+    is_product:        !!l.product_id,
+    saved_received_date: dateByLine.get(l.id) ?? null,
     unit_cost:         l.unit_cost != null ? Number(l.unit_cost) : null,
     unit_of_measure:   l.unit_of_measure,
     notes:             l.notes ?? '',

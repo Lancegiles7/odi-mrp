@@ -399,7 +399,9 @@ export async function receivePoLines(input: {
     // Over-delivery is allowed — no cap at the ordered quantity.
     const received = Math.max(0, Number(r.received) || 0)
     const delta = received - Number(line.quantity_received)
-    if (delta === 0) continue
+    // Note: we DON'T skip when delta === 0 — the caller only sends lines whose
+    // qty OR received-date changed, and a date-only change still needs the
+    // finished-goods receipt re-dated below.
 
     const receiptIso = isoDate(r.received_date) ?? poReceiptIso
 
@@ -411,8 +413,8 @@ export async function receivePoLines(input: {
     if (lineErr) return { ok: false, error: lineErr.message }
 
     // Stock movement — ingredient / packaging lines only (products don't touch
-    // ingredient inventory). Positive delta = received; negative = correction down.
-    if (line.ingredient_id || line.packaging_id) {
+    // ingredient inventory), and only when the qty actually moved.
+    if ((line.ingredient_id || line.packaging_id) && delta !== 0) {
       const invoiceCost = (r.invoice_unit_cost != null && Number.isFinite(r.invoice_unit_cost) && r.invoice_unit_cost >= 0)
         ? r.invoice_unit_cost
         : line.unit_cost
