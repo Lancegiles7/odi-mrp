@@ -2,6 +2,7 @@ import { Fragment } from 'react'
 import type { StockRow } from '@/lib/stock-movements'
 import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
 import { InboundCell } from '@/components/stock-movements/inbound-cell'
+import { OpenPoChips } from '@/components/stock-movements/open-po-chips'
 
 const nf = (n: number) => Math.round(n).toLocaleString('en-NZ')
 const dash = <span className="text-gray-300">—</span>
@@ -140,10 +141,10 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
       </td>
       <td className="px-2 py-2 text-right sticky left-[240px] bg-white group-hover:bg-gray-50 z-10 border-r-2 border-gray-300 text-gray-500">{nf(r.opening)}</td>
       {actualMonths.map((m) => {
-        const c = r.actual[m] ?? { inbound: 0, outbound: 0, writeoff: 0, eom: 0, receipts: [] }
+        const c = r.actual[m] ?? { inbound: 0, outbound: 0, writeoff: 0, eom: 0, receipts: [], toReceipt: [] }
         return (
           <Fragment key={m}>
-            <InboundCell value={c.inbound} receipts={c.receipts ?? []} />
+            <InboundCell value={c.inbound} receipts={c.receipts ?? []} toReceipt={c.toReceipt ?? []} />
             <td className="px-1.5 py-2 text-right text-blue-700">{cell(c.outbound)}</td>
             <td className="px-1.5 py-2 text-right text-rose-700">{cell(c.writeoff)}</td>
             <td className={`px-1.5 py-2 text-right font-semibold bg-gray-50/60 border-r border-gray-100 ${eomClass(c.eom)}`}>{nf(c.eom)}</td>
@@ -151,10 +152,14 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
         )
       })}
       {forecastMonths.map((m, i) => {
-        const c = r.forecast[m] ?? { produced: 0, demand: 0, eom: 0, shortfall: false }
+        const c = r.forecast[m] ?? { produced: 0, demand: 0, eom: 0, shortfall: false, onOrder: [], noPo: false }
         return (
           <Fragment key={m}>
-            <td className={`px-1.5 py-2 text-right text-emerald-700 bg-amber-50/20 ${i === 0 ? 'border-l-2 border-amber-200' : 'border-l border-gray-100'}`}>{cell(c.produced)}</td>
+            <td className={`px-1.5 py-2 text-right text-emerald-700 bg-amber-50/20 ${i === 0 ? 'border-l-2 border-amber-200' : 'border-l border-gray-100'}`}>
+              {cell(c.produced)}
+              {(c.onOrder?.length ?? 0) > 0 && <div><OpenPoChips items={c.onOrder} kind="onorder" /></div>}
+              {c.noPo && <div className="mt-0.5 text-[9px] font-bold px-1.5 rounded border bg-amber-50 text-amber-700 border-amber-200 inline-block">⚑ no PO</div>}
+            </td>
             <td className="px-1.5 py-2 text-right text-blue-700 bg-amber-50/20">{cell(c.demand)}</td>
             <td className={`px-1.5 py-2 text-right font-semibold bg-amber-50/40 border-r border-gray-100 ${eomClass(c.eom)}`}>
               {c.shortfall ? <span className="inline-block px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">{nf(c.eom)}</span> : nf(c.eom)}

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
-import { buildStockLedger, type ReceiptDetail } from '@/lib/stock-movements'
+import { buildStockLedger, type ReceiptDetail, type OpenPoDetail } from '@/lib/stock-movements'
 import { StockMovementsTable } from '@/components/stock-movements/stock-movements-table'
 import { InwardsUpload } from '@/components/stock-movements/inwards-upload'
 
@@ -88,11 +88,41 @@ export default async function StockMovementsPage() {
     for (const [m, u] of Array.from(mm.entries())) produced.get(pid)!.set(m, u)
   }
 
+  // ── Open POs still to receipt (drives the "to receipt / on order" chips) ──
+  // NZ builds only, to match the NZ production ledger. Keyed by expected month.
+  const openPo = new Map<string, Map<string, OpenPoDetail[]>>()
+  const { data: openPos } = await supabase.from('purchase_orders')
+    .select('id, po_number, expected_delivery_date, market, suppliers(name)')
+    .in('status', ['submitted', 'partially_received']) as {
+      data: Array<{ id: string; po_number: string; expected_delivery_date: string | null; market: string | null; suppliers: { name: string } | null }> | null }
+  const nzOpenPos = (openPos ?? []).filter((p) => (p.market ?? 'NZ') !== 'AU')
+  if (nzOpenPos.length) {
+    const poById = new Map(nzOpenPos.map((p) => [p.id, p]))
+    const { data: openLines } = await supabase.from('purchase_order_lines')
+      .select('purchase_order_id, product_id, quantity_ordered, quantity_received')
+      .in('purchase_order_id', nzOpenPos.map((p) => p.id))
+      .not('product_id', 'is', null) as {
+        data: Array<{ purchase_order_id: string; product_id: string; quantity_ordered: number; quantity_received: number }> | null }
+    for (const l of openLines ?? []) {
+      const remaining = Number(l.quantity_ordered) - Number(l.quantity_received)
+      if (remaining <= 0) continue
+      const po = poById.get(l.purchase_order_id)
+      if (!po?.expected_delivery_date) continue
+      const month = norm(po.expected_delivery_date)
+      if (!openPo.has(l.product_id)) openPo.set(l.product_id, new Map())
+      const bm = openPo.get(l.product_id)!
+      if (!bm.has(month)) bm.set(month, [])
+      bm.get(month)!.push({ po: po.po_number, supplier: po.suppliers?.name ?? null, remaining, expected: po.expected_delivery_date })
+    }
+  }
+
   // ── Month range + actual/forecast split ─────────────────────
   const monthSet = new Set<string>()
   for (const map of [inbound, outbound, writeoff, planned, demandM]) {
     for (const [, mm] of Array.from(map.entries())) for (const k of Array.from(mm.keys())) monthSet.add(k)
   }
+  // Open-PO expected months extend the window so a future arrival gets a column.
+  for (const bm of Array.from(openPo.values())) for (const k of Array.from(bm.keys())) monthSet.add(k)
   const sorted = Array.from(monthSet).sort()
   const months: string[] = []
   if (sorted.length) {
@@ -114,7 +144,7 @@ export default async function StockMovementsPage() {
 
   const allRows = buildStockLedger({
     products: products ?? [], actualMonths, forecastMonths,
-    inbound, outbound, writeoff, produced, demand: demandM, inboundReceipts,
+    inbound, outbound, writeoff, produced, demand: demandM, inboundReceipts, openPo,
   })
   const rows = allRows.filter((r) => r.hasActivity)
 

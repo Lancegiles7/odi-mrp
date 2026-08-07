@@ -20,12 +20,21 @@ export interface ReceiptDetail {
   batch: string | null
 }
 
+/** An open (not-fully-received) finished-goods PO line, placed on its expected month. */
+export interface OpenPoDetail {
+  po: string            // PO number
+  supplier: string | null
+  remaining: number     // ordered − received
+  expected: string | null   // ISO expected delivery date
+}
+
 export interface ActualCell {
   inbound: number
   outbound: number     // sold + samples (BvA actuals)
   writeoff: number
   eom: number          // predicted closing stock
   receipts: ReceiptDetail[]   // breakdown behind `inbound` (for the hover)
+  toReceipt: OpenPoDetail[]   // open POs that were due this (closed) month — overdue
 }
 
 export interface ForecastCell {
@@ -33,6 +42,8 @@ export interface ForecastCell {
   demand: number       // demand forecast
   eom: number
   shortfall: boolean   // eom < 0
+  onOrder: OpenPoDetail[]   // open POs expected this (future) month
+  noPo: boolean             // planned production this month with no covering open PO
 }
 
 export interface StockRow {
@@ -62,10 +73,13 @@ export function buildStockLedger(input: {
   opening?: Map<string, number>
   /** product_id -> month -> the receipts that make up that month's inbound. */
   inboundReceipts?: Map<string, Map<string, ReceiptDetail[]>>
+  /** product_id -> month (expected delivery) -> open PO lines still to receipt. */
+  openPo?: Map<string, Map<string, OpenPoDetail[]>>
 }): StockRow[] {
   return input.products.map((p) => {
     let eom = input.opening?.get(p.id) ?? 0
     let activity = eom !== 0
+    const openByMonth = input.openPo?.get(p.id)
 
     const actual: Record<string, ActualCell> = {}
     for (const m of input.actualMonths) {
@@ -73,9 +87,11 @@ export function buildStockLedger(input: {
       const outbound = at(input.outbound, p.id, m)
       const writeoff = at(input.writeoff, p.id, m)
       eom = eom + inbound - outbound - writeoff
-      if (inbound || outbound || writeoff) activity = true
+      // Open POs due in a CLOSED month, still outstanding = overdue "to receipt".
+      const toReceipt = openByMonth?.get(m) ?? []
+      if (inbound || outbound || writeoff || toReceipt.length) activity = true
       const receipts = input.inboundReceipts?.get(p.id)?.get(m) ?? []
-      actual[m] = { inbound, outbound, writeoff, eom, receipts }
+      actual[m] = { inbound, outbound, writeoff, eom, receipts, toReceipt }
     }
 
     const forecast: Record<string, ForecastCell> = {}
@@ -83,8 +99,12 @@ export function buildStockLedger(input: {
       const produced = at(input.produced, p.id, m)
       const demand   = at(input.demand, p.id, m)
       eom = eom + produced - demand
-      if (produced || demand) activity = true
-      forecast[m] = { produced, demand, eom, shortfall: eom < 0 }
+      // Open POs expected in a FUTURE month = "on order". Planned production with
+      // no covering open PO that month = "no PO".
+      const onOrder = openByMonth?.get(m) ?? []
+      const noPo = produced > 0 && onOrder.length === 0
+      if (produced || demand || onOrder.length) activity = true
+      forecast[m] = { produced, demand, eom, shortfall: eom < 0, onOrder, noPo }
     }
 
     return {
