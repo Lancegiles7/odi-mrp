@@ -25,7 +25,7 @@ interface Props {
 }
 
 interface RowState {
-  receiving_now: number
+  received: number                   // TOTAL received for this line (edit-in-place)
   received_date: string              // ISO yyyy-mm-dd the stock physically arrived (per line)
   invoice_unit_cost: number | null   // user-entered invoice price (defaults to PO price)
   lot_number: string
@@ -62,9 +62,11 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
   const [state, setState] = useState<Record<string, RowState>>(() => {
     const out: Record<string, RowState> = {}
     for (const l of lines) {
-      const remaining = Math.max(0, l.quantity_ordered - l.quantity_received)
+      // Pre-fill the total: a fresh line defaults to the full ordered qty (the
+      // common "received in full" case); an already-received line shows its
+      // current total so you can correct it.
       out[l.id] = {
-        receiving_now:     remaining,
+        received:          l.quantity_received > 0 ? l.quantity_received : l.quantity_ordered,
         received_date:     today,
         invoice_unit_cost: l.unit_cost,
         lot_number:        '',
@@ -110,10 +112,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
   }
 
   const willBePartial = useMemo(() => {
-    return lines.some((l) => {
-      const newReceived = Math.min(l.quantity_ordered, l.quantity_received + (state[l.id]?.receiving_now ?? 0))
-      return newReceived < l.quantity_ordered
-    })
+    return lines.some((l) => (state[l.id]?.received ?? 0) < l.quantity_ordered)
   }, [lines, state])
 
   function onSave() {
@@ -124,11 +123,12 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
       return
     }
 
+    // Only send lines whose total actually changed (edit-in-place).
     const receipts = lines
-      .filter((l) => (state[l.id]?.receiving_now ?? 0) > 0)
+      .filter((l) => (state[l.id]?.received ?? 0) !== l.quantity_received)
       .map((l) => ({
         line_id:           l.id,
-        receiving_now:     state[l.id].receiving_now,
+        received:          state[l.id].received,
         received_date:     state[l.id].received_date,
         invoice_unit_cost: state[l.id].invoice_unit_cost,
         note:              state[l.id].note,
@@ -139,11 +139,11 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
       }))
 
     if (receipts.length === 0) {
-      setError('Nothing to receive — set a quantity on at least one line.')
+      setError('No changes to save — edit a Received quantity first.')
       return
     }
     if (receipts.some((r) => !r.received_date)) {
-      setError('Set a Date received on every line you’re receiving.')
+      setError('Set a Date received on every line you’re changing.')
       return
     }
 
@@ -200,9 +200,8 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
             <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
               <th className="text-left px-4 py-2 font-medium">Item</th>
               <th className="text-right px-3 py-2 font-medium">Ordered</th>
-              <th className="text-right px-3 py-2 font-medium">Already received</th>
-              <th className="text-right px-3 py-2 font-medium">Receiving now</th>
-              <th className="text-left px-3 py-2 font-medium">Received</th>
+              <th className="text-right px-3 py-2 font-medium">Received</th>
+              <th className="text-left px-3 py-2 font-medium">Date received</th>
               <th className="text-right px-3 py-2 font-medium">PO price</th>
               <th className="text-right px-3 py-2 font-medium">Invoice price</th>
               <th className="text-left px-3 py-2 font-medium">Lot #</th>
@@ -214,12 +213,10 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
           <tbody>
             {lines.map((l) => {
               const s = state[l.id]
-              const newReceived = Math.min(l.quantity_ordered, l.quantity_received + (s.receiving_now ?? 0))
-              const remaining   = Math.max(0, l.quantity_ordered - newReceived)
-              const isShort     = remaining > 0 && (s.receiving_now ?? 0) > 0
-              // Qty over: receiving now exceeds remaining-to-go
-              const remainingBefore = Math.max(0, l.quantity_ordered - l.quantity_received)
-              const qtyOver = (s.receiving_now ?? 0) > remainingBefore
+              const received    = s.received ?? 0
+              const isShort     = received < l.quantity_ordered
+              const qtyOver     = received > l.quantity_ordered
+              const changed     = received !== l.quantity_received
               // Price drift vs PO line price
               const priceDrift = l.unit_cost != null && s.invoice_unit_cost != null
                 && Math.abs(s.invoice_unit_cost - l.unit_cost) > 0.001
@@ -228,7 +225,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
               const expDays = daysUntil(s.expiry_date)
               const expirySoon = expDays != null && expDays <= EXPIRY_WARN_DAYS
               const expiryPast = expDays != null && expDays < 0
-              const flagged = isShort || qtyOver || priceDrift || expirySoon
+              const flagged = qtyOver || priceDrift || expirySoon
               return (
                 <tr key={l.id} className={`border-t border-gray-100 align-top ${flagged ? 'bg-amber-50/40' : ''}`}>
                   <td className="px-4 py-2">
@@ -238,20 +235,18 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
                   <td className="px-3 py-2 text-right tabular-nums">
                     {l.quantity_ordered.toLocaleString()} {l.unit_of_measure}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-gray-500">
-                    {l.quantity_received > 0 ? l.quantity_received.toLocaleString() : '0'}
-                  </td>
                   <td className="px-3 py-2 text-right">
                     <input
                       type="number"
                       step="any"
                       min={0}
-                      value={s.receiving_now}
-                      onChange={(e) => updateRow(l.id, { receiving_now: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)) })}
-                      className="w-24 text-right text-xs border border-amber-300 rounded px-1.5 py-1 bg-amber-50 tabular-nums"
+                      value={s.received}
+                      onChange={(e) => updateRow(l.id, { received: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)) })}
+                      className={`w-24 text-right text-xs border rounded px-1.5 py-1 tabular-nums ${changed ? 'border-amber-300 bg-amber-50' : 'border-gray-300'}`}
                     />
-                    {isShort  && <div className="text-[10px] text-amber-800 mt-0.5">⚠ short {remaining.toLocaleString()} {l.unit_of_measure}</div>}
-                    {qtyOver  && <div className="text-[10px] text-amber-800 mt-0.5">⚠ over by {((s.receiving_now ?? 0) - remainingBefore).toLocaleString()} {l.unit_of_measure}</div>}
+                    {l.quantity_received > 0 && <div className="text-[10px] text-gray-400 mt-0.5">was {l.quantity_received.toLocaleString()}</div>}
+                    {isShort && <div className="text-[10px] text-amber-800 mt-0.5">⚠ {(l.quantity_ordered - received).toLocaleString()} short of order</div>}
+                    {qtyOver && <div className="text-[10px] text-amber-800 mt-0.5">⚠ over order by {(received - l.quantity_ordered).toLocaleString()}</div>}
                   </td>
                   <td className="px-3 py-2">
                     <input
