@@ -132,15 +132,32 @@ export function StockMovementsTable({
   )
 }
 
-function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMonths: string[]; forecastMonths: string[] }) {
+function MarketBadge({ market }: { market: 'NZ' | 'AU' }) {
+  const isNz = market === 'NZ'
   return (
-    <tr className="group hover:bg-gray-50 [&>td]:border-b [&>td]:border-gray-100">
-      <td className="px-3 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10">
-        <div className="font-medium text-gray-900 truncate max-w-[224px]">{r.name}</div>
-        <div className="text-[10px] font-mono text-gray-500">{r.sku}</div>
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isNz ? 'bg-gray-800 text-white' : 'bg-sky-100 text-sky-700 border border-sky-200'}`}>
+      {isNz ? 'NZ' : 'AUS'}
+    </span>
+  )
+}
+
+function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMonths: string[]; forecastMonths: string[] }) {
+  const isAu = r.market === 'AU'
+  // AUS rows are the second of a stacked pair — hang them under the NZ row
+  // (thinner top border, muted name) and blank out months before they start.
+  const before = (m: string) => r.startMonth != null && m < r.startMonth
+  return (
+    <tr className={`group hover:bg-gray-50 [&>td]:border-b [&>td]:border-gray-100 ${isAu ? 'bg-sky-50/20' : ''}`}>
+      <td className={`px-3 py-2 sticky left-0 z-10 ${isAu ? 'bg-sky-50/40' : 'bg-white'} group-hover:bg-gray-50`}>
+        <div className="flex items-center gap-1.5">
+          <MarketBadge market={r.market} />
+          <div className={`font-medium truncate max-w-[196px] ${isAu ? 'text-gray-600' : 'text-gray-900'}`}>{r.name}</div>
+        </div>
+        {!isAu && <div className="text-[10px] font-mono text-gray-500 mt-0.5">{r.sku}</div>}
       </td>
-      <td className="px-2 py-2 text-right sticky left-[240px] bg-white group-hover:bg-gray-50 z-10 border-r-2 border-gray-300 text-gray-500">{nf(r.opening)}</td>
+      <td className={`px-2 py-2 text-right sticky left-[240px] z-10 border-r-2 border-gray-300 text-gray-500 ${isAu ? 'bg-sky-50/40' : 'bg-white'} group-hover:bg-gray-50`}>{nf(r.opening)}</td>
       {actualMonths.map((m) => {
+        if (before(m)) return <BlankActual key={m} />
         const c = r.actual[m] ?? { inbound: 0, outbound: 0, writeoff: 0, eom: 0, receipts: [], stillToReceipt: [], partialReceipt: [] }
         return (
           <Fragment key={m}>
@@ -152,6 +169,7 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
         )
       })}
       {forecastMonths.map((m, i) => {
+        if (before(m)) return <BlankForecast key={m} first={i === 0} />
         const c = r.forecast[m] ?? { produced: 0, demand: 0, eom: 0, shortfall: false, stillToReceipt: [], partialReceipt: [], noPo: false }
         return (
           <Fragment key={m}>
@@ -169,6 +187,27 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
         )
       })}
     </tr>
+  )
+}
+
+/** Blank cells for an AUS row's months before it starts (pre-Sept 2026). */
+function BlankActual() {
+  return (
+    <>
+      <td className="px-1.5 py-2 text-right text-gray-300">·</td>
+      <td className="px-1.5 py-2" />
+      <td className="px-1.5 py-2" />
+      <td className="px-1.5 py-2 bg-gray-50/40 border-r border-gray-100" />
+    </>
+  )
+}
+function BlankForecast({ first }: { first: boolean }) {
+  return (
+    <>
+      <td className={`px-1.5 py-2 text-right text-gray-300 bg-amber-50/10 ${first ? 'border-l-2 border-amber-200' : 'border-l border-gray-100'}`}>·</td>
+      <td className="px-1.5 py-2 bg-amber-50/10" />
+      <td className="px-1.5 py-2 bg-amber-50/20 border-r border-gray-100" />
+    </>
   )
 }
 

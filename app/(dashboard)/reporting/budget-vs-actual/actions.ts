@@ -378,6 +378,7 @@ export async function setProductWriteoff(input: {
   year_month: string
   units:      number | null
   comment:    string | null
+  market?:    'NZ' | 'AU'
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -392,23 +393,27 @@ export async function setProductWriteoff(input: {
   const units   = input.units != null && Number.isFinite(input.units) ? input.units : 0
   const comment = input.comment?.trim() || null
 
+  const market = input.market === 'AU' ? 'AU' : 'NZ'
   if (units === 0 && !comment) {
     const { error } = await supabase.from('product_writeoffs').delete()
       .eq('product_id', input.product_id)
       .eq('year_month', input.year_month)
+      .eq('market', market)
     if (error) return { ok: false, error: error.message }
   } else {
     const { error } = await supabase.from('product_writeoffs').upsert({
       product_id: input.product_id,
       year_month: input.year_month,
+      market,
       units,
       comment,
       created_by: createdBy,
-    } as never, { onConflict: 'product_id,year_month' })
+    } as never, { onConflict: 'product_id,year_month,market' })
     if (error) return { ok: false, error: error.message }
   }
 
   revalidatePath(REVAL)
+  revalidatePath('/stock-movements')   // write-offs (esp. AUS) feed the stock ledger
   return { ok: true }
 }
 
