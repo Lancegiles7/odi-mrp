@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import type { ReceiptDetail } from '@/lib/stock-movements'
+import type { ReceiptDetail, OpenPoDetail } from '@/lib/stock-movements'
+import { OpenPoChips } from '@/components/stock-movements/open-po-chips'
 
 const nf = (n: number) => Math.round(n).toLocaleString('en-NZ')
 const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -16,21 +17,23 @@ function fmtDate(iso: string | null): string {
  * and, when receipts are known, a hover tooltip listing each one with its PO ref.
  * Fixed-position tooltip so the scroll container can't clip it.
  */
-export function InboundCell({ value, receipts }: { value: number; receipts: ReceiptDetail[] }) {
+export function InboundCell({ value, receipts, toReceipt = [] }: { value: number; receipts: ReceiptDetail[]; toReceipt?: OpenPoDetail[] }) {
   const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
   const has = receipts.length > 0
 
   return (
-    <td
-      className="px-1.5 py-2 text-right text-emerald-700 border-l border-gray-100"
-      onMouseEnter={has ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ x: r.right, y: r.bottom }) } : undefined}
-      onMouseLeave={has ? () => setTip(null) : undefined}
-    >
+    <td className="px-1.5 py-2 text-right text-emerald-700 border-l border-gray-100">
+      <span
+        onMouseEnter={has ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ x: r.right, y: r.bottom }) } : undefined}
+        onMouseLeave={has ? () => setTip(null) : undefined}
+      >
       {value
         ? (has
             ? <span className="cursor-help underline decoration-dotted decoration-emerald-300 underline-offset-2">{nf(value)}</span>
             : nf(value))
         : <span className="text-gray-300">—</span>}
+      </span>
+      {toReceipt.length > 0 && <div><OpenPoChips items={toReceipt} kind="overdue" /></div>}
 
       {tip && has && (
         <div
