@@ -11,11 +11,21 @@
  * and this rolls them into the ledger.
  */
 
+/** One finished-goods receipt behind a month's inbound total. */
+export interface ReceiptDetail {
+  date: string | null   // ISO received_date
+  units: number
+  po: string | null     // PO number, when the receipt came from a PO receipt
+  source: string        // 'po_receipt' | 'inwards_upload' | 'manual'
+  batch: string | null
+}
+
 export interface ActualCell {
   inbound: number
   outbound: number     // sold + samples (BvA actuals)
   writeoff: number
   eom: number          // predicted closing stock
+  receipts: ReceiptDetail[]   // breakdown behind `inbound` (for the hover)
 }
 
 export interface ForecastCell {
@@ -50,6 +60,8 @@ export function buildStockLedger(input: {
   produced: PM
   demand: PM
   opening?: Map<string, number>
+  /** product_id -> month -> the receipts that make up that month's inbound. */
+  inboundReceipts?: Map<string, Map<string, ReceiptDetail[]>>
 }): StockRow[] {
   return input.products.map((p) => {
     let eom = input.opening?.get(p.id) ?? 0
@@ -62,7 +74,8 @@ export function buildStockLedger(input: {
       const writeoff = at(input.writeoff, p.id, m)
       eom = eom + inbound - outbound - writeoff
       if (inbound || outbound || writeoff) activity = true
-      actual[m] = { inbound, outbound, writeoff, eom }
+      const receipts = input.inboundReceipts?.get(p.id)?.get(m) ?? []
+      actual[m] = { inbound, outbound, writeoff, eom, receipts }
     }
 
     const forecast: Record<string, ForecastCell> = {}

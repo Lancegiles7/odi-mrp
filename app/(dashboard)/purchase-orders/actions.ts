@@ -445,6 +445,25 @@ export async function receivePoLines(input: {
         pakBump.set(line.packaging_id, (pakBump.get(line.packaging_id) ?? 0) + qty)
       }
     }
+
+    // Finished-goods product line — log the arrival so it shows in Stock
+    // Movements, tagged with this PO. Product lines don't move ingredient /
+    // packaging inventory, so there's no stock_movement for them above.
+    if (line.product_id) {
+      const iso = new Date().toISOString().slice(0, 10)
+      const { error: fgErr } = await supabase.from('finished_goods_receipts').insert({
+        product_id:             line.product_id,
+        received_month:         `${iso.slice(0, 7)}-01`,
+        received_date:          iso,
+        units:                  actualReceiving,
+        source:                 'po_receipt',
+        po_number:              po?.po_number ?? null,
+        purchase_order_line_id: line.id,
+        market:                 poMarket,
+        created_by:             profile?.id ?? null,
+      } as never)
+      if (fgErr) return { ok: false, error: `Receipt log failed: ${fgErr.message}` }
+    }
   }
 
   // Recompute PO status: sum of received vs ordered across all lines
@@ -490,6 +509,7 @@ export async function receivePoLines(input: {
   revalidatePath('/purchase-orders')
   revalidatePath(`/purchase-orders/${input.po_id}`)
   revalidatePath('/ingredients/demand')
+  revalidatePath('/stock-movements')
   return { ok: true }
 }
 
@@ -519,6 +539,14 @@ export async function correctReceivedQuantities(input: {
     }> | null }
   if (!lines) return { ok: false, error: 'PO lines not found' }
 
+  // PO + user for re-logging finished-goods receipts (product lines) below.
+  const { data: po } = await supabase
+    .from('purchase_orders').select('po_number, market').eq('id', input.po_id).maybeSingle() as
+    { data: { po_number: string; market: string | null } | null }
+  const poMarket: 'NZ' | 'AU' = po?.market === 'AU' ? 'AU' : 'NZ'
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+
   // Lines that already moved inventory can't be corrected from here.
   const lineIds = lines.map((l) => l.id)
   const { data: movements } = await supabase
@@ -537,6 +565,28 @@ export async function correctReceivedQuantities(input: {
     const { error } = await supabase
       .from('purchase_order_lines').update({ quantity_received: qty }).eq('id', line.id)
     if (error) return { ok: false, error: error.message }
+
+    // Keep the finished-goods ledger in step for product lines: drop this line's
+    // PO-sourced receipts and re-log the corrected total (if any), so Stock
+    // Movements never double- or under-counts after a correction.
+    if (line.product_id) {
+      await supabase.from('finished_goods_receipts')
+        .delete().eq('purchase_order_line_id', line.id).eq('source', 'po_receipt')
+      if (qty > 0) {
+        const iso = new Date().toISOString().slice(0, 10)
+        await supabase.from('finished_goods_receipts').insert({
+          product_id:             line.product_id,
+          received_month:         `${iso.slice(0, 7)}-01`,
+          received_date:          iso,
+          units:                  qty,
+          source:                 'po_receipt',
+          po_number:              po?.po_number ?? null,
+          purchase_order_line_id: line.id,
+          market:                 poMarket,
+          created_by:             profile?.id ?? null,
+        } as never)
+      }
+    }
   }
 
   // Recompute status from the corrected quantities.
@@ -554,6 +604,7 @@ export async function correctReceivedQuantities(input: {
   revalidatePath(`/purchase-orders/${input.po_id}`)
   revalidatePath('/purchase-orders')
   revalidatePath(`/purchase-orders/${input.po_id}/receive`)
+  revalidatePath('/stock-movements')
   return { ok: true, skipped: skipped.length ? skipped : undefined }
 }
 

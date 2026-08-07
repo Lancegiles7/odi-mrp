@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import type { StockRow } from '@/lib/stock-movements'
 import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
+import { InboundCell } from '@/components/stock-movements/inbound-cell'
 
 const nf = (n: number) => Math.round(n).toLocaleString('en-NZ')
 const dash = <span className="text-gray-300">—</span>
@@ -139,10 +140,10 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
       </td>
       <td className="px-2 py-2 text-right sticky left-[240px] bg-white group-hover:bg-gray-50 z-10 border-r-2 border-gray-300 text-gray-500">{nf(r.opening)}</td>
       {actualMonths.map((m) => {
-        const c = r.actual[m] ?? { inbound: 0, outbound: 0, writeoff: 0, eom: 0 }
+        const c = r.actual[m] ?? { inbound: 0, outbound: 0, writeoff: 0, eom: 0, receipts: [] }
         return (
           <Fragment key={m}>
-            <td className="px-1.5 py-2 text-right text-emerald-700 border-l border-gray-100">{cell(c.inbound)}</td>
+            <InboundCell value={c.inbound} receipts={c.receipts ?? []} />
             <td className="px-1.5 py-2 text-right text-blue-700">{cell(c.outbound)}</td>
             <td className="px-1.5 py-2 text-right text-rose-700">{cell(c.writeoff)}</td>
             <td className={`px-1.5 py-2 text-right font-semibold bg-gray-50/60 border-r border-gray-100 ${eomClass(c.eom)}`}>{nf(c.eom)}</td>
