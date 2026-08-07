@@ -519,6 +519,7 @@ export async function receivePoLines(input: {
   revalidatePath('/packaging/demand')
   revalidatePath('/purchase-orders')
   revalidatePath(`/purchase-orders/${input.po_id}`)
+  revalidatePath(`/purchase-orders/${input.po_id}/receive`)
   revalidatePath('/ingredients/demand')
   revalidatePath('/stock-movements')
   return { ok: true }
