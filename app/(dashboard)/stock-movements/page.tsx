@@ -37,8 +37,8 @@ export default async function StockMovementsPage() {
     { data: writeoffs }, { data: production }, demand,
   ] = await Promise.all([
     supabase.from('products')
-      .select('id, sku_code, name, product_type, manufacturer_au')
-      .is('deleted_at', null).eq('is_active', true).order('sku_code') as { data: Array<{ id: string; sku_code: string; name: string; product_type: string | null; manufacturer_au: string | null }> | null },
+      .select('id, sku_code, name, product_type')
+      .is('deleted_at', null).eq('is_active', true).order('sku_code') as { data: Array<{ id: string; sku_code: string; name: string; product_type: string | null }> | null },
     supabase.from('finished_goods_receipts')
       .select('product_id, received_month, received_date, units, po_number, source, batch_ref, market') as { data: Array<{ product_id: string; received_month: string; received_date: string | null; units: number; po_number: string | null; source: string; batch_ref: string | null; market: string | null }> | null },
     supabase.from('product_actuals')
@@ -101,23 +101,9 @@ export default async function StockMovementsPage() {
     return out
   }
   const producedNz = mergeProduced(plannedNz, inboundNz)
+  // AU production is only what's actually planned/received — no make-to-demand
+  // default. Unplanned months show blank production and the EOM draws down.
   const producedAu = mergeProduced(plannedAu, inboundAu)
-
-  // Dual-made products (own AU factory) auto-fill AU production from AU demand
-  // where nothing is planned or received yet — a make-to-demand baseline the
-  // planner overrides by entering an AU production plan. NZ-made products get
-  // no auto-fill: their AU supply must be planned in manually.
-  const dualSet = new Set((products ?? []).filter((p) => (p.manufacturer_au ?? '').trim()).map((p) => p.id))
-  for (const [pid, mm] of Array.from(demandAu.entries())) {
-    if (!dualSet.has(pid)) continue
-    if (!producedAu.has(pid)) producedAu.set(pid, new Map())
-    const pmm = producedAu.get(pid)!
-    for (const [m, dem] of Array.from(mm.entries())) {
-      // Fill when nothing is planned/received OR a leftover zero plan sits there
-      // (seed rows) — a real non-zero plan or receipt is kept as-is.
-      if (!pmm.get(m)) pmm.set(m, dem)
-    }
-  }
 
   // ── Open POs still to receipt (chips), split NZ / AU by PO market ──
   const openPoNz = new Map<string, Map<string, OpenPoDetail[]>>()
