@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
-import { buildStockLedger } from '@/lib/stock-movements'
+import { buildStockLedger, type ReceiptDetail } from '@/lib/stock-movements'
 import { StockMovementsTable } from '@/components/stock-movements/stock-movements-table'
 import { InwardsUpload } from '@/components/stock-movements/inwards-upload'
 
@@ -35,7 +35,7 @@ export default async function StockMovementsPage() {
       .select('id, sku_code, name, product_type')
       .is('deleted_at', null).eq('is_active', true).order('sku_code') as { data: Array<{ id: string; sku_code: string; name: string; product_type: string | null }> | null },
     supabase.from('finished_goods_receipts')
-      .select('product_id, received_month, units') as { data: Array<{ product_id: string; received_month: string; units: number }> | null },
+      .select('product_id, received_month, received_date, units, po_number, source, batch_ref') as { data: Array<{ product_id: string; received_month: string; received_date: string | null; units: number; po_number: string | null; source: string; batch_ref: string | null }> | null },
     supabase.from('product_actuals')
       .select('product_id, year_month, units') as { data: Array<{ product_id: string; year_month: string; units: number }> | null },
     supabase.from('product_writeoffs')
@@ -56,7 +56,23 @@ export default async function StockMovementsPage() {
   const planned: PM  = new Map()   // NZ production plan
   const demandM: PM  = new Map()   // demand forecast (total)
 
-  for (const r of receipts ?? [])  addTo(inbound,  r.product_id, norm(r.received_month), Number(r.units))
+  // Per-product/per-month receipt breakdown (for the Inbound hover tooltip).
+  const inboundReceipts = new Map<string, Map<string, ReceiptDetail[]>>()
+  for (const r of receipts ?? []) {
+    const month = norm(r.received_month)
+    addTo(inbound, r.product_id, month, Number(r.units))
+    if (!inboundReceipts.has(r.product_id)) inboundReceipts.set(r.product_id, new Map())
+    const byMonth = inboundReceipts.get(r.product_id)!
+    if (!byMonth.has(month)) byMonth.set(month, [])
+    byMonth.get(month)!.push({
+      date: r.received_date ?? null, units: Number(r.units),
+      po: r.po_number ?? null, source: r.source, batch: r.batch_ref ?? null,
+    })
+  }
+  // Newest receipts first within each cell.
+  for (const byMonth of Array.from(inboundReceipts.values()))
+    for (const list of Array.from(byMonth.values()))
+      list.sort((a: ReceiptDetail, b: ReceiptDetail) => (b.date ?? '').localeCompare(a.date ?? ''))
   for (const a of actuals ?? [])   addTo(outbound, a.product_id, norm(a.year_month),     Number(a.units))
   for (const w of writeoffs ?? []) addTo(writeoff, w.product_id, norm(w.year_month),     Number(w.units))
   for (const p of production ?? []) if ((p.market ?? 'NZ') !== 'AU') addTo(planned, p.product_id, norm(p.year_month), Number(p.units_planned))
@@ -98,7 +114,7 @@ export default async function StockMovementsPage() {
 
   const allRows = buildStockLedger({
     products: products ?? [], actualMonths, forecastMonths,
-    inbound, outbound, writeoff, produced, demand: demandM,
+    inbound, outbound, writeoff, produced, demand: demandM, inboundReceipts,
   })
   const rows = allRows.filter((r) => r.hasActivity)
 
