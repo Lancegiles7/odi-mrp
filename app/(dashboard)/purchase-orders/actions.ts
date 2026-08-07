@@ -449,6 +449,9 @@ export async function receivePoLines(input: {
     // Finished-goods product line — log the arrival so it shows in Stock
     // Movements, tagged with this PO. Product lines don't move ingredient /
     // packaging inventory, so there's no stock_movement for them above.
+    // NON-FATAL: the physical receipt (quantity_received above) is what matters;
+    // if this Stock-Movements log fails, never block the receive — just record
+    // the problem so it can be backfilled.
     if (line.product_id) {
       const iso = new Date().toISOString().slice(0, 10)
       const { error: fgErr } = await supabase.from('finished_goods_receipts').insert({
@@ -462,7 +465,7 @@ export async function receivePoLines(input: {
         market:                 poMarket,
         created_by:             profile?.id ?? null,
       } as never)
-      if (fgErr) return { ok: false, error: `Receipt log failed: ${fgErr.message}` }
+      if (fgErr) console.error(`[receivePoLines] Stock-Movements receipt log failed for line ${line.id}: ${fgErr.message}`)
     }
   }
 
