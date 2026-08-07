@@ -177,6 +177,7 @@ function ProductTr({ r, year_month, isLocked, isYtd }: { r: ProductRow; year_mon
         <WriteoffCell
           product_id={r.product_id} year_month={year_month}
           units={r.writeoff} comment={r.writeoff_comment} name={r.name}
+          auUnits={r.writeoff_au} auComment={r.writeoff_au_comment}
           isLocked={isLocked} readOnly={isYtd}
         />
       </td>
@@ -259,14 +260,16 @@ function KeySwatch({ className }: { className: string }) {
  * (shows the cumulative units and reasons).
  */
 function WriteoffCell({
-  product_id, year_month, units, comment, name, isLocked, readOnly,
+  product_id, year_month, units, comment, name, auUnits, auComment, isLocked, readOnly,
 }: {
   product_id: string; year_month: string; units: number; comment: string | null
-  name: string; isLocked: boolean; readOnly: boolean
+  name: string; auUnits: number; auComment: string | null; isLocked: boolean; readOnly: boolean
 }) {
   const router = useRouter()
   const [unitsVal, setUnitsVal] = useState<string>(units ? String(units) : '')
   const [commentVal, setCommentVal] = useState<string>(comment ?? '')
+  const [auUnitsVal, setAuUnitsVal] = useState<string>(auUnits ? String(auUnits) : '')
+  const [auCommentVal, setAuCommentVal] = useState<string>(auComment ?? '')
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
   const [pending, start] = useTransition()
@@ -279,9 +282,12 @@ function WriteoffCell({
   useEffect(() => {
     setUnitsVal(units ? String(units) : '')
     setCommentVal(comment ?? '')
-  }, [units, comment, year_month, product_id])
+    setAuUnitsVal(auUnits ? String(auUnits) : '')
+    setAuCommentVal(auComment ?? '')
+  }, [units, comment, auUnits, auComment, year_month, product_id])
 
   const hasComment = (comment ?? '').trim().length > 0
+  const hasAu = (auUnits || 0) > 0
 
   function persist(nextUnits: string, nextComment: string) {
     if (isLocked || readOnly) return
@@ -290,7 +296,20 @@ function WriteoffCell({
     if ((u || 0) === (units || 0) && nextComment.trim() === (comment ?? '').trim()) return  // no change
     setError(null)
     start(async () => {
-      const res = await setProductWriteoff({ product_id, year_month, units: u, comment: nextComment.trim() || null })
+      const res = await setProductWriteoff({ product_id, year_month, units: u, comment: nextComment.trim() || null, market: 'NZ' })
+      if (!res.ok) { setError(res.error ?? 'Save failed'); return }
+      router.refresh()
+    })
+  }
+
+  function persistAu(nextUnits: string, nextComment: string) {
+    if (isLocked || readOnly) return
+    const u = nextUnits.trim() === '' ? 0 : Number(nextUnits)
+    if (!Number.isFinite(u)) { setError('Invalid'); return }
+    if ((u || 0) === (auUnits || 0) && nextComment.trim() === (auComment ?? '').trim()) return  // no change
+    setError(null)
+    start(async () => {
+      const res = await setProductWriteoff({ product_id, year_month, units: u, comment: nextComment.trim() || null, market: 'AU' })
       if (!res.ok) { setError(res.error ?? 'Save failed'); return }
       router.refresh()
     })
@@ -316,35 +335,66 @@ function WriteoffCell({
             placeholder={isLocked ? '—' : '0'}
             className={`w-14 text-right text-xs border rounded px-1.5 py-1 tabular-nums ${error ? 'border-red-300 bg-red-50' : 'border-gray-200'} ${isLocked ? 'bg-gray-50 text-gray-400' : 'bg-white'}`}
           />}
-      {(!readOnly || hasComment) && (
+      {(!readOnly || hasComment || hasAu) && (
         <button
           ref={btnRef}
           type="button"
           onClick={() => (open ? setOpen(false) : openPopover())}
-          title={hasComment ? 'View / edit reason' : 'Add reason'}
-          aria-label={hasComment ? 'View or edit write-off reason' : 'Add write-off reason'}
-          className={`relative w-5 h-5 shrink-0 rounded border inline-flex items-center justify-center text-[10px] ${hasComment ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-700'}`}
+          title={hasComment || hasAu ? 'View / edit reason + AUS write-off' : 'Add reason / AUS write-off'}
+          aria-label="Edit write-off reason and AUS write-off"
+          className={`relative w-5 h-5 shrink-0 rounded border inline-flex items-center justify-center text-[10px] ${hasComment || hasAu ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-700'}`}
         >
-          ✎{hasComment && <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-rose-500" />}
+          ✎{(hasComment || hasAu) && <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-rose-500" />}
         </button>
       )}
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden="true" />
           <div style={{ position: 'fixed', top: pos.top, left: pos.left }}
-            className="z-50 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-left">
-            <div className="text-[11px] font-semibold text-gray-700 mb-1.5">Why written off — {name}</div>
+            className="z-50 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-left">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-800 text-white">NZ</span>
+              <div className="text-[11px] font-semibold text-gray-700">Why written off — {name}</div>
+            </div>
             <textarea
               value={commentVal}
               onChange={(e) => setCommentVal(e.target.value)}
               disabled={readOnly || isLocked}
               placeholder={readOnly ? 'No reason recorded.' : 'e.g. Damaged in transit — insurance claim lodged'}
-              className="w-full text-xs border border-gray-200 rounded p-2 min-h-[64px] resize-y disabled:bg-gray-50 disabled:text-gray-600"
+              className="w-full text-xs border border-gray-200 rounded p-2 min-h-[56px] resize-y disabled:bg-gray-50 disabled:text-gray-600"
             />
+
+            {/* AUS write-off — separate country entry, feeds the Stock Movements AUS row. */}
+            <div className="mt-3 pt-2.5 border-t border-gray-100">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 border border-sky-200">AUS</span>
+                  <div className="text-[11px] font-semibold text-gray-700">AUS write-off</div>
+                </div>
+                <input
+                  type="number" step="any" min={0}
+                  value={auUnitsVal}
+                  onChange={(e) => setAuUnitsVal(e.target.value)}
+                  onBlur={() => persistAu(auUnitsVal, auCommentVal)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  disabled={readOnly || isLocked || pending}
+                  placeholder={readOnly ? '—' : '0'}
+                  className="w-16 text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums disabled:bg-gray-50 disabled:text-gray-600"
+                />
+              </div>
+              <textarea
+                value={auCommentVal}
+                onChange={(e) => setAuCommentVal(e.target.value)}
+                disabled={readOnly || isLocked}
+                placeholder={readOnly ? 'No AUS reason recorded.' : 'AUS reason (optional)'}
+                className="w-full text-xs border border-gray-200 rounded p-2 min-h-[48px] resize-y disabled:bg-gray-50 disabled:text-gray-600"
+              />
+            </div>
+
             <div className="flex justify-end gap-2 mt-2">
               <button type="button" onClick={() => setOpen(false)} className="text-[11px] font-medium px-2.5 py-1 rounded border border-gray-200 hover:bg-gray-50">Close</button>
               {!readOnly && !isLocked && (
-                <button type="button" onClick={() => { persist(unitsVal, commentVal); setOpen(false) }}
+                <button type="button" onClick={() => { persist(unitsVal, commentVal); persistAu(auUnitsVal, auCommentVal); setOpen(false) }}
                   className="text-[11px] font-medium px-2.5 py-1 rounded bg-gray-900 text-white hover:bg-gray-800">Save</button>
               )}
             </div>

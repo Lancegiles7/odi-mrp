@@ -203,6 +203,9 @@ export interface ProductRow {
   writeoff: number
   /** Reason for the write-off (free text). */
   writeoff_comment: string | null
+  /** AUS write-offs for the same period — entered here, shown on Stock Movements AUS row. */
+  writeoff_au: number
+  writeoff_au_comment: string | null
   receipts: number
   calc_eom: number | null
   counted_eom: number | null
@@ -234,6 +237,8 @@ export function computeProductRow(input: {
   counted_eom: number | null
   writeoff?: number
   writeoff_comment?: string | null
+  writeoff_au?: number
+  writeoff_au_comment?: string | null
 }): ProductRow {
   const budgetFull   = fillChannels(input.budget_by_channel)
   const channelsFull = fillChannels(input.channels)
@@ -266,6 +271,8 @@ export function computeProductRow(input: {
     total_sales,
     writeoff,
     writeoff_comment: input.writeoff_comment ?? null,
+    writeoff_au: input.writeoff_au ?? 0,
+    writeoff_au_comment: input.writeoff_au_comment ?? null,
     receipts:   input.receipts,
     calc_eom,
     counted_eom: input.counted_eom,

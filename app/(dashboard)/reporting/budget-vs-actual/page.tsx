@@ -109,7 +109,7 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
   const isFyStart  = month === months[0]
 
   // ── Summary figures (bva_figures) for the whole FY + FY locks + write-offs ──
-  const [{ data: figRows }, { data: fyLocks }, { data: writeoffFy }] = await Promise.all([
+  const [{ data: figRows }, { data: fyLocks }, { data: writeoffFy }, { data: writeoffAuFy }] = await Promise.all([
     supabase.from('bva_figures')
       .select('year_month, line_key, budget, actual')
       .gte('year_month', months[0]).lte('year_month', months[11]) as { data: Array<{ year_month: string; line_key: string; budget: number | null; actual: number | null }> | null },
@@ -118,6 +118,11 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
       .gte('year_month', months[0]).lte('year_month', months[11]) as { data: Array<{ year_month: string }> | null },
     supabase.from('product_writeoffs')
       .select('product_id, year_month, units, comment')
+      .eq('market', 'NZ')
+      .gte('year_month', months[0]).lte('year_month', months[11]) as { data: Array<{ product_id: string; year_month: string; units: number; comment: string | null }> | null },
+    supabase.from('product_writeoffs')
+      .select('product_id, year_month, units, comment')
+      .eq('market', 'AU')
       .gte('year_month', months[0]).lte('year_month', months[11]) as { data: Array<{ product_id: string; year_month: string; units: number; comment: string | null }> | null },
   ])
 
@@ -129,6 +134,14 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
     writeoffByMonthProduct.get(mk)!.set(w.product_id, { units: Number(w.units), comment: w.comment })
   }
   const writeoffThisMonth = writeoffByMonthProduct.get(month) ?? new Map<string, { units: number; comment: string | null }>()
+
+  // AUS write-offs — entered alongside NZ in the products tab, surfaced on the
+  // Stock Movements AUS row. Selected-month lookup only (BvA totals stay NZ).
+  const writeoffAuThisMonth = new Map<string, { units: number; comment: string | null }>()
+  for (const w of writeoffAuFy ?? []) {
+    if (ymKey(w.year_month) !== month) continue
+    writeoffAuThisMonth.set(w.product_id, { units: Number(w.units), comment: w.comment })
+  }
 
   const lockedSet = new Set((fyLocks ?? []).map((l) => ymKey(l.year_month)!))
   // figures indexed by month → line_key (plain objects to keep iteration simple)
@@ -234,6 +247,8 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
     counted_eom:       stockThisByEntity.get(p.id)?.counted ?? null,
     writeoff:          writeoffThisMonth.get(p.id)?.units ?? 0,
     writeoff_comment:  writeoffThisMonth.get(p.id)?.comment ?? null,
+    writeoff_au:         writeoffAuThisMonth.get(p.id)?.units ?? 0,
+    writeoff_au_comment: writeoffAuThisMonth.get(p.id)?.comment ?? null,
   }))
 
   // Map: product_id → total_out (used to derive ingredient/packaging consumption).
@@ -296,6 +311,8 @@ export default async function BudgetVsActualPage({ searchParams }: PageProps) {
       counted_eom:       stockThisByEntity.get(p.id)?.counted ?? null,
       writeoff:          ytdWriteoff.get(p.id)?.units ?? 0,
       writeoff_comment:  ytdWriteoff.get(p.id)?.comments.join('; ') || null,
+      writeoff_au:         writeoffAuThisMonth.get(p.id)?.units ?? 0,
+      writeoff_au_comment: writeoffAuThisMonth.get(p.id)?.comment ?? null,
     }))
     productYtdLabel = `${shortMonth(months[0])} – ${shortMonth(month)}`
   }
