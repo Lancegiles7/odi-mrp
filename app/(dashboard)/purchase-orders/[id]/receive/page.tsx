@@ -73,13 +73,12 @@ export default async function ReceivePoPage({ params }: PageProps) {
   // Saved received date per line (from the finished-goods receipt log) so the
   // form shows the real date already on record instead of defaulting to today.
   const lineIds = (lines ?? []).map((l) => l.id)
-  const { data: fgDates } = lineIds.length
+  const { data: fgSaved } = lineIds.length
     ? await supabase.from('finished_goods_receipts')
-        .select('purchase_order_line_id, received_date')
-        .in('purchase_order_line_id', lineIds) as { data: Array<{ purchase_order_line_id: string | null; received_date: string | null }> | null }
-    : { data: [] as Array<{ purchase_order_line_id: string | null; received_date: string | null }> }
-  const dateByLine = new Map<string, string>()
-  for (const r of fgDates ?? []) if (r.purchase_order_line_id && r.received_date) dateByLine.set(r.purchase_order_line_id, r.received_date)
+        .select('purchase_order_line_id, received_date, batch_ref, expiry_date, coa_file_path, coa_file_name')
+        .in('purchase_order_line_id', lineIds) as { data: Array<{ purchase_order_line_id: string | null; received_date: string | null; batch_ref: string | null; expiry_date: string | null; coa_file_path: string | null; coa_file_name: string | null }> | null }
+    : { data: [] as Array<{ purchase_order_line_id: string | null; received_date: string | null; batch_ref: string | null; expiry_date: string | null; coa_file_path: string | null; coa_file_name: string | null }> }
+  const savedByLine = new Map((fgSaved ?? []).filter((r) => r.purchase_order_line_id).map((r) => [r.purchase_order_line_id as string, r]))
 
   const lineRows = (lines ?? []).map((l) => ({
     id: l.id,
@@ -94,7 +93,11 @@ export default async function ReceivePoPage({ params }: PageProps) {
     quantity_ordered:  Number(l.quantity_ordered),
     quantity_received: Number(l.quantity_received),
     is_product:        !!l.product_id,
-    saved_received_date: dateByLine.get(l.id) ?? null,
+    saved_received_date: savedByLine.get(l.id)?.received_date ?? null,
+    saved_lot:           savedByLine.get(l.id)?.batch_ref ?? null,
+    saved_expiry:        savedByLine.get(l.id)?.expiry_date ?? null,
+    saved_coa_path:      savedByLine.get(l.id)?.coa_file_path ?? null,
+    saved_coa_name:      savedByLine.get(l.id)?.coa_file_name ?? null,
     unit_cost:         l.unit_cost != null ? Number(l.unit_cost) : null,
     unit_of_measure:   l.unit_of_measure,
     notes:             l.notes ?? '',

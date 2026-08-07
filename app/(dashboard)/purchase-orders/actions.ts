@@ -469,6 +469,10 @@ export async function receivePoLines(input: {
           po_number:              po?.po_number ?? null,
           purchase_order_line_id: line.id,
           market:                 poMarket,
+          batch_ref:              r.lot_number?.trim() || null,
+          expiry_date:            r.expiry_date?.trim() || null,
+          coa_file_path:          r.coa_file_path?.trim() || null,
+          coa_file_name:          r.coa_file_name?.trim() || null,
           created_by:             profile?.id ?? null,
         } as never)
         if (fgErr) console.error(`[receivePoLines] Stock-Movements receipt log failed for line ${line.id}: ${fgErr.message}`)
