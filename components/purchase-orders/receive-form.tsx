@@ -26,6 +26,7 @@ interface Props {
 
 interface RowState {
   receiving_now: number
+  received_date: string              // ISO yyyy-mm-dd the stock physically arrived (per line)
   invoice_unit_cost: number | null   // user-entered invoice price (defaults to PO price)
   lot_number: string
   expiry_date: string                // ISO yyyy-mm-dd, '' when unset
@@ -52,10 +53,10 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
   const router = useRouter()
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  // Date the stock was physically received — drives the Stock Movements month.
-  // Defaults to today but is editable so late-entered receipts land in the right
-  // month (e.g. goods received in July, keyed in during August).
-  const [receivedDate, setReceivedDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  // "Set all" convenience — changing it stamps every line's received date.
+  // Each line still holds its own date so split deliveries can differ.
+  const today = new Date().toISOString().slice(0, 10)
+  const [receivedDate, setReceivedDate] = useState<string>(today)
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const [state, setState] = useState<Record<string, RowState>>(() => {
@@ -64,6 +65,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
       const remaining = Math.max(0, l.quantity_ordered - l.quantity_received)
       out[l.id] = {
         receiving_now:     remaining,
+        received_date:     today,
         invoice_unit_cost: l.unit_cost,
         lot_number:        '',
         expiry_date:       '',
@@ -127,6 +129,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
       .map((l) => ({
         line_id:           l.id,
         receiving_now:     state[l.id].receiving_now,
+        received_date:     state[l.id].received_date,
         invoice_unit_cost: state[l.id].invoice_unit_cost,
         note:              state[l.id].note,
         lot_number:        state[l.id].lot_number,
@@ -139,13 +142,13 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
       setError('Nothing to receive — set a quantity on at least one line.')
       return
     }
-    if (!receivedDate) {
-      setError('Set the date the stock was received.')
+    if (receipts.some((r) => !r.received_date)) {
+      setError('Set a Date received on every line you’re receiving.')
       return
     }
 
     start(async () => {
-      const res = await receivePoLines({ po_id: poId, received_date: receivedDate, receipts })
+      const res = await receivePoLines({ po_id: poId, receipts })
       if (!res.ok) { setError(res.error ?? 'Save failed'); return }
       router.push(`/purchase-orders/${poId}`)
       router.refresh()
@@ -166,17 +169,23 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
         </div>
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
-            Date received
+            Set all dates
             <input
               type="date"
               value={receivedDate}
-              max={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setReceivedDate(e.target.value)}
+              max={today}
+              onChange={(e) => {
+                const v = e.target.value
+                setReceivedDate(v)
+                setState((prev) => Object.fromEntries(
+                  Object.entries(prev).map(([id, r]) => [id, { ...r, received_date: v }]),
+                ))
+              }}
               className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
             />
           </label>
-          <div className="text-xs text-gray-400 max-w-[180px]">
-            Sets the Stock Movements month · leave at 0 to skip a line
+          <div className="text-xs text-gray-400 max-w-[170px]">
+            Fills every line · each line’s date can differ
           </div>
         </div>
       </div>
@@ -193,6 +202,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
               <th className="text-right px-3 py-2 font-medium">Ordered</th>
               <th className="text-right px-3 py-2 font-medium">Already received</th>
               <th className="text-right px-3 py-2 font-medium">Receiving now</th>
+              <th className="text-left px-3 py-2 font-medium">Received</th>
               <th className="text-right px-3 py-2 font-medium">PO price</th>
               <th className="text-right px-3 py-2 font-medium">Invoice price</th>
               <th className="text-left px-3 py-2 font-medium">Lot #</th>
@@ -242,6 +252,15 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
                     />
                     {isShort  && <div className="text-[10px] text-amber-800 mt-0.5">⚠ short {remaining.toLocaleString()} {l.unit_of_measure}</div>}
                     {qtyOver  && <div className="text-[10px] text-amber-800 mt-0.5">⚠ over by {((s.receiving_now ?? 0) - remainingBefore).toLocaleString()} {l.unit_of_measure}</div>}
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="date"
+                      value={s.received_date}
+                      max={today}
+                      onChange={(e) => updateRow(l.id, { received_date: e.target.value })}
+                      className="text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                    />
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-gray-500">
                     {l.unit_cost != null ? `$${l.unit_cost.toFixed(2)}` : '—'}
