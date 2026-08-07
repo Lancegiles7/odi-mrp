@@ -2,6 +2,10 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ReceiveForm } from '@/components/purchase-orders/receive-form'
 
+// Always render live data — never serve a cached copy, so a receipt just saved
+// is always reflected (no stale "already received").
+export const dynamic = 'force-dynamic'
+
 interface PageProps {
   params: { id: string }
 }
