@@ -1,15 +1,10 @@
 'use client'
 
-import { useCallback, useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
-import {
-  updateProductionCell,
-  updateOpeningStockOverride,
-  getOpeningStockHistory,
-} from '@/app/(dashboard)/production/actions'
+import { updateProductionCell } from '@/app/(dashboard)/production/actions'
 import { calcRollingBalance, monthLabel, type ShortfallState } from '@/lib/demand'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
-import { OpeningStockHistoryPopover } from '@/components/inventory/opening-stock-popover'
 import { CellCommentPopover } from '@/components/inventory/cell-comment-popover'
 
 interface Props {
@@ -19,20 +14,17 @@ interface Props {
   manufacturer: string | null
   isActive: boolean
   openingStock: number
-  openingStockOverride: number | null
+  /** Label of the closed month the opening came from (Stock Movements EOM). */
+  openingSource?: string | null
   months: string[]
   forecastByMonth: Record<string, number>
   productionByMonth: Record<string, number>
   commentedCells: Set<string>      // "productId|yyyy-mm-01" keys
-  /** Bulk-fetched opening-stock summary: drives the clock-button render. */
-  openingHistory?: { hasHistory: boolean; hasComment: boolean }
   showManufacturerChip?: boolean   // true on the flat "view all" table
   /** Which build this row plans. Production cells write to this market. */
   market?: 'NZ' | 'AU'
   /** Show a small NZ/AU tag (used when a product is dual-made). */
   marketTag?: 'NZ' | 'AU'
-  /** AU lines can't edit product-level opening stock (it's shared) — show it static. */
-  canEditOpening?: boolean
 }
 
 /**
@@ -44,13 +36,12 @@ interface Props {
  */
 export function ProductionRow({
   productId, skuCode, productName, manufacturer, isActive,
-  openingStock, openingStockOverride, months, forecastByMonth, productionByMonth,
-  commentedCells, openingHistory, showManufacturerChip,
-  market = 'NZ', marketTag, canEditOpening = true,
+  openingStock, openingSource, months, forecastByMonth, productionByMonth,
+  commentedCells, showManufacturerChip,
+  market = 'NZ', marketTag,
 }: Props) {
   const [prod, setProd] = useState<Record<string, number>>(productionByMonth)
-  const [opening, setOpening] = useState<number>(openingStock)
-  const [override, setOverride] = useState<number | null>(openingStockOverride)
+  const opening = openingStock
   const [saving, setSaving] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -73,12 +64,6 @@ export function ProductionRow({
       const res = await updateProductionCell(productId, month, units, market)
       if (!res.ok) setError(res.error ?? 'Save failed')
     })
-  }
-
-  function handleOpeningSaved(next: number | null) {
-    setOverride(next)
-    setOpening(next ?? 0)
-    setError(null)
   }
 
   const manufacturerChip = manufacturer
@@ -111,20 +96,14 @@ export function ProductionRow({
       )}
 
       <td className="px-3 py-2 text-right">
-        {canEditOpening ? (
-          <OpeningStockHistoryPopover
-            entityLabel={`Opening stock · ${productName}`}
-            description="Manual override · leave blank to fall back to inventory on hand."
-            currentValue={override}
-            onSave={useCallback((v, note) => updateOpeningStockOverride(productId, v, note), [productId])}
-            onLoadHistory={useCallback(() => getOpeningStockHistory(productId), [productId])}
-            onSaved={handleOpeningSaved}
-            hasHistory={openingHistory?.hasHistory}
-            hasComment={openingHistory?.hasComment}
-          />
-        ) : (
-          <span className="text-gray-300 text-xs" title="Opening stock is tracked on the NZ build">—</span>
-        )}
+        <span
+          className="text-xs text-gray-700 tabular-nums"
+          title={openingSource
+            ? `Closing stock at end of ${openingSource}, from Stock Movements`
+            : 'From Stock Movements'}
+        >
+          {opening ? opening.toLocaleString() : <span className="text-gray-300">—</span>}
+        </span>
       </td>
 
       {rows.map((r) => {
