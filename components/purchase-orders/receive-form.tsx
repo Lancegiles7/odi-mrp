@@ -52,6 +52,10 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
   const router = useRouter()
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // Date the stock was physically received — drives the Stock Movements month.
+  // Defaults to today but is editable so late-entered receipts land in the right
+  // month (e.g. goods received in July, keyed in during August).
+  const [receivedDate, setReceivedDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const [state, setState] = useState<Record<string, RowState>>(() => {
@@ -135,9 +139,13 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
       setError('Nothing to receive — set a quantity on at least one line.')
       return
     }
+    if (!receivedDate) {
+      setError('Set the date the stock was received.')
+      return
+    }
 
     start(async () => {
-      const res = await receivePoLines({ po_id: poId, receipts })
+      const res = await receivePoLines({ po_id: poId, received_date: receivedDate, receipts })
       if (!res.ok) { setError(res.error ?? 'Save failed'); return }
       router.push(`/purchase-orders/${poId}`)
       router.refresh()
@@ -156,8 +164,20 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
             </p>
           </div>
         </div>
-        <div className="text-xs text-gray-500">
-          Tip: leave at 0 to skip a line · price can be amended at receipt
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+            Date received
+            <input
+              type="date"
+              value={receivedDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setReceivedDate(e.target.value)}
+              className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+            />
+          </label>
+          <div className="text-xs text-gray-400 max-w-[180px]">
+            Sets the Stock Movements month · leave at 0 to skip a line
+          </div>
         </div>
       </div>
 

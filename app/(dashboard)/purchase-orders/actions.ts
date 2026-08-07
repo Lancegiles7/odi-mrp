@@ -310,6 +310,7 @@ export async function deletePurchaseOrder(id: string): Promise<{ ok: boolean; er
 // ============================================================
 export async function receivePoLines(input: {
   po_id: string
+  received_date?: string           // ISO yyyy-mm-dd the stock physically arrived
   receipts: Array<{
     line_id: string
     receiving_now: number
@@ -357,6 +358,12 @@ export async function receivePoLines(input: {
     .maybeSingle() as { data: { po_number: string; market: string | null } | null }
   const poMarket: 'NZ' | 'AU' = po?.market === 'AU' ? 'AU' : 'NZ'
   const openCol = poMarket === 'AU' ? 'opening_stock_override_au' : 'opening_stock_override'
+
+  // The date stock physically arrived — drives the Stock Movements month.
+  // Use the user-entered date (validated yyyy-mm-dd); fall back to today.
+  const receiptIso = /^\d{4}-\d{2}-\d{2}$/.test(input.received_date ?? '')
+    ? (input.received_date as string)
+    : new Date().toISOString().slice(0, 10)
 
   // Current opening figures + display UoM for the ingredients/packaging on this
   // PO, so we can convert the received qty into the demand view's unit and add it.
@@ -453,11 +460,10 @@ export async function receivePoLines(input: {
     // if this Stock-Movements log fails, never block the receive — just record
     // the problem so it can be backfilled.
     if (line.product_id) {
-      const iso = new Date().toISOString().slice(0, 10)
       const { error: fgErr } = await supabase.from('finished_goods_receipts').insert({
         product_id:             line.product_id,
-        received_month:         `${iso.slice(0, 7)}-01`,
-        received_date:          iso,
+        received_month:         `${receiptIso.slice(0, 7)}-01`,
+        received_date:          receiptIso,
         units:                  actualReceiving,
         source:                 'po_receipt',
         po_number:              po?.po_number ?? null,
