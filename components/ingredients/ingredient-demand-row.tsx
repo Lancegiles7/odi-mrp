@@ -212,28 +212,15 @@ export function IngredientDemandRow({ row, months, commentedCells, openingHistor
           </tr>
           {row.products.map((p) => (
             <tr key={p.id} className="bg-blue-50/30 hover:bg-blue-50/50 text-[11px]">
-              <td className="px-4 pl-12 py-1.5">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-gray-400">└</span>
-                  <Link href={`/products/${p.id}`} className="text-gray-700 hover:underline truncate">
+              <td className="px-4 pl-12 py-1.5" colSpan={4 + months.length}>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-gray-400 flex-shrink-0">└</span>
+                  <Link href={`/products/${p.id}`} className="text-gray-700 hover:underline">
                     {p.name}
                   </Link>
                   <span className="text-gray-400 text-[10px] flex-shrink-0">· {Number(p.gramsPerUnit.toFixed(2))} {isCountUom(row.ingredient.unit_of_measure) ? `${unit}/unit` : 'g/unit'}</span>
                 </div>
               </td>
-              <td className="px-3 py-1.5 text-right text-gray-400 tabular-nums">—</td>
-              {months.map((m) => {
-                const v = p.demandByMonth.get(m) ?? 0
-                return (
-                  <td key={m} className="px-2 py-1.5 text-right tabular-nums text-gray-600 border-l border-blue-100/60">
-                    {v === 0 ? <span className="text-gray-300">—</span> : fmt(v)}
-                  </td>
-                )
-              })}
-              <td className="px-3 py-1.5 text-right tabular-nums text-gray-600 border-l border-blue-100/60">
-                {fmt(p.totalDemand)}
-              </td>
-              <td className="px-3 py-1.5 border-l border-blue-100/60" />
             </tr>
           ))}
         </>
