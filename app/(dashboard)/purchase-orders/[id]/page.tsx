@@ -84,6 +84,12 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       .is('deleted_at', null)
       .order('name') as unknown as { data: ProductOption[] | null }
     const srtByProduct = await loadSrtByProduct()
+    // Logistics fields fetched separately so their columns only affect the
+    // transfer view (never the whole PO list) if the migration hasn't run yet.
+    const { data: logistics } = await supabase.from('purchase_orders')
+      .select('pickup_date, transport_provider')
+      .eq('id', po.id)
+      .maybeSingle() as { data: { pickup_date: string | null; transport_provider: string | null } | null }
     const transferLines: TransferLine[] = (lines ?? [])
       .filter((l) => l.product_id)
       .map((l) => {
@@ -104,6 +110,9 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         initialFromId={po.supplier_id}
         initialToId={po.destination_supplier_id ?? ''}
         initialMarket={po.market === 'AU' ? 'AU' : 'NZ'}
+        initialPickupDate={logistics?.pickup_date ?? null}
+        initialExpectedDate={po.expected_delivery_date?.slice(0, 10) ?? null}
+        initialTransportProvider={logistics?.transport_provider ?? null}
         initialNotes={po.notes}
         initialLines={transferLines}
         sites={sites ?? []}

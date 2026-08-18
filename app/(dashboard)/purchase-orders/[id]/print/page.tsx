@@ -131,6 +131,14 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
         .eq('id', po.destination_supplier_id)
         .maybeSingle() as { data: { name: string; contact_name: string | null; email: string | null; phone: string | null; address: string | null } | null }
     : { data: null }
+  // Logistics fetched separately so the columns only affect the transfer PDF
+  // (never the purchase PDF) if the migration hasn't run yet.
+  const { data: logistics } = isTransfer
+    ? await supabase.from('purchase_orders')
+        .select('pickup_date, transport_provider')
+        .eq('id', params.id)
+        .maybeSingle() as { data: { pickup_date: string | null; transport_provider: string | null } | null }
+    : { data: null }
 
   const ingMap  = new Map((ingredients ?? []).map((i) => [i.id, i]))
   const prodMap = new Map((products ?? []).map((p) => [p.id, p]))
@@ -222,7 +230,10 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
         </div>
 
         <div className="flex items-end justify-between mt-6 mb-6">
-          <h1 className="text-[28px] font-light tracking-wide" style={{ color: brandDark }}>{isTransfer ? 'TRANSFER ORDER' : 'PURCHASE ORDER'}</h1>
+          <h1 className="text-[28px] font-light tracking-wide" style={{ color: brandDark }}>
+            {isTransfer ? 'TRANSFER ORDER' : 'PURCHASE ORDER'}
+            {isTransfer && <span className="ml-3 text-[12px] font-normal text-gray-500 align-middle">{po.market === 'AU' ? 'Australia' : 'New Zealand'}</span>}
+          </h1>
           <div className="text-right">
             <div className="text-[10px] uppercase tracking-wider text-gray-500">{isTransfer ? 'Transfer No.' : 'PO Number'}</div>
             <div className="font-mono text-[16px] font-semibold">{po.po_number}</div>
@@ -280,17 +291,27 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
         </div>
 
         <div className="grid grid-cols-3 gap-4 mb-5 pb-3 border-b border-gray-200">
-          <div>
-            <div className="text-[9px] uppercase tracking-wider text-gray-500">Order date</div>
-            <div className="text-[12px] font-medium">{fmtDate(po.order_date)}</div>
-          </div>
           {isTransfer ? (
-            <div>
-              <div className="text-[9px] uppercase tracking-wider text-gray-500">Market</div>
-              <div className="text-[12px] font-medium">{po.market === 'AU' ? 'Australia' : 'New Zealand'}</div>
-            </div>
+            <>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-gray-500">Pick-up date</div>
+                <div className="text-[12px] font-medium">{fmtDate(logistics?.pickup_date ?? null)}</div>
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-gray-500">Expected delivery</div>
+                <div className="text-[12px] font-medium">{fmtDate(po.expected_delivery_date)}</div>
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-gray-500">Transport provider</div>
+                <div className="text-[12px] font-medium">{logistics?.transport_provider || '—'}</div>
+              </div>
+            </>
           ) : (
             <>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-gray-500">Order date</div>
+                <div className="text-[12px] font-medium">{fmtDate(po.order_date)}</div>
+              </div>
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-gray-500">Expected delivery</div>
                 <div className="text-[12px] font-medium">{fmtDate(po.expected_delivery_date)}</div>

@@ -33,6 +33,9 @@ export default async function NewTransferOrderPage() {
       initialFromId=""
       initialToId=""
       initialMarket="NZ"
+      initialPickupDate={null}
+      initialExpectedDate={null}
+      initialTransportProvider={null}
       initialNotes={null}
       initialLines={[]}
       sites={sites ?? []}

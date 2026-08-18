@@ -68,6 +68,8 @@ export async function createPurchaseOrder(input: {
   supplier_id: string
   po_type?: 'purchase' | 'transfer'
   destination_supplier_id?: string | null
+  pickup_date?: string | null
+  transport_provider?: string | null
   currency?: string
   market?: string
   issuer_id?: string | null
@@ -104,6 +106,8 @@ export async function createPurchaseOrder(input: {
       po_type:                isTransfer ? 'transfer' : 'purchase',
       supplier_id:            input.supplier_id,
       destination_supplier_id: isTransfer ? input.destination_supplier_id : null,
+      pickup_date:            isTransfer ? (input.pickup_date ?? null) : null,
+      transport_provider:     isTransfer ? (input.transport_provider?.trim() || null) : null,
       currency:               (input.currency ?? 'NZD').toUpperCase(),
       market:                 input.market === 'AU' ? 'AU' : 'NZ',
       issuer_id:              input.issuer_id ?? null,
@@ -153,6 +157,8 @@ export async function updatePurchaseOrder(input: {
   supplier_id: string
   po_type?: 'purchase' | 'transfer'
   destination_supplier_id?: string | null
+  pickup_date?: string | null
+  transport_provider?: string | null
   currency?: string
   market?: string
   issuer_id?: string | null
@@ -190,6 +196,8 @@ export async function updatePurchaseOrder(input: {
       po_number:              input.po_number.trim(),
       supplier_id:            input.supplier_id,
       destination_supplier_id: isTransfer ? input.destination_supplier_id : null,
+      pickup_date:            isTransfer ? (input.pickup_date ?? null) : null,
+      transport_provider:     isTransfer ? (input.transport_provider?.trim() || null) : null,
       currency:               (input.currency ?? 'NZD').toUpperCase(),
       market:                 input.market === 'AU' ? 'AU' : 'NZ',
       issuer_id:              input.issuer_id ?? null,
