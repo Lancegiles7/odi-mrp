@@ -16,6 +16,7 @@ interface SupplierForm {
   lead_time_days: number | null
   notes: string | null
   is_active: boolean
+  site_type: 'manufacturer' | 'dc' | null
 }
 
 function parsePayload(formData: FormData): SupplierForm | string {
@@ -38,6 +39,8 @@ function parsePayload(formData: FormData): SupplierForm | string {
     lead_time_days: ltn != null && Number.isFinite(ltn) && ltn >= 0 ? Math.round(ltn) : null,
     notes:          ((formData.get('notes')         as string | null) || '').trim() || null,
     is_active:      (formData.get('is_active') === 'on'),
+    site_type:      ((formData.get('site_type')     as string | null) || '') === 'manufacturer' ? 'manufacturer'
+                  : ((formData.get('site_type')     as string | null) || '') === 'dc' ? 'dc' : null,
   }
 }
 

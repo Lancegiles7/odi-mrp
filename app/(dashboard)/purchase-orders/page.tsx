@@ -7,6 +7,8 @@ export const metadata: Metadata = { title: 'Purchase orders' }
 interface POListRow {
   id: string
   po_number: string
+  po_type: string | null
+  destination_supplier_id: string | null
   status: 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled'
   order_date: string
   expected_delivery_date: string | null
@@ -15,7 +17,7 @@ interface POListRow {
 }
 
 interface PageProps {
-  searchParams: { status?: string; supplier?: string }
+  searchParams: { status?: string; supplier?: string; type?: string }
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -46,7 +48,7 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
 
   const [{ data: pos }, { data: suppliers }, { data: lines }] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('id, po_number, status, order_date, expected_delivery_date, supplier_id, market')
+      .select('id, po_number, po_type, destination_supplier_id, status, order_date, expected_delivery_date, supplier_id, market')
       .order('po_number', { ascending: false }) as unknown as Promise<{ data: POListRow[] | null }>,
     supabase.from('suppliers')
       .select('id, name')
@@ -73,8 +75,11 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
 
   const filterStatus   = searchParams.status   ?? 'all'
   const filterSupplier = searchParams.supplier ?? 'all'
+  const filterType     = searchParams.type     ?? 'all'
+  const poType = (p: POListRow) => (p.po_type === 'transfer' ? 'transfer' : 'purchase')
   const filtered = allPos.filter((p) =>
     (filterStatus === 'all'   || p.status === filterStatus) &&
+    (filterType === 'all'     || poType(p) === filterType) &&
     (filterSupplier === 'all' || p.supplier_id === filterSupplier),
   )
 
@@ -92,17 +97,30 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
             {totalCount} POs · {awaitingCount} awaiting receipt{partialCount > 0 ? ` · ${partialCount} partial` : ''}
           </p>
         </div>
-        <Link
-          href="/purchase-orders/new"
-          className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800"
-        >
-          + New PO
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/purchase-orders/new-transfer"
+            className="px-3 py-1.5 text-sm bg-violet-600 text-white rounded-md hover:bg-violet-700"
+          >
+            + New transfer
+          </Link>
+          <Link
+            href="/purchase-orders/new"
+            className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800"
+          >
+            + New PO
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3">
         <span className="text-xs text-gray-500">Filter:</span>
         <form className="flex items-center gap-2" action="/purchase-orders" method="get">
+          <select name="type" defaultValue={filterType} className="text-xs border border-gray-300 rounded-md px-2 py-1.5">
+            <option value="all">All types</option>
+            <option value="purchase">Purchase</option>
+            <option value="transfer">Transfer</option>
+          </select>
           <select name="status" defaultValue={filterStatus} className="text-xs border border-gray-300 rounded-md px-2 py-1.5">
             <option value="all">All statuses</option>
             <option value="draft">Draft</option>
@@ -131,7 +149,8 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
             <thead>
               <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                 <th className="text-left px-4 py-2 font-medium w-[120px]">PO #</th>
-                <th className="text-left px-4 py-2 font-medium">Supplier</th>
+                <th className="text-left px-3 py-2 font-medium w-[92px]">Type</th>
+                <th className="text-left px-4 py-2 font-medium">Supplier / route</th>
                 <th className="text-right px-3 py-2 font-medium w-[60px]">Lines</th>
                 <th className="text-right px-3 py-2 font-medium w-[110px]">Total</th>
                 <th className="text-left px-3 py-2 font-medium w-[110px]">Status</th>
@@ -142,6 +161,7 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
             <tbody>
               {filtered.map((p) => {
                 const stats = linesByPo.get(p.id) ?? { count: 0, total: 0 }
+                const isTransfer = poType(p) === 'transfer'
                 return (
                   <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-2 font-mono">
@@ -150,7 +170,16 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
                         <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-sans">AU</span>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-gray-700">{supplierById.get(p.supplier_id) ?? '—'}</td>
+                    <td className="px-3 py-2">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isTransfer ? 'bg-violet-100 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                        {isTransfer ? 'Transfer' : 'Purchase'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-gray-700">
+                      {isTransfer
+                        ? <span>{supplierById.get(p.supplier_id) ?? '—'} <span className="text-gray-400">→</span> {supplierById.get(p.destination_supplier_id ?? '') ?? '—'}</span>
+                        : (supplierById.get(p.supplier_id) ?? '—')}
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums text-gray-600">{stats.count}</td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {stats.total > 0 ? `$${stats.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-gray-400">—</span>}

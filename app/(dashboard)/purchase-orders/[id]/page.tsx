@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { POForm } from '@/components/purchase-orders/po-form'
+import { TransferForm, type SiteOption, type ProductOption, type TransferLine } from '@/components/purchase-orders/transfer-form'
 import { ReceiptHistory } from '@/components/purchase-orders/receipt-history'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
 import { getAppSettings } from '@/lib/settings'
@@ -20,10 +21,11 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
 
   const [{ data: po }, { data: lines }, { data: suppliers }, { data: ingredients }, { data: products }, { data: packaging }, { data: addresses }, { data: issuers }, { data: companies }] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('id, po_number, supplier_id, currency, market, issuer_id, company_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, external_notes')
+      .select('id, po_number, po_type, destination_supplier_id, supplier_id, currency, market, issuer_id, company_id, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, external_notes')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
-        id: string; po_number: string; supplier_id: string; currency: string | null; issuer_id: string | null;
+        id: string; po_number: string; po_type: string | null; destination_supplier_id: string | null;
+        supplier_id: string; currency: string | null; issuer_id: string | null;
         company_id: string | null;
         status: 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled';
         order_date: string; expected_delivery_date: string | null;
@@ -68,6 +70,40 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
   ])
 
   if (!po) notFound()
+
+  // Transfer orders use their own site-to-site form, not the purchase form.
+  if (po.po_type === 'transfer') {
+    const { data: sites } = await supabase.from('suppliers')
+      .select('id, name, site_type, address')
+      .not('site_type', 'is', null)
+      .eq('is_active', true)
+      .order('site_type').order('name') as unknown as { data: SiteOption[] | null }
+    const { data: transferProducts } = await supabase.from('products')
+      .select('id, sku_code, name, product_type')
+      .is('deleted_at', null)
+      .order('name') as unknown as { data: ProductOption[] | null }
+    const transferLines: TransferLine[] = (lines ?? [])
+      .filter((l) => l.product_id)
+      .map((l) => {
+        const prod = (transferProducts ?? []).find((p) => p.id === l.product_id)
+        return { product_id: l.product_id!, group: prod?.product_type ?? '', quantity: String(Number(l.quantity_ordered)) }
+      })
+    return (
+      <TransferForm
+        mode="edit"
+        id={po.id}
+        status={po.status}
+        initialPoNumber={po.po_number}
+        initialFromId={po.supplier_id}
+        initialToId={po.destination_supplier_id ?? ''}
+        initialMarket={po.market === 'AU' ? 'AU' : 'NZ'}
+        initialNotes={po.notes}
+        initialLines={transferLines}
+        sites={sites ?? []}
+        products={transferProducts ?? []}
+      />
+    )
+  }
 
   const settings = await getAppSettings()
   const fxRate = Number(settings.fx_rates?.AUD) || 1.2
