@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { generatePoNumber } from '@/app/(dashboard)/purchase-orders/actions'
+import { loadSrtByProduct } from '@/lib/transfer-orders'
 import { TransferForm, type SiteOption, type ProductOption } from '@/components/purchase-orders/transfer-form'
 
 export const metadata: Metadata = { title: 'New transfer order' }
@@ -23,6 +24,7 @@ export default async function NewTransferOrderPage() {
   ])
 
   const poNumber = await generatePoNumber('transfer')
+  const srtByProduct = await loadSrtByProduct()
 
   return (
     <TransferForm
@@ -35,6 +37,7 @@ export default async function NewTransferOrderPage() {
       initialLines={[]}
       sites={sites ?? []}
       products={products ?? []}
+      srtByProduct={srtByProduct}
     />
   )
 }

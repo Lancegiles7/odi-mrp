@@ -53,12 +53,12 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
         company_id: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
-      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes, supplier_code')
+      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes, supplier_code, supplier_pack_size')
       .eq('purchase_order_id', params.id)
       .order('created_at') as unknown as Promise<{ data: Array<{
         id: string; ingredient_id: string | null; product_id: string | null; packaging_id: string | null;
         description: string | null; quantity_ordered: number; unit_cost: number | null;
-        unit_of_measure: string; notes: string | null; supplier_code: string | null;
+        unit_of_measure: string; notes: string | null; supplier_code: string | null; supplier_pack_size: number | null;
       }> | null }>,
     getAppSettings(),
   ])
@@ -328,6 +328,7 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
                     <div className="font-medium">{name}</div>
                     {sku && <div className="text-gray-500 text-[10px]">{`SKU: ${sku}`}{!isTransfer && supplierSku ? `  ·  Supplier code: ${supplierSku}` : ''}</div>}
                     {!sku && !isTransfer && supplierSku && <div className="text-gray-500 text-[10px]">Supplier code: {supplierSku}</div>}
+                    {isTransfer && l.unit_of_measure === 'SRT' && <div className="text-gray-500 text-[10px]">SRT of {Number(l.supplier_pack_size) || 1} units · {(Number(l.quantity_ordered) * (Number(l.supplier_pack_size) || 1)).toLocaleString()} units total</div>}
                     {l.notes && <div className="text-gray-500 text-[10px]">{l.notes}</div>}
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums align-top">{Number(l.quantity_ordered).toLocaleString()}</td>
@@ -347,11 +348,22 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
             </tfoot>
           )}
         </table>
-        {isTransfer && (
-          <div className="flex justify-end mb-6 text-[12px] font-semibold" style={{ color: brandDark }}>
-            Total units: {(lines ?? []).reduce((s, l) => s + Number(l.quantity_ordered), 0).toLocaleString()}
-          </div>
-        )}
+        {isTransfer && (() => {
+          let individual = 0, srts = 0, combined = 0
+          for (const l of lines ?? []) {
+            const per = Number(l.supplier_pack_size) || 1
+            const qty = Number(l.quantity_ordered)
+            if (l.unit_of_measure === 'SRT') { srts += qty; combined += qty * per }
+            else { individual += qty; combined += qty }
+          }
+          return (
+            <div className="flex justify-end gap-6 mb-6 text-[12px] pt-2 border-t border-gray-200" style={{ color: brandDark }}>
+              <span><span className="font-semibold">{individual.toLocaleString()}</span> individual units</span>
+              <span><span className="font-semibold">{srts.toLocaleString()}</span> SRTs</span>
+              <span><span className="font-bold">{combined.toLocaleString()}</span> units combined</span>
+            </div>
+          )
+        })()}
 
         {isTransfer && po.notes && (
           <div className="mb-4 p-3 border border-gray-200 rounded text-[10px] text-gray-700">

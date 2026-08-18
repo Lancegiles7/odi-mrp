@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { POForm } from '@/components/purchase-orders/po-form'
 import { TransferForm, type SiteOption, type ProductOption, type TransferLine } from '@/components/purchase-orders/transfer-form'
+import { loadSrtByProduct } from '@/lib/transfer-orders'
 import { ReceiptHistory } from '@/components/purchase-orders/receipt-history'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
 import { getAppSettings } from '@/lib/settings'
@@ -82,11 +83,17 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       .select('id, sku_code, name, product_type')
       .is('deleted_at', null)
       .order('name') as unknown as { data: ProductOption[] | null }
+    const srtByProduct = await loadSrtByProduct()
     const transferLines: TransferLine[] = (lines ?? [])
       .filter((l) => l.product_id)
       .map((l) => {
         const prod = (transferProducts ?? []).find((p) => p.id === l.product_id)
-        return { product_id: l.product_id!, group: prod?.product_type ?? '', quantity: String(Number(l.quantity_ordered)) }
+        return {
+          product_id: l.product_id!,
+          group: prod?.product_type ?? '',
+          pack: (l.unit_of_measure === 'SRT' ? 'srt' : 'individual') as 'individual' | 'srt',
+          quantity: String(Number(l.quantity_ordered)),
+        }
       })
     return (
       <TransferForm
@@ -101,6 +108,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         initialLines={transferLines}
         sites={sites ?? []}
         products={transferProducts ?? []}
+        srtByProduct={srtByProduct}
       />
     )
   }
