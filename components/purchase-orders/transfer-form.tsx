@@ -21,10 +21,12 @@ export interface ProductOption {
   name: string
   product_type: string | null
 }
+export interface SrtInfo { name: string; unitsPerSrt: number }
 export interface TransferLine {
   product_id: string
   group: string          // UI filter only
-  quantity: string
+  pack: 'individual' | 'srt'
+  quantity: string       // number of packs (individual units, or SRTs)
 }
 
 interface Props {
@@ -39,10 +41,13 @@ interface Props {
   initialLines: TransferLine[]
   sites: SiteOption[]
   products: ProductOption[]
+  /** product_id → SRT pack info, when the product has an SRT packaging. */
+  srtByProduct: Record<string, SrtInfo>
 }
 
 const groupLabel = (g: string | null) => (g ? (PRODUCT_GROUP_LABELS[g] ?? g) : 'Ungrouped')
-const emptyLine = (): TransferLine => ({ product_id: '', group: '', quantity: '' })
+const emptyLine = (): TransferLine => ({ product_id: '', group: '', pack: 'individual', quantity: '' })
+const nf = (n: number) => n.toLocaleString()
 
 export function TransferForm(props: Props) {
   const router = useRouter()
@@ -59,7 +64,24 @@ export function TransferForm(props: Props) {
 
   const readOnly = props.mode === 'edit' && props.status != null && !['draft', 'submitted'].includes(props.status)
   const toSite = props.sites.find((s) => s.id === toId) ?? null
-  const totalUnits = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0)
+
+  const srtFor = (productId: string) => props.srtByProduct[productId]
+  const lineUnits = (l: TransferLine) => {
+    const qty = Number(l.quantity) || 0
+    const per = l.pack === 'srt' ? (srtFor(l.product_id)?.unitsPerSrt ?? 1) : 1
+    return qty * per
+  }
+  // Three-way total: loose units, SRTs, and everything as individual units.
+  const totals = lines.reduce(
+    (acc, l) => {
+      const qty = Number(l.quantity) || 0
+      if (!l.product_id || qty <= 0) return acc
+      if (l.pack === 'srt') { acc.srts += qty; acc.combined += lineUnits(l) }
+      else { acc.individual += qty; acc.combined += qty }
+      return acc
+    },
+    { individual: 0, srts: 0, combined: 0 },
+  )
 
   // Group options present in the product catalogue, ordered by PRODUCT_GROUPS.
   const groups = useMemo(() => {
@@ -76,17 +98,23 @@ export function TransferForm(props: Props) {
   function toPoLines(): POLineInput[] {
     return lines
       .filter((l) => l.product_id && Number(l.quantity) > 0)
-      .map((l) => ({
-        line_type: 'product',
-        ingredient_id: null,
-        product_id: l.product_id,
-        packaging_id: null,
-        description: null,
-        quantity_ordered: Number(l.quantity),
-        unit_cost: null,
-        unit_of_measure: 'units',
-        notes: null,
-      }))
+      .map((l) => {
+        const isSrt = l.pack === 'srt' && !!srtFor(l.product_id)
+        const per = isSrt ? (srtFor(l.product_id)!.unitsPerSrt) : 1
+        return {
+          line_type: 'product' as const,
+          ingredient_id: null,
+          product_id: l.product_id,
+          packaging_id: null,
+          description: null,
+          quantity_ordered: Number(l.quantity),   // number of packs
+          unit_cost: null,
+          unit_of_measure: isSrt ? 'SRT' : 'units',
+          notes: null,
+          // Units per pack — lets the ledger/PDF show combined individual units.
+          supplier_pack_size: per,
+        }
+      })
   }
 
   function validate(): string | null {
@@ -168,9 +196,17 @@ export function TransferForm(props: Props) {
           </div>
           <h1 className="text-2xl font-semibold mt-1">{props.initialPoNumber}</h1>
         </div>
-        {props.mode === 'edit' && props.status && (
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 capitalize">{props.status}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {props.mode === 'edit' && props.id && (
+            <a href={`/purchase-orders/${props.id}/print`} target="_blank" rel="noopener noreferrer"
+              className="text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50">
+              Print / PDF
+            </a>
+          )}
+          {props.mode === 'edit' && props.status && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 capitalize">{props.status}</span>
+          )}
+        </div>
       </div>
 
       {readOnly && (
@@ -213,38 +249,60 @@ export function TransferForm(props: Props) {
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Products to move</h2>
-          <span className="text-xs text-gray-500 tabular-nums">{totalUnits.toLocaleString()} units</span>
+          <span className="text-xs text-gray-500 tabular-nums">{nf(totals.combined)} units total</span>
         </div>
         <div className="divide-y divide-gray-100">
-          <div className="grid grid-cols-[160px_1fr_100px_32px] gap-2 px-4 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-400">
-            <div>Product group</div><div>Product</div><div className="text-right">Units</div><div></div>
+          <div className="grid grid-cols-[150px_1fr_150px_80px_32px] gap-2 px-4 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+            <div>Product group</div><div>Product</div><div>Pack</div><div className="text-right">Qty</div><div></div>
           </div>
           {lines.map((l, i) => {
             const options = props.products.filter((p) => !l.group || (p.product_type ?? '') === l.group)
+            const srt = srtFor(l.product_id)
+            const units = lineUnits(l)
             return (
-              <div key={i} className="grid grid-cols-[160px_1fr_100px_32px] gap-2 px-4 py-2 items-center">
+              <div key={i} className="grid grid-cols-[150px_1fr_150px_80px_32px] gap-2 px-4 py-2 items-start">
                 <select value={l.group} disabled={readOnly}
-                  onChange={(e) => patchLine(i, { group: e.target.value, product_id: '' })}
+                  onChange={(e) => patchLine(i, { group: e.target.value, product_id: '', pack: 'individual' })}
                   className="text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
                   <option value="">All groups</option>
                   {groups.map((g) => <option key={g} value={g}>{groupLabel(g)}</option>)}
                 </select>
                 <select value={l.product_id} disabled={readOnly}
-                  onChange={(e) => patchLine(i, { product_id: e.target.value })}
+                  onChange={(e) => patchLine(i, { product_id: e.target.value, pack: 'individual' })}
                   className="text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
                   <option value="">— Select product —</option>
                   {options.map((p) => <option key={p.id} value={p.id}>{p.sku_code} · {p.name}</option>)}
                 </select>
+                <div>
+                  <select value={l.pack} disabled={readOnly || !l.product_id}
+                    onChange={(e) => patchLine(i, { pack: e.target.value as 'individual' | 'srt' })}
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
+                    <option value="individual">Individual unit</option>
+                    {srt && <option value="srt">{srt.name} (×{srt.unitsPerSrt})</option>}
+                  </select>
+                  {l.pack === 'srt' && srt && Number(l.quantity) > 0 && (
+                    <div className="text-[10px] text-gray-400 mt-0.5">= {nf(units)} units</div>
+                  )}
+                </div>
                 <input type="number" min={0} step="any" value={l.quantity} disabled={readOnly}
                   onChange={(e) => patchLine(i, { quantity: e.target.value })}
                   placeholder="0"
                   className="text-sm text-right border border-gray-200 rounded px-2 py-1.5 tabular-nums bg-white disabled:bg-gray-50" />
                 <button type="button" disabled={readOnly} onClick={() => removeLine(i)}
-                  className="text-gray-400 hover:text-rose-600 disabled:opacity-40 text-sm">✕</button>
+                  className="text-gray-400 hover:text-rose-600 disabled:opacity-40 text-sm pt-1.5">✕</button>
               </div>
             )
           })}
         </div>
+
+        {/* Three-way total */}
+        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+          <span className="text-gray-500">Total:</span>
+          <span><span className="font-semibold tabular-nums">{nf(totals.individual)}</span> individual units</span>
+          <span><span className="font-semibold tabular-nums">{nf(totals.srts)}</span> SRTs</span>
+          <span className="text-gray-900"><span className="font-semibold tabular-nums">{nf(totals.combined)}</span> units combined</span>
+        </div>
+
         {!readOnly && (
           <div className="px-4 py-3 border-t border-gray-100">
             <button type="button" onClick={addLine}

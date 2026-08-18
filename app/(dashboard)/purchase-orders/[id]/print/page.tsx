@@ -43,21 +43,22 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
 
   const [{ data: po }, { data: lines }, settings] = await Promise.all([
     supabase.from('purchase_orders')
-      .select('po_number, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, external_notes, supplier_id, currency, issuer_id, company_id')
+      .select('po_number, po_type, destination_supplier_id, market, status, order_date, expected_delivery_date, delivery_address_id, delivery_notes, notes, external_notes, supplier_id, currency, issuer_id, company_id')
       .eq('id', params.id)
       .maybeSingle() as unknown as Promise<{ data: {
-        po_number: string; status: string; order_date: string; expected_delivery_date: string | null;
+        po_number: string; po_type: string | null; destination_supplier_id: string | null; market: string | null;
+        status: string; order_date: string; expected_delivery_date: string | null;
         delivery_address_id: string | null; delivery_notes: string | null;
         notes: string | null; external_notes: string | null; supplier_id: string; currency: string | null; issuer_id: string | null;
         company_id: string | null;
       } | null }>,
     supabase.from('purchase_order_lines')
-      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes, supplier_code')
+      .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, unit_cost, unit_of_measure, notes, supplier_code, supplier_pack_size')
       .eq('purchase_order_id', params.id)
       .order('created_at') as unknown as Promise<{ data: Array<{
         id: string; ingredient_id: string | null; product_id: string | null; packaging_id: string | null;
         description: string | null; quantity_ordered: number; unit_cost: number | null;
-        unit_of_measure: string; notes: string | null; supplier_code: string | null;
+        unit_of_measure: string; notes: string | null; supplier_code: string | null; supplier_pack_size: number | null;
       }> | null }>,
     getAppSettings(),
   ])
@@ -121,6 +122,15 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
         .select('legal_name, country, business_number_label, business_number, tax_number_label, tax_number, address, website, email, phone, logo_path, brand_colour')
         .eq('is_default', true)
         .maybeSingle() as { data: CompanyRow | null }
+
+  const isTransfer = po.po_type === 'transfer'
+  // Transfer destination is another site (supplier), not a delivery address.
+  const { data: destinationSite } = isTransfer && po.destination_supplier_id
+    ? await supabase.from('suppliers')
+        .select('name, contact_name, email, phone, address')
+        .eq('id', po.destination_supplier_id)
+        .maybeSingle() as { data: { name: string; contact_name: string | null; email: string | null; phone: string | null; address: string | null } | null }
+    : { data: null }
 
   const ingMap  = new Map((ingredients ?? []).map((i) => [i.id, i]))
   const prodMap = new Map((products ?? []).map((p) => [p.id, p]))
@@ -212,16 +222,16 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
         </div>
 
         <div className="flex items-end justify-between mt-6 mb-6">
-          <h1 className="text-[28px] font-light tracking-wide" style={{ color: brandDark }}>PURCHASE ORDER</h1>
+          <h1 className="text-[28px] font-light tracking-wide" style={{ color: brandDark }}>{isTransfer ? 'TRANSFER ORDER' : 'PURCHASE ORDER'}</h1>
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">PO Number</div>
+            <div className="text-[10px] uppercase tracking-wider text-gray-500">{isTransfer ? 'Transfer No.' : 'PO Number'}</div>
             <div className="font-mono text-[16px] font-semibold">{po.po_number}</div>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-6 mb-6">
           <div>
-            <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">Supplier</div>
+            <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">{isTransfer ? 'From site' : 'Supplier'}</div>
             <div className="text-[13px] font-semibold">{supplier?.name ?? '—'}</div>
             {supplier?.contact_name && <div className="text-[11px] text-gray-700">Attn: {supplier.contact_name}</div>}
             {supplier?.email && <div className="text-[11px] text-gray-700">{supplier.email}</div>}
@@ -229,8 +239,17 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
             {supplier?.address && <div className="text-[11px] text-gray-700 whitespace-pre-line">{supplier.address}</div>}
           </div>
           <div>
-            <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">Deliver to</div>
-            {deliveryAddress ? (
+            <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1.5">{isTransfer ? 'To site' : 'Deliver to'}</div>
+            {isTransfer ? (
+              destinationSite ? (
+                <>
+                  <div className="text-[13px] font-semibold">{destinationSite.name}</div>
+                  {destinationSite.address && <div className="text-[11px] text-gray-700 whitespace-pre-line">{destinationSite.address}</div>}
+                  {destinationSite.contact_name && <div className="text-[11px] text-gray-700 mt-1">Attn: {destinationSite.contact_name}</div>}
+                  {destinationSite.phone && <div className="text-[11px] text-gray-700">{destinationSite.phone}</div>}
+                </>
+              ) : <div className="text-[11px] text-gray-400">No destination selected</div>
+            ) : deliveryAddress ? (
               <>
                 <div className="text-[13px] font-semibold">{deliveryAddress.label}</div>
                 <div className="text-[11px] text-gray-700 whitespace-pre-line">{deliveryAddress.street}</div>
@@ -265,24 +284,33 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
             <div className="text-[9px] uppercase tracking-wider text-gray-500">Order date</div>
             <div className="text-[12px] font-medium">{fmtDate(po.order_date)}</div>
           </div>
-          <div>
-            <div className="text-[9px] uppercase tracking-wider text-gray-500">Expected delivery</div>
-            <div className="text-[12px] font-medium">{fmtDate(po.expected_delivery_date)}</div>
-          </div>
-          <div>
-            <div className="text-[9px] uppercase tracking-wider text-gray-500">Payment terms</div>
-            <div className="text-[12px] font-medium">{paymentTermsLabel(supplier?.payment_terms)}</div>
-          </div>
+          {isTransfer ? (
+            <div>
+              <div className="text-[9px] uppercase tracking-wider text-gray-500">Market</div>
+              <div className="text-[12px] font-medium">{po.market === 'AU' ? 'Australia' : 'New Zealand'}</div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-gray-500">Expected delivery</div>
+                <div className="text-[12px] font-medium">{fmtDate(po.expected_delivery_date)}</div>
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-gray-500">Payment terms</div>
+                <div className="text-[12px] font-medium">{paymentTermsLabel(supplier?.payment_terms)}</div>
+              </div>
+            </>
+          )}
         </div>
 
         <table className="w-full text-[11px] mb-6">
           <thead>
             <tr style={{ background: company.brandColour + '14', color: brandDark }}>
               <th className="text-left px-2 py-1.5 font-semibold">Description</th>
-              <th className="text-right px-2 py-1.5 font-semibold w-[60px]">Qty</th>
+              <th className="text-right px-2 py-1.5 font-semibold w-[70px]">{isTransfer ? 'Units' : 'Qty'}</th>
               <th className="text-left px-2 py-1.5 font-semibold w-[50px]">UoM</th>
-              <th className="text-right px-2 py-1.5 font-semibold w-[80px]">Unit price</th>
-              <th className="text-right px-2 py-1.5 font-semibold w-[90px]">Total</th>
+              {!isTransfer && <th className="text-right px-2 py-1.5 font-semibold w-[80px]">Unit price</th>}
+              {!isTransfer && <th className="text-right px-2 py-1.5 font-semibold w-[90px]">Total</th>}
             </tr>
           </thead>
           <tbody>
@@ -298,37 +326,60 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
                 <tr key={l.id} className="border-b border-gray-100">
                   <td className="px-2 py-2 align-top">
                     <div className="font-medium">{name}</div>
-                    {(sku || supplierSku) && (
-                      <div className="text-gray-500 text-[10px]">
-                        {sku ? `Internal SKU: ${sku}` : ''}{sku && supplierSku ? '  ·  ' : ''}{supplierSku ? `Supplier code: ${supplierSku}` : ''}
-                      </div>
-                    )}
+                    {sku && <div className="text-gray-500 text-[10px]">{`SKU: ${sku}`}{!isTransfer && supplierSku ? `  ·  Supplier code: ${supplierSku}` : ''}</div>}
+                    {!sku && !isTransfer && supplierSku && <div className="text-gray-500 text-[10px]">Supplier code: {supplierSku}</div>}
+                    {isTransfer && l.unit_of_measure === 'SRT' && <div className="text-gray-500 text-[10px]">SRT of {Number(l.supplier_pack_size) || 1} units · {(Number(l.quantity_ordered) * (Number(l.supplier_pack_size) || 1)).toLocaleString()} units total</div>}
                     {l.notes && <div className="text-gray-500 text-[10px]">{l.notes}</div>}
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums align-top">{Number(l.quantity_ordered).toLocaleString()}</td>
                   <td className="px-2 py-2 align-top">{l.unit_of_measure}</td>
-                  <td className="px-2 py-2 text-right tabular-nums align-top">{fmtMoney(l.unit_cost)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums align-top">{fmtMoney(total)}</td>
+                  {!isTransfer && <td className="px-2 py-2 text-right tabular-nums align-top">{fmtMoney(l.unit_cost)}</td>}
+                  {!isTransfer && <td className="px-2 py-2 text-right tabular-nums align-top">{fmtMoney(total)}</td>}
                 </tr>
               )
             })}
           </tbody>
-          <tfoot>
-            <tr className="text-[12px]">
-              <td colSpan={4} className="px-2 py-2 text-right font-semibold">Total ({po.currency ?? 'NZD'} ex-GST)</td>
-              <td className="px-2 py-2 text-right tabular-nums font-bold">{fmtMoney(subtotal)}</td>
-            </tr>
-          </tfoot>
+          {!isTransfer && (
+            <tfoot>
+              <tr className="text-[12px]">
+                <td colSpan={4} className="px-2 py-2 text-right font-semibold">Total ({po.currency ?? 'NZD'} ex-GST)</td>
+                <td className="px-2 py-2 text-right tabular-nums font-bold">{fmtMoney(subtotal)}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
+        {isTransfer && (() => {
+          let individual = 0, srts = 0, combined = 0
+          for (const l of lines ?? []) {
+            const per = Number(l.supplier_pack_size) || 1
+            const qty = Number(l.quantity_ordered)
+            if (l.unit_of_measure === 'SRT') { srts += qty; combined += qty * per }
+            else { individual += qty; combined += qty }
+          }
+          return (
+            <div className="flex justify-end gap-6 mb-6 text-[12px] pt-2 border-t border-gray-200" style={{ color: brandDark }}>
+              <span><span className="font-semibold">{individual.toLocaleString()}</span> individual units</span>
+              <span><span className="font-semibold">{srts.toLocaleString()}</span> SRTs</span>
+              <span><span className="font-bold">{combined.toLocaleString()}</span> units combined</span>
+            </div>
+          )
+        })()}
 
-        {po.external_notes && (
+        {isTransfer && po.notes && (
+          <div className="mb-4 p-3 border border-gray-200 rounded text-[10px] text-gray-700">
+            <div className="font-semibold text-gray-900 mb-1">Notes</div>
+            <div className="whitespace-pre-line">{po.notes}</div>
+          </div>
+        )}
+
+        {!isTransfer && po.external_notes && (
           <div className="mb-4 p-3 border border-gray-200 rounded text-[10px] text-gray-700">
             <div className="font-semibold text-gray-900 mb-1">Notes</div>
             <div className="whitespace-pre-line">{po.external_notes}</div>
           </div>
         )}
 
-        {po.delivery_notes && (
+        {!isTransfer && po.delivery_notes && (
           <div className="mb-4 p-3 border border-gray-200 rounded text-[10px] text-gray-700">
             <div className="font-semibold text-gray-900 mb-1">Delivery notes</div>
             <div className="whitespace-pre-line">{po.delivery_notes}</div>
