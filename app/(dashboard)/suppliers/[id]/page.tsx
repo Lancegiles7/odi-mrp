@@ -25,13 +25,14 @@ interface SupplierRow {
   lead_time_days: number | null
   notes: string | null
   is_active: boolean
+  site_type: 'manufacturer' | 'dc' | null
 }
 
 export default async function EditSupplierPage({ params, searchParams }: PageProps) {
   const supabase = createClient()
   const { data } = await supabase
     .from('suppliers')
-    .select('id, code, name, contact_name, email, phone, address, payment_terms, lead_time_days, notes, is_active')
+    .select('id, code, name, contact_name, email, phone, address, payment_terms, lead_time_days, notes, is_active, site_type')
     .eq('id', params.id)
     .maybeSingle() as { data: SupplierRow | null }
 

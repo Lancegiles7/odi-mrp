@@ -15,6 +15,7 @@ interface Initial {
   lead_time_days: number | null
   notes: string | null
   is_active: boolean
+  site_type?: 'manufacturer' | 'dc' | null
 }
 
 export function SupplierForm({
@@ -93,6 +94,13 @@ export function SupplierForm({
         </Field>
         <Field label="Lead time (days)">
           <input name="lead_time_days" type="number" min={0} step={1} defaultValue={initial.lead_time_days ?? ''} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+        </Field>
+        <Field label="Transfer site">
+          <select name="site_type" defaultValue={initial.site_type ?? ''} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+            <option value="">Not a transfer site</option>
+            <option value="manufacturer">Manufacturer</option>
+            <option value="dc">Distribution centre (DC)</option>
+          </select>
         </Field>
       </div>
 

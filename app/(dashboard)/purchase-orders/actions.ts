@@ -37,10 +37,12 @@ export interface POLineInput {
 // PO number generator: PO-YYYY-NNN, where NNN is the next number
 // in the current year. Falls back to 001 if none exist yet.
 // ============================================================
-export async function generatePoNumber(): Promise<string> {
+export async function generatePoNumber(poType: 'purchase' | 'transfer' = 'purchase'): Promise<string> {
   const supabase = createClient()
   const year = new Date().getFullYear()
-  const prefix = `PO-${year}-`
+  // Transfers get their own TRN-YYYY-NNN series so they read clearly apart
+  // from purchase orders (PO-YYYY-NNN).
+  const prefix = poType === 'transfer' ? `TRN-${year}-` : `PO-${year}-`
 
   const { data } = await supabase
     .from('purchase_orders')
@@ -52,7 +54,7 @@ export async function generatePoNumber(): Promise<string> {
 
   let next = 1
   if (data?.po_number) {
-    const match = data.po_number.match(/PO-\d{4}-(\d+)/)
+    const match = data.po_number.match(/-(\d+)$/)
     if (match) next = parseInt(match[1], 10) + 1
   }
   return `${prefix}${String(next).padStart(3, '0')}`
@@ -64,6 +66,8 @@ export async function generatePoNumber(): Promise<string> {
 export async function createPurchaseOrder(input: {
   po_number: string
   supplier_id: string
+  po_type?: 'purchase' | 'transfer'
+  destination_supplier_id?: string | null
   currency?: string
   market?: string
   issuer_id?: string | null
@@ -83,8 +87,13 @@ export async function createPurchaseOrder(input: {
   const { data: profile } = await supabase
     .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
 
+  const isTransfer = input.po_type === 'transfer'
   if (!input.po_number?.trim()) return { ok: false, error: 'PO number is required' }
-  if (!input.supplier_id)       return { ok: false, error: 'Supplier is required' }
+  if (!input.supplier_id)       return { ok: false, error: isTransfer ? 'From site is required' : 'Supplier is required' }
+  if (isTransfer) {
+    if (!input.destination_supplier_id) return { ok: false, error: 'To site is required' }
+    if (input.destination_supplier_id === input.supplier_id) return { ok: false, error: 'From and To sites must be different' }
+  }
   if (input.lines.length === 0) return { ok: false, error: 'Add at least one line' }
 
   // Insert PO header
@@ -92,7 +101,9 @@ export async function createPurchaseOrder(input: {
     .from('purchase_orders')
     .insert({
       po_number:              input.po_number.trim(),
+      po_type:                isTransfer ? 'transfer' : 'purchase',
       supplier_id:            input.supplier_id,
+      destination_supplier_id: isTransfer ? input.destination_supplier_id : null,
       currency:               (input.currency ?? 'NZD').toUpperCase(),
       market:                 input.market === 'AU' ? 'AU' : 'NZ',
       issuer_id:              input.issuer_id ?? null,
@@ -140,6 +151,8 @@ export async function updatePurchaseOrder(input: {
   id: string
   po_number: string
   supplier_id: string
+  po_type?: 'purchase' | 'transfer'
+  destination_supplier_id?: string | null
   currency?: string
   market?: string
   issuer_id?: string | null
@@ -156,6 +169,12 @@ export async function updatePurchaseOrder(input: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
 
+  const isTransfer = input.po_type === 'transfer'
+  if (isTransfer) {
+    if (!input.destination_supplier_id) return { ok: false, error: 'To site is required' }
+    if (input.destination_supplier_id === input.supplier_id) return { ok: false, error: 'From and To sites must be different' }
+  }
+
   // Allow edits in draft or submitted state. Once any receipt has been
   // recorded (partially_received) we lock the form to protect receipt history.
   const { data: existing } = await supabase
@@ -170,6 +189,7 @@ export async function updatePurchaseOrder(input: {
     .update({
       po_number:              input.po_number.trim(),
       supplier_id:            input.supplier_id,
+      destination_supplier_id: isTransfer ? input.destination_supplier_id : null,
       currency:               (input.currency ?? 'NZD').toUpperCase(),
       market:                 input.market === 'AU' ? 'AU' : 'NZ',
       issuer_id:              input.issuer_id ?? null,
