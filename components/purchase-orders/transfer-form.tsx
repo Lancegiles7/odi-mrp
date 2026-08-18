@@ -168,9 +168,17 @@ export function TransferForm(props: Props) {
           </div>
           <h1 className="text-2xl font-semibold mt-1">{props.initialPoNumber}</h1>
         </div>
-        {props.mode === 'edit' && props.status && (
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 capitalize">{props.status}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {props.mode === 'edit' && props.id && (
+            <a href={`/purchase-orders/${props.id}/print`} target="_blank" rel="noopener noreferrer"
+              className="text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50">
+              Print / PDF
+            </a>
+          )}
+          {props.mode === 'edit' && props.status && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 capitalize">{props.status}</span>
+          )}
+        </div>
       </div>
 
       {readOnly && (
