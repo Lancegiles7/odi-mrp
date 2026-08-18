@@ -37,6 +37,9 @@ interface Props {
   initialFromId: string
   initialToId: string
   initialMarket: 'NZ' | 'AU'
+  initialPickupDate: string | null
+  initialExpectedDate: string | null
+  initialTransportProvider: string | null
   initialNotes: string | null
   initialLines: TransferLine[]
   sites: SiteOption[]
@@ -57,6 +60,9 @@ export function TransferForm(props: Props) {
   const [fromId, setFromId]   = useState(props.initialFromId)
   const [toId, setToId]       = useState(props.initialToId)
   const [market, setMarket]   = useState<'NZ' | 'AU'>(props.initialMarket)
+  const [pickupDate, setPickupDate]     = useState(props.initialPickupDate ?? '')
+  const [expectedDate, setExpectedDate] = useState(props.initialExpectedDate ?? '')
+  const [transport, setTransport]       = useState(props.initialTransportProvider ?? '')
   const [notes, setNotes]     = useState(props.initialNotes ?? '')
   const [lines, setLines]     = useState<TransferLine[]>(
     props.initialLines.length ? props.initialLines : [emptyLine()],
@@ -137,12 +143,14 @@ export function TransferForm(props: Props) {
       po_type: 'transfer' as const,
       supplier_id: fromId,
       destination_supplier_id: toId,
+      pickup_date: pickupDate || null,
+      transport_provider: transport.trim() || null,
       currency: 'NZD',
       market,
       issuer_id: null,
       company_id: null,
       order_date: orderDate,
-      expected_delivery_date: null,
+      expected_delivery_date: expectedDate || null,
       delivery_address_id: null,
       delivery_notes: null,
       notes: notes.trim() || null,
@@ -234,6 +242,29 @@ export function TransferForm(props: Props) {
                 {m}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Logistics */}
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Pick-up date</label>
+            <input type="date" value={pickupDate} disabled={readOnly}
+              onChange={(e) => setPickupDate(e.target.value)}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white disabled:bg-gray-50" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Expected delivery</label>
+            <input type="date" value={expectedDate} disabled={readOnly} min={pickupDate || undefined}
+              onChange={(e) => setExpectedDate(e.target.value)}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white disabled:bg-gray-50" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Transport provider</label>
+            <input type="text" value={transport} disabled={readOnly}
+              onChange={(e) => setTransport(e.target.value)}
+              placeholder="e.g. Mainfreight"
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white disabled:bg-gray-50" />
           </div>
         </div>
 
