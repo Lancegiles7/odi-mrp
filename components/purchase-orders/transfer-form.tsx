@@ -252,7 +252,7 @@ export function TransferForm(props: Props) {
           <span className="text-xs text-gray-500 tabular-nums">{nf(totals.combined)} units total</span>
         </div>
         <div className="divide-y divide-gray-100">
-          <div className="grid grid-cols-[150px_1fr_150px_80px_32px] gap-2 px-4 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+          <div className="grid grid-cols-[150px_minmax(0,1fr)_150px_80px_32px] gap-2 px-4 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-400">
             <div>Product group</div><div>Product</div><div>Pack</div><div className="text-right">Qty</div><div></div>
           </div>
           {lines.map((l, i) => {
@@ -260,23 +260,23 @@ export function TransferForm(props: Props) {
             const srt = srtFor(l.product_id)
             const units = lineUnits(l)
             return (
-              <div key={i} className="grid grid-cols-[150px_1fr_150px_80px_32px] gap-2 px-4 py-2 items-start">
+              <div key={i} className="grid grid-cols-[150px_minmax(0,1fr)_150px_80px_32px] gap-2 px-4 py-2 items-start">
                 <select value={l.group} disabled={readOnly}
                   onChange={(e) => patchLine(i, { group: e.target.value, product_id: '', pack: 'individual' })}
-                  className="text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
+                  className="w-full min-w-0 text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
                   <option value="">All groups</option>
                   {groups.map((g) => <option key={g} value={g}>{groupLabel(g)}</option>)}
                 </select>
                 <select value={l.product_id} disabled={readOnly}
                   onChange={(e) => patchLine(i, { product_id: e.target.value, pack: 'individual' })}
-                  className="text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
+                  className="w-full min-w-0 text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
                   <option value="">— Select product —</option>
                   {options.map((p) => <option key={p.id} value={p.id}>{p.sku_code} · {p.name}</option>)}
                 </select>
-                <div>
+                <div className="min-w-0">
                   <select value={l.pack} disabled={readOnly || !l.product_id}
                     onChange={(e) => patchLine(i, { pack: e.target.value as 'individual' | 'srt' })}
-                    className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
+                    className="w-full min-w-0 text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
                     <option value="individual">Individual unit</option>
                     {srt && <option value="srt">{srt.name} (×{srt.unitsPerSrt})</option>}
                   </select>
@@ -287,7 +287,7 @@ export function TransferForm(props: Props) {
                 <input type="number" min={0} step="any" value={l.quantity} disabled={readOnly}
                   onChange={(e) => patchLine(i, { quantity: e.target.value })}
                   placeholder="0"
-                  className="text-sm text-right border border-gray-200 rounded px-2 py-1.5 tabular-nums bg-white disabled:bg-gray-50" />
+                  className="w-full min-w-0 text-sm text-right border border-gray-200 rounded px-2 py-1.5 tabular-nums bg-white disabled:bg-gray-50" />
                 <button type="button" disabled={readOnly} onClick={() => removeLine(i)}
                   className="text-gray-400 hover:text-rose-600 disabled:opacity-40 text-sm pt-1.5">✕</button>
               </div>
