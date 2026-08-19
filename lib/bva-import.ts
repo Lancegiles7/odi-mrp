@@ -174,33 +174,25 @@ export const RETAIL_MAP: Record<string, RetailMatch> = {
 
 /**
  * Export `FG-` codes (Shopify / Upstock-resolved / sample tracker) →
- * the MRP product master's system SKU. Built from the exported product list
- * (odi-products.csv). Products not listed here (e.g. puffs/melts that already
- * use FG- codes in the master) fall through and match on their own code.
+ * the MRP product master's system SKU.
+ *
+ * As of Aug 2026 the master uses the FG- codes directly, so most FG codes now
+ * match on their own and need NO entry here (they fall through to identity via
+ * toSystemSku). Explicit rows remain only for:
+ *   - the two sachets whose master SKU did NOT change (Baby Cereal, Carrot),
+ *   - pre-rename puff/melt codes → their new master SKU,
+ *   - legacy aliases.
  */
 export const FG_TO_SYSTEM: Record<string, string> = {
-  'FG-ODI-PCH-BRY':  'ODI-BABY-PURE-BERR-POUCH-120G',
-  'FG-ODI-PCH-CKN':  'ODI-BABY-PURE-CHIC-POUCH-120G',
-  'FG-ODI-PCH-VAN':  'ODI-BABY-PURE-VANI-POUCH-120G',
-  'FG-ODI-PCH-VEG':  'ODI-BABY-PURE-VEGG-POUCH-120G',
-  'FG-ODI-SAC-BCR':  'ODI-ODI-BABY-PURE-SACHET-20G',
-  'FG-ODI-SAC-BET':  'ODI-BABY-PURE-BEET-SACHET-20G',
-  'FG-ODI-SAC-BLU':  'ODI-BABY-PURE-BLUE-SACHET-20G',
-  'FG-ODI-SAC-BRO':  'ODI-BABY-PURE-BROC-SACHET-20G',
-  'FG-ODI-SAC-CAR':  'ODI-BABY-PURE-CARR-SACHET-20G',
-  'FG-ODI-BITE-BAN': 'ODI-ODI-ORGA-BANA-SNACK4-30G',
-  'FG-ODI-BITE-BRN': 'ODI-ODI-ORGA-BROW-SNACK4-30G',
-  'FG-ODI-BITE-CHC': 'ODI-ODI-ORGA-CHER-SNACK4-30G',
-  'FG-ODI-BAL-CAS':  'ODI-ODI-ORGA-CASH-SNACK4-20G',
-  'FG-ODI-BAL-COA':  'ODI-ODI-ORGA-COCO-SNACK4-20G',
-  'FG-ODI-CCO-SUN':  'ODI-ODI-ORGA-SUNF-SNACK4-20G',
-  'FG-ODI-CCO-VAN':  'ODI-ODI-ORGA-VANI-SNACK4-20G',
-  'FG-ODI-TUB-BC':   'ODI-ODI-ORGA-BABY-TUB-150G',
-  'FG-ODI-TUB-BBB':  'ODI-ODI-ORGA-BEEF-TUB-125G',
-  'FG-ODI-TUB-MB':   'ODI-ODI-ORGA-MEAL-TUB-125G',
-  'FG-ODI-TUB-SB':   'ODI-ODI-ORGA-SMOO-TUB-125G',
+  'FG-ODI-SAC-BCR':  'ODI-ODI-BABY-PURE-SACHET-20G',  // Baby Cereal sachet — master SKU unchanged
+  'FG-ODI-SAC-CAR':  'ODI-BABY-PURE-CARR-SACHET-20G', // Carrot sachet — master SKU unchanged
+  // Pre-rename puff/melt codes → current master SKU (renamed Aug 2026)
+  'FG-ODI-PUF-BER':  'FG-ODI-PUF-BBK',  // Puffs Berries & Banana
+  'FG-ODI-PUF-CAR':  'FG-ODI-PUF-CPK',  // Puffs Carrot, Pumpkin & Kelp
+  'FG-ODI-MEL-STR':  'FG-ODI-DRP-STR',  // Melt → Yoghurt Drops Strawberry
+  'FG-ODI-MEL-BLU':  'FG-ODI-DRP-BLU',  // Melt → Yoghurt Drops Blueberry
   // Legacy / pre-rebrand SKUs
-  'ODIMEAL':         'ODI-ODI-ORGA-MEAL-TUB-125G', // "NutriDense Meal Booster" → Meal Booster
+  'ODIMEAL':         'FG-ODI-TUB-MB',   // "NutriDense Meal Booster" → Meal Booster
 }
 
 /** Translate an export FG- code to the MRP system SKU (identity if unmapped). */
