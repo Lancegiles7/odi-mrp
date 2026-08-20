@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { generatePoNumber } from '@/app/(dashboard)/purchase-orders/actions'
 import { loadSrtByProduct } from '@/lib/transfer-orders'
-import { TransferForm, type SiteOption, type ProductOption } from '@/components/purchase-orders/transfer-form'
+import { TransferForm, type SiteOption, type ProductOption, type PackagingOption } from '@/components/purchase-orders/transfer-form'
 
 export const metadata: Metadata = { title: 'New transfer order' }
 export const dynamic = 'force-dynamic'
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export default async function NewTransferOrderPage() {
   const supabase = createClient()
 
-  const [{ data: sites }, { data: products }] = await Promise.all([
+  const [{ data: sites }, { data: products }, { data: packaging }] = await Promise.all([
     supabase.from('suppliers')
       .select('id, name, site_type, address')
       .not('site_type', 'is', null)
@@ -21,6 +21,10 @@ export default async function NewTransferOrderPage() {
       .is('deleted_at', null)
       .eq('is_active', true)
       .order('name') as unknown as Promise<{ data: ProductOption[] | null }>,
+    supabase.from('packaging')
+      .select('id, sku_code, name')
+      .eq('is_active', true)
+      .order('name') as unknown as Promise<{ data: PackagingOption[] | null }>,
   ])
 
   const poNumber = await generatePoNumber('transfer')
@@ -38,8 +42,10 @@ export default async function NewTransferOrderPage() {
       initialTransportProvider={null}
       initialNotes={null}
       initialLines={[]}
+      initialPkgLines={[]}
       sites={sites ?? []}
       products={products ?? []}
+      packaging={packaging ?? []}
       srtByProduct={srtByProduct}
     />
   )

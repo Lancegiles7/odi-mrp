@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { POForm } from '@/components/purchase-orders/po-form'
-import { TransferForm, type SiteOption, type ProductOption, type TransferLine } from '@/components/purchase-orders/transfer-form'
+import { TransferForm, type SiteOption, type ProductOption, type PackagingOption, type TransferLine, type TransferPkgLine } from '@/components/purchase-orders/transfer-form'
 import { loadSrtByProduct } from '@/lib/transfer-orders'
 import { ReceiptHistory } from '@/components/purchase-orders/receipt-history'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
@@ -83,6 +83,10 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       .select('id, sku_code, name, product_type')
       .is('deleted_at', null)
       .order('name') as unknown as { data: ProductOption[] | null }
+    const { data: transferPackaging } = await supabase.from('packaging')
+      .select('id, sku_code, name')
+      .eq('is_active', true)
+      .order('name') as unknown as { data: PackagingOption[] | null }
     const srtByProduct = await loadSrtByProduct()
     // Logistics fields fetched separately so their columns only affect the
     // transfer view (never the whole PO list) if the migration hasn't run yet.
@@ -101,6 +105,9 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
           quantity: String(Number(l.quantity_ordered)),
         }
       })
+    const transferPkgLines: TransferPkgLine[] = (lines ?? [])
+      .filter((l) => l.packaging_id)
+      .map((l) => ({ packaging_id: l.packaging_id!, quantity: String(Number(l.quantity_ordered)) }))
     return (
       <TransferForm
         mode="edit"
@@ -115,8 +122,10 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         initialTransportProvider={logistics?.transport_provider ?? null}
         initialNotes={po.notes}
         initialLines={transferLines}
+        initialPkgLines={transferPkgLines}
         sites={sites ?? []}
         products={transferProducts ?? []}
+        packaging={transferPackaging ?? []}
         srtByProduct={srtByProduct}
       />
     )
