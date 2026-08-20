@@ -21,12 +21,21 @@ export interface ProductOption {
   name: string
   product_type: string | null
 }
+export interface PackagingOption {
+  id: string
+  sku_code: string
+  name: string
+}
 export interface SrtInfo { name: string; unitsPerSrt: number }
 export interface TransferLine {
   product_id: string
   group: string          // UI filter only
   pack: 'individual' | 'srt'
   quantity: string       // number of packs (individual units, or SRTs)
+}
+export interface TransferPkgLine {
+  packaging_id: string
+  quantity: string
 }
 
 interface Props {
@@ -42,14 +51,17 @@ interface Props {
   initialTransportProvider: string | null
   initialNotes: string | null
   initialLines: TransferLine[]
+  initialPkgLines: TransferPkgLine[]
   sites: SiteOption[]
   products: ProductOption[]
+  packaging: PackagingOption[]
   /** product_id → SRT pack info, when the product has an SRT packaging. */
   srtByProduct: Record<string, SrtInfo>
 }
 
 const groupLabel = (g: string | null) => (g ? (PRODUCT_GROUP_LABELS[g] ?? g) : 'Ungrouped')
 const emptyLine = (): TransferLine => ({ product_id: '', group: '', pack: 'individual', quantity: '' })
+const emptyPkgLine = (): TransferPkgLine => ({ packaging_id: '', quantity: '' })
 const nf = (n: number) => n.toLocaleString()
 
 export function TransferForm(props: Props) {
@@ -67,6 +79,7 @@ export function TransferForm(props: Props) {
   const [lines, setLines]     = useState<TransferLine[]>(
     props.initialLines.length ? props.initialLines : [emptyLine()],
   )
+  const [pkgLines, setPkgLines] = useState<TransferPkgLine[]>(props.initialPkgLines)
 
   const readOnly = props.mode === 'edit' && props.status != null && !['draft', 'submitted'].includes(props.status)
   const toSite = props.sites.find((s) => s.id === toId) ?? null
@@ -95,14 +108,22 @@ export function TransferForm(props: Props) {
     return PRODUCT_GROUPS.map((g) => g.value as string).filter((v) => present.has(v))
   }, [props.products])
 
+  const pkgTotal = pkgLines.reduce((s, l) => s + (l.packaging_id && Number(l.quantity) > 0 ? Number(l.quantity) : 0), 0)
+
   function patchLine(i: number, patch: Partial<TransferLine>) {
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
   }
   function addLine()     { setLines((ls) => [...ls, emptyLine()]) }
   function removeLine(i: number) { setLines((ls) => (ls.length === 1 ? [emptyLine()] : ls.filter((_, idx) => idx !== i))) }
 
+  function patchPkg(i: number, patch: Partial<TransferPkgLine>) {
+    setPkgLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
+  }
+  function addPkg()      { setPkgLines((ls) => [...ls, emptyPkgLine()]) }
+  function removePkg(i: number) { setPkgLines((ls) => ls.filter((_, idx) => idx !== i)) }
+
   function toPoLines(): POLineInput[] {
-    return lines
+    const productRows: POLineInput[] = lines
       .filter((l) => l.product_id && Number(l.quantity) > 0)
       .map((l) => {
         const isSrt = l.pack === 'srt' && !!srtFor(l.product_id)
@@ -121,6 +142,20 @@ export function TransferForm(props: Props) {
           supplier_pack_size: per,
         }
       })
+    const pkgRows: POLineInput[] = pkgLines
+      .filter((l) => l.packaging_id && Number(l.quantity) > 0)
+      .map((l) => ({
+        line_type: 'packaging' as const,
+        ingredient_id: null,
+        product_id: null,
+        packaging_id: l.packaging_id,
+        description: null,
+        quantity_ordered: Number(l.quantity),
+        unit_cost: null,
+        unit_of_measure: 'units',
+        notes: null,
+      }))
+    return [...productRows, ...pkgRows]
   }
 
   function validate(): string | null {
@@ -128,7 +163,7 @@ export function TransferForm(props: Props) {
     if (!toId) return 'Choose a To site.'
     if (fromId === toId) return 'From and To sites must be different.'
     const poLines = toPoLines()
-    if (poLines.length === 0) return 'Add at least one product with a quantity.'
+    if (poLines.length === 0) return 'Add at least one product or packaging item with a quantity.'
     return null
   }
 
@@ -339,6 +374,45 @@ export function TransferForm(props: Props) {
             <button type="button" onClick={addLine}
               className="text-sm font-medium text-emerald-700 bg-emerald-50 border border-dashed border-emerald-300 rounded-lg px-3 py-1.5">
               ＋ Add product line
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Packaging */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Packaging to move</h2>
+          <span className="text-xs text-gray-500 tabular-nums">{nf(pkgTotal)} units</span>
+        </div>
+        {pkgLines.length > 0 && (
+          <div className="divide-y divide-gray-100">
+            <div className="grid grid-cols-[minmax(0,1fr)_80px_32px] gap-2 px-4 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              <div>Packaging item</div><div className="text-right">Qty</div><div></div>
+            </div>
+            {pkgLines.map((l, i) => (
+              <div key={i} className="grid grid-cols-[minmax(0,1fr)_80px_32px] gap-2 px-4 py-2 items-center">
+                <select value={l.packaging_id} disabled={readOnly}
+                  onChange={(e) => patchPkg(i, { packaging_id: e.target.value })}
+                  className="w-full min-w-0 text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
+                  <option value="">— Select packaging —</option>
+                  {props.packaging.map((p) => <option key={p.id} value={p.id}>{p.sku_code} · {p.name}</option>)}
+                </select>
+                <input type="number" min={0} step="any" value={l.quantity} disabled={readOnly}
+                  onChange={(e) => patchPkg(i, { quantity: e.target.value })}
+                  placeholder="0"
+                  className="w-full min-w-0 text-sm text-right border border-gray-200 rounded px-2 py-1.5 tabular-nums bg-white disabled:bg-gray-50" />
+                <button type="button" disabled={readOnly} onClick={() => removePkg(i)}
+                  className="text-gray-400 hover:text-rose-600 disabled:opacity-40 text-sm">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {!readOnly && (
+          <div className="px-4 py-3 border-t border-gray-100">
+            <button type="button" onClick={addPkg}
+              className="text-sm font-medium text-emerald-700 bg-emerald-50 border border-dashed border-emerald-300 rounded-lg px-3 py-1.5">
+              ＋ Add packaging line
             </button>
           </div>
         )}

@@ -346,7 +346,7 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
               return (
                 <tr key={l.id} className="border-b border-gray-100">
                   <td className="px-2 py-2 align-top">
-                    <div className="font-medium">{name}</div>
+                    <div className="font-medium">{name}{isTransfer && l.packaging_id && <span className="ml-2 text-[9px] font-semibold uppercase text-gray-400">Packaging</span>}</div>
                     {sku && <div className="text-gray-500 text-[10px]">{`SKU: ${sku}`}{!isTransfer && supplierSku ? `  ·  Supplier code: ${supplierSku}` : ''}</div>}
                     {!sku && !isTransfer && supplierSku && <div className="text-gray-500 text-[10px]">Supplier code: {supplierSku}</div>}
                     {isTransfer && l.unit_of_measure === 'SRT' && <div className="text-gray-500 text-[10px]">SRT of {Number(l.supplier_pack_size) || 1} units · {(Number(l.quantity_ordered) * (Number(l.supplier_pack_size) || 1)).toLocaleString()} units total</div>}
@@ -370,18 +370,26 @@ export default async function PurchaseOrderPrintPage({ params }: PageProps) {
           )}
         </table>
         {isTransfer && (() => {
-          let individual = 0, srts = 0, combined = 0
+          let individual = 0, srts = 0, combined = 0, pkg = 0
           for (const l of lines ?? []) {
-            const per = Number(l.supplier_pack_size) || 1
             const qty = Number(l.quantity_ordered)
+            if (l.packaging_id) { pkg += qty; continue }   // packaging counted separately
+            const per = Number(l.supplier_pack_size) || 1
             if (l.unit_of_measure === 'SRT') { srts += qty; combined += qty * per }
             else { individual += qty; combined += qty }
           }
           return (
-            <div className="flex justify-end gap-6 mb-6 text-[12px] pt-2 border-t border-gray-200" style={{ color: brandDark }}>
-              <span><span className="font-semibold">{individual.toLocaleString()}</span> individual units</span>
-              <span><span className="font-semibold">{srts.toLocaleString()}</span> SRTs</span>
-              <span><span className="font-bold">{combined.toLocaleString()}</span> units combined</span>
+            <div className="mb-6 pt-2 border-t border-gray-200 text-[12px]" style={{ color: brandDark }}>
+              <div className="flex justify-end gap-6">
+                <span><span className="font-semibold">{individual.toLocaleString()}</span> individual units</span>
+                <span><span className="font-semibold">{srts.toLocaleString()}</span> SRTs</span>
+                <span><span className="font-bold">{combined.toLocaleString()}</span> product units combined</span>
+              </div>
+              {pkg > 0 && (
+                <div className="flex justify-end mt-1">
+                  <span><span className="font-semibold">{pkg.toLocaleString()}</span> packaging units</span>
+                </div>
+              )}
             </div>
           )
         })()}
