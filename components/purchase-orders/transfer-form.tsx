@@ -37,6 +37,10 @@ export interface TransferPkgLine {
   packaging_id: string
   quantity: string
 }
+export interface TransferOtherLine {
+  description: string
+  quantity: string
+}
 
 interface Props {
   mode: 'new' | 'edit'
@@ -52,6 +56,7 @@ interface Props {
   initialNotes: string | null
   initialLines: TransferLine[]
   initialPkgLines: TransferPkgLine[]
+  initialOtherLines: TransferOtherLine[]
   sites: SiteOption[]
   products: ProductOption[]
   packaging: PackagingOption[]
@@ -62,6 +67,7 @@ interface Props {
 const groupLabel = (g: string | null) => (g ? (PRODUCT_GROUP_LABELS[g] ?? g) : 'Ungrouped')
 const emptyLine = (): TransferLine => ({ product_id: '', group: '', pack: 'individual', quantity: '' })
 const emptyPkgLine = (): TransferPkgLine => ({ packaging_id: '', quantity: '' })
+const emptyOtherLine = (): TransferOtherLine => ({ description: '', quantity: '' })
 const nf = (n: number) => n.toLocaleString()
 
 export function TransferForm(props: Props) {
@@ -80,6 +86,7 @@ export function TransferForm(props: Props) {
     props.initialLines.length ? props.initialLines : [emptyLine()],
   )
   const [pkgLines, setPkgLines] = useState<TransferPkgLine[]>(props.initialPkgLines)
+  const [otherLines, setOtherLines] = useState<TransferOtherLine[]>(props.initialOtherLines)
 
   const readOnly = props.mode === 'edit' && props.status != null && !['draft', 'submitted'].includes(props.status)
   const toSite = props.sites.find((s) => s.id === toId) ?? null
@@ -122,6 +129,13 @@ export function TransferForm(props: Props) {
   function addPkg()      { setPkgLines((ls) => [...ls, emptyPkgLine()]) }
   function removePkg(i: number) { setPkgLines((ls) => ls.filter((_, idx) => idx !== i)) }
 
+  const otherTotal = otherLines.reduce((s, l) => s + (l.description.trim() && Number(l.quantity) > 0 ? Number(l.quantity) : 0), 0)
+  function patchOther(i: number, patch: Partial<TransferOtherLine>) {
+    setOtherLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
+  }
+  function addOther()      { setOtherLines((ls) => [...ls, emptyOtherLine()]) }
+  function removeOther(i: number) { setOtherLines((ls) => ls.filter((_, idx) => idx !== i)) }
+
   function toPoLines(): POLineInput[] {
     const productRows: POLineInput[] = lines
       .filter((l) => l.product_id && Number(l.quantity) > 0)
@@ -155,7 +169,20 @@ export function TransferForm(props: Props) {
         unit_of_measure: 'units',
         notes: null,
       }))
-    return [...productRows, ...pkgRows]
+    const otherRows: POLineInput[] = otherLines
+      .filter((l) => l.description.trim() && Number(l.quantity) > 0)
+      .map((l) => ({
+        line_type: 'other' as const,
+        ingredient_id: null,
+        product_id: null,
+        packaging_id: null,
+        description: l.description.trim(),
+        quantity_ordered: Number(l.quantity),
+        unit_cost: null,
+        unit_of_measure: 'units',
+        notes: null,
+      }))
+    return [...productRows, ...pkgRows, ...otherRows]
   }
 
   function validate(): string | null {
@@ -163,7 +190,7 @@ export function TransferForm(props: Props) {
     if (!toId) return 'Choose a To site.'
     if (fromId === toId) return 'From and To sites must be different.'
     const poLines = toPoLines()
-    if (poLines.length === 0) return 'Add at least one product or packaging item with a quantity.'
+    if (poLines.length === 0) return 'Add at least one product, packaging, or other item with a quantity.'
     return null
   }
 
@@ -413,6 +440,46 @@ export function TransferForm(props: Props) {
             <button type="button" onClick={addPkg}
               className="text-sm font-medium text-emerald-700 bg-emerald-50 border border-dashed border-emerald-300 rounded-lg px-3 py-1.5">
               ＋ Add packaging line
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Other items — free text for anything not yet in the MRP (e.g. delivery boxes) */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Other items</h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">Anything not in the MRP yet — type it in (e.g. delivery boxes).</p>
+          </div>
+          <span className="text-xs text-gray-500 tabular-nums">{nf(otherTotal)} units</span>
+        </div>
+        {otherLines.length > 0 && (
+          <div className="divide-y divide-gray-100">
+            <div className="grid grid-cols-[minmax(0,1fr)_80px_32px] gap-2 px-4 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              <div>Description</div><div className="text-right">Qty</div><div></div>
+            </div>
+            {otherLines.map((l, i) => (
+              <div key={i} className="grid grid-cols-[minmax(0,1fr)_80px_32px] gap-2 px-4 py-2 items-center">
+                <input type="text" value={l.description} disabled={readOnly}
+                  onChange={(e) => patchOther(i, { description: e.target.value })}
+                  placeholder="e.g. Delivery boxes — large"
+                  className="w-full min-w-0 text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50" />
+                <input type="number" min={0} step="any" value={l.quantity} disabled={readOnly}
+                  onChange={(e) => patchOther(i, { quantity: e.target.value })}
+                  placeholder="0"
+                  className="w-full min-w-0 text-sm text-right border border-gray-200 rounded px-2 py-1.5 tabular-nums bg-white disabled:bg-gray-50" />
+                <button type="button" disabled={readOnly} onClick={() => removeOther(i)}
+                  className="text-gray-400 hover:text-rose-600 disabled:opacity-40 text-sm">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {!readOnly && (
+          <div className="px-4 py-3 border-t border-gray-100">
+            <button type="button" onClick={addOther}
+              className="text-sm font-medium text-emerald-700 bg-emerald-50 border border-dashed border-emerald-300 rounded-lg px-3 py-1.5">
+              ＋ Add other item
             </button>
           </div>
         )}

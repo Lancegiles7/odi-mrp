@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { POForm } from '@/components/purchase-orders/po-form'
-import { TransferForm, type SiteOption, type ProductOption, type PackagingOption, type TransferLine, type TransferPkgLine } from '@/components/purchase-orders/transfer-form'
+import { TransferForm, type SiteOption, type ProductOption, type PackagingOption, type TransferLine, type TransferPkgLine, type TransferOtherLine } from '@/components/purchase-orders/transfer-form'
 import { loadSrtByProduct } from '@/lib/transfer-orders'
 import { ReceiptHistory } from '@/components/purchase-orders/receipt-history'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
@@ -108,6 +108,9 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
     const transferPkgLines: TransferPkgLine[] = (lines ?? [])
       .filter((l) => l.packaging_id)
       .map((l) => ({ packaging_id: l.packaging_id!, quantity: String(Number(l.quantity_ordered)) }))
+    const transferOtherLines: TransferOtherLine[] = (lines ?? [])
+      .filter((l) => !l.product_id && !l.packaging_id && !l.ingredient_id && l.description)
+      .map((l) => ({ description: l.description ?? '', quantity: String(Number(l.quantity_ordered)) }))
     return (
       <TransferForm
         mode="edit"
@@ -123,6 +126,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         initialNotes={po.notes}
         initialLines={transferLines}
         initialPkgLines={transferPkgLines}
+        initialOtherLines={transferOtherLines}
         sites={sites ?? []}
         products={transferProducts ?? []}
         packaging={transferPackaging ?? []}
