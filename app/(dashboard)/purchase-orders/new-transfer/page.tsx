@@ -43,6 +43,7 @@ export default async function NewTransferOrderPage() {
       initialNotes={null}
       initialLines={[]}
       initialPkgLines={[]}
+      initialOtherLines={[]}
       sites={sites ?? []}
       products={products ?? []}
       packaging={packaging ?? []}
