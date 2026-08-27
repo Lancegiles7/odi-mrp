@@ -5,6 +5,10 @@ import { getAppSettings } from '@/lib/settings'
 import { paymentTermsLabel } from '@/lib/constants'
 import { PrintTrigger } from '@/components/purchase-orders/print-trigger'
 
+// Always render fresh — a just-added line (product, packaging, or other item)
+// must show in the printable document immediately, not a cached copy.
+export const dynamic = 'force-dynamic'
+
 interface PageProps {
   params: { id: string }
 }
