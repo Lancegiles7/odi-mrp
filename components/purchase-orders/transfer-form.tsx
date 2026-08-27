@@ -189,6 +189,13 @@ export function TransferForm(props: Props) {
     if (!fromId) return 'Choose a From site.'
     if (!toId) return 'Choose a To site.'
     if (fromId === toId) return 'From and To sites must be different.'
+    // Flag half-filled lines so nothing is ever silently dropped on save.
+    if (lines.some((l) => l.product_id && !(Number(l.quantity) > 0)))     return 'A product line is missing its quantity.'
+    if (lines.some((l) => !l.product_id && Number(l.quantity) > 0))       return 'A product line has a quantity but no product selected.'
+    if (pkgLines.some((l) => l.packaging_id && !(Number(l.quantity) > 0))) return 'A packaging line is missing its quantity.'
+    if (pkgLines.some((l) => !l.packaging_id && Number(l.quantity) > 0))   return 'A packaging line has a quantity but no item selected.'
+    if (otherLines.some((l) => l.description.trim() && !(Number(l.quantity) > 0))) return 'An "other" item is missing its quantity — enter a number, or remove the line.'
+    if (otherLines.some((l) => !l.description.trim() && Number(l.quantity) > 0))   return 'An "other" item has a quantity but no description.'
     const poLines = toPoLines()
     if (poLines.length === 0) return 'Add at least one product, packaging, or other item with a quantity.'
     return null
