@@ -194,13 +194,10 @@ export function TransferForm(props: Props) {
     return null
   }
 
-  function save(then: 'view' | 'submit') {
-    const v = validate()
-    if (v) { setError(v); return }
-    setError(null)
+  function buildCommon() {
     const today = new Date()
     const orderDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    const common = {
+    return {
       po_number: props.initialPoNumber,
       po_type: 'transfer' as const,
       supplier_id: fromId,
@@ -219,6 +216,14 @@ export function TransferForm(props: Props) {
       external_notes: null,
       lines: toPoLines(),
     }
+  }
+
+  // Save (create or update) then run `after` with the saved id. Returns via callback.
+  function persist(after: (poId: string) => void | Promise<void>) {
+    const v = validate()
+    if (v) { setError(v); return }
+    setError(null)
+    const common = buildCommon()
     start(async () => {
       let poId = props.id
       if (props.mode === 'new') {
@@ -229,13 +234,26 @@ export function TransferForm(props: Props) {
         const res = await updatePurchaseOrder({ id: props.id!, ...common })
         if (!res.ok) { setError(res.error ?? 'Could not save transfer'); return }
       }
-      if (then === 'submit' && poId) {
+      await after(poId!)
+    })
+  }
+
+  function save(then: 'view' | 'submit') {
+    persist(async (poId) => {
+      if (then === 'submit') {
         const res = await setPoStatus(poId, 'submitted')
         if (!res.ok) { setError(res.error ?? 'Saved, but could not submit'); return }
       }
       router.push(`/purchase-orders/${poId}`)
       router.refresh()
     })
+  }
+
+  // Save first, then open the printable document — so what prints always
+  // matches what's on screen (no "I clicked print before saving" trap).
+  function saveAndPrint() {
+    if (readOnly) { router.push(`/purchase-orders/${props.id}/print`); return }
+    persist((poId) => { router.push(`/purchase-orders/${poId}/print`) })
   }
 
   function cancelTransfer() {
@@ -268,10 +286,11 @@ export function TransferForm(props: Props) {
         </div>
         <div className="flex items-center gap-2">
           {props.mode === 'edit' && props.id && (
-            <a href={`/purchase-orders/${props.id}/print`} target="_blank" rel="noopener noreferrer"
-              className="text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50">
-              Print / PDF
-            </a>
+            <button type="button" disabled={pending} onClick={saveAndPrint}
+              title={readOnly ? undefined : 'Saves your changes first, then opens the printable document'}
+              className="text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-60">
+              {readOnly ? 'Print / PDF' : 'Save & print'}
+            </button>
           )}
           {props.mode === 'edit' && props.status && (
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 capitalize">{props.status}</span>
