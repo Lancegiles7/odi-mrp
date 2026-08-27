@@ -129,7 +129,7 @@ export function TransferForm(props: Props) {
   function addPkg()      { setPkgLines((ls) => [...ls, emptyPkgLine()]) }
   function removePkg(i: number) { setPkgLines((ls) => ls.filter((_, idx) => idx !== i)) }
 
-  const otherTotal = otherLines.reduce((s, l) => s + (l.description.trim() && Number(l.quantity) > 0 ? Number(l.quantity) : 0), 0)
+  const otherTotal = otherLines.reduce((s, l) => s + (l.description.trim() ? (Number(l.quantity) > 0 ? Number(l.quantity) : 1) : 0), 0)
   function patchOther(i: number, patch: Partial<TransferOtherLine>) {
     setOtherLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
   }
@@ -170,14 +170,16 @@ export function TransferForm(props: Props) {
         notes: null,
       }))
     const otherRows: POLineInput[] = otherLines
-      .filter((l) => l.description.trim() && Number(l.quantity) > 0)
+      // Other items are descriptive (e.g. "boxes stored at Moonbi") — the
+      // quantity is optional. A description alone is enough; blank qty → 1.
+      .filter((l) => l.description.trim())
       .map((l) => ({
         line_type: 'other' as const,
         ingredient_id: null,
         product_id: null,
         packaging_id: null,
         description: l.description.trim(),
-        quantity_ordered: Number(l.quantity),
+        quantity_ordered: Number(l.quantity) > 0 ? Number(l.quantity) : 1,
         unit_cost: null,
         unit_of_measure: 'units',
         notes: null,
@@ -189,6 +191,13 @@ export function TransferForm(props: Props) {
     if (!fromId) return 'Choose a From site.'
     if (!toId) return 'Choose a To site.'
     if (fromId === toId) return 'From and To sites must be different.'
+    // Flag half-filled lines so nothing is ever silently dropped on save.
+    if (lines.some((l) => l.product_id && !(Number(l.quantity) > 0)))     return 'A product line is missing its quantity.'
+    if (lines.some((l) => !l.product_id && Number(l.quantity) > 0))       return 'A product line has a quantity but no product selected.'
+    if (pkgLines.some((l) => l.packaging_id && !(Number(l.quantity) > 0))) return 'A packaging line is missing its quantity.'
+    if (pkgLines.some((l) => !l.packaging_id && Number(l.quantity) > 0))   return 'A packaging line has a quantity but no item selected.'
+    // Other items only need a description — quantity is optional (defaults to 1).
+    if (otherLines.some((l) => !l.description.trim() && Number(l.quantity) > 0))   return 'An "other" item has a quantity but no description.'
     const poLines = toPoLines()
     if (poLines.length === 0) return 'Add at least one product, packaging, or other item with a quantity.'
     return null
@@ -486,7 +495,8 @@ export function TransferForm(props: Props) {
                   className="w-full min-w-0 text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50" />
                 <input type="number" min={0} step="any" value={l.quantity} disabled={readOnly}
                   onChange={(e) => patchOther(i, { quantity: e.target.value })}
-                  placeholder="0"
+                  placeholder="1"
+                  title="Optional — leave blank for 1"
                   className="w-full min-w-0 text-sm text-right border border-gray-200 rounded px-2 py-1.5 tabular-nums bg-white disabled:bg-gray-50" />
                 <button type="button" disabled={readOnly} onClick={() => removeOther(i)}
                   className="text-gray-400 hover:text-rose-600 disabled:opacity-40 text-sm">✕</button>
