@@ -375,9 +375,21 @@ export function writeoffsFromTracker(
   return out
 }
 
-/** "2026-07-01" → "July 2026" (sample tracker sheet name). */
+/** "2026-07-01" → "July 2026" (canonical sample tracker sheet name). */
 export function sampleSheetName(yearMonth: string): string {
   const [y, m] = yearMonth.split('-').map(Number)
   const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
   return `${names[m - 1]} ${y}`
+}
+
+/** The sample tracker's sheet for `yearMonth`, or null.
+ *  Tabs are named by hand and mix full and shortened months ("July 2026" but
+ *  "Aug 2026", "Sept 2026"), so match on the first three letters plus the year
+ *  — in 2- or 4-digit form — rather than requiring one exact spelling. */
+export function findSampleSheet(sheetNames: string[], yearMonth: string): string | null {
+  const [y, m] = yearMonth.split('-').map(Number)
+  const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const abbr = names[m - 1].slice(0, 3).toLowerCase()
+  const re = new RegExp(`^${abbr}[a-z]*\\.?\\s*'?(${y}|${String(y).slice(2)})$`, 'i')
+  return sheetNames.find((n) => re.test(n.trim())) ?? null
 }

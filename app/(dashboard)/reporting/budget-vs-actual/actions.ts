@@ -8,7 +8,7 @@ import type { Channel, EntityType } from '@/lib/budget-vs-actual'
 import { fyMonths, fyStartFor } from '@/lib/budget-vs-actual'
 import {
   d2cFromShopify, retailFromUpstock, samplesFromSheet, monthOf,
-  actualsToFigureLines, sampleSheetName, perProductUnits, monthsCovered,
+  actualsToFigureLines, sampleSheetName, findSampleSheet, perProductUnits, monthsCovered,
   candidateSkus, resolveProductSku, writeoffsFromTracker,
 } from '@/lib/bva-import'
 
@@ -59,10 +59,9 @@ export async function importBvaActuals(formData: FormData): Promise<{
       const wb = XLSX.read(await samples.arrayBuffer(), { type: 'array', raw: true })
       // Exact sheet only — falling back to "the last sheet" silently files
       // another month's samples against this one.
-      const wantSheet = sampleSheetName(yearMonth)
-      const sheetName = wb.SheetNames.find((n) => n.trim() === wantSheet)
+      const sheetName = findSampleSheet(wb.SheetNames, yearMonth)
       if (!sheetName) {
-        return { ok: false, error: `The sample tracker has no "${wantSheet}" sheet (it has: ${wb.SheetNames.join(', ')}).` }
+        return { ok: false, error: `The sample tracker has no sheet for ${sampleSheetName(yearMonth)} (it has: ${wb.SheetNames.join(', ')}).` }
       }
       samplesAoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: '' }) as unknown[][]
     }
