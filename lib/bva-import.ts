@@ -14,7 +14,7 @@
  * these functions take already-parsed rows so they stay testable.
  */
 
-export type GroupKey = 'sachets' | 'tubs' | 'snacks' | 'pouches' | 'other'
+export type GroupKey = 'sachets' | 'tubs' | 'snacks' | 'pouches' | 'puffs_melts' | 'noodles' | 'other'
 
 /** Product group from any of the SKU schemes (FG-/SRC-/SHIP-…). */
 export function bvaGroup(sku: string | null | undefined): GroupKey {
@@ -22,6 +22,9 @@ export function bvaGroup(sku: string | null | undefined): GroupKey {
   if (s.includes('SAC')) return 'sachets'
   if (s.includes('TUB')) return 'tubs'
   if (s.includes('PCH')) return 'pouches'
+  if (s.includes('NDL') || s.includes('NOODLE')) return 'noodles'
+  // Quinoa puffs (PUF) and yoghurt drops / melts (DRP, MLT) share one group.
+  if (s.includes('PUF') || s.includes('DRP') || s.includes('MLT')) return 'puffs_melts'
   if (s.includes('BITE') || s.includes('-BAR') || s.includes('BAL') || s.includes('CCO') || s.includes('COOK')) return 'snacks'
   return 'other'
 }
@@ -42,7 +45,7 @@ export interface D2cActuals { revenue: number; orders: number; units: Record<Gro
 export interface RetailActuals { revenue: number; ordersWw: number; ordersOther: number; units: Record<GroupKey, number> }
 
 function zeroUnits(): Record<GroupKey, number> {
-  return { sachets: 0, tubs: 0, snacks: 0, pouches: 0, other: 0 }
+  return { sachets: 0, tubs: 0, snacks: 0, pouches: 0, puffs_melts: 0, noodles: 0, other: 0 }
 }
 
 /** Shopify export → D2C actuals for `ym` (YYYY-MM).
@@ -117,23 +120,49 @@ export function samplesFromSheet(aoa: unknown[][]): Record<GroupKey, number> {
   return units
 }
 
-/** Map the computed actuals into bva_figures line_key → value. */
-export function actualsToFigureLines(d2c: D2cActuals, retail: RetailActuals, samples: Record<GroupKey, number>): Record<string, number> {
-  const groups: GroupKey[] = ['sachets', 'tubs', 'snacks', 'pouches']
-  const out: Record<string, number> = {
-    rev_d2c:          d2c.revenue,
-    rev_retail:       retail.revenue,
-    ord_d2c:          d2c.orders,
-    ord_retail:       retail.ordersWw + retail.ordersOther,
-    ord_retail_ww:    retail.ordersWw,
-    ord_retail_other: retail.ordersOther,
+/** Which of the three exports were actually attached to this import. */
+export interface ActualSources { d2c: boolean; retail: boolean; samples: boolean }
+
+/** Map the computed actuals into bva_figures line_key → value.
+ *  Only lines the attached files can actually speak for are returned — a line
+ *  left out keeps whatever is already saved for the month, rather than being
+ *  overwritten with a zero by an import that never saw its source file. */
+export function actualsToFigureLines(
+  d2c: D2cActuals,
+  retail: RetailActuals,
+  samples: Record<GroupKey, number>,
+  sources: ActualSources = { d2c: true, retail: true, samples: true },
+): Record<string, number> {
+  const groups: GroupKey[] = ['sachets', 'tubs', 'snacks', 'pouches', 'puffs_melts', 'noodles']
+  const out: Record<string, number> = {}
+  if (sources.d2c) {
+    out.rev_d2c = d2c.revenue
+    out.ord_d2c = d2c.orders
+  }
+  if (sources.retail) {
+    out.rev_retail       = retail.revenue
+    out.ord_retail       = retail.ordersWw + retail.ordersOther
+    out.ord_retail_ww    = retail.ordersWw
+    out.ord_retail_other = retail.ordersOther
   }
   for (const g of groups) {
-    // Sales units = D2C + Retail (samples tracked separately, indicative).
-    out[`units_${g}`] = d2c.units[g] + retail.units[g]
-    out[`smpl_${g}`]  = samples[g]
+    // Sales units = D2C + Retail, so both files must be present — otherwise a
+    // retail-only (or D2C-only) import would halve the month's units.
+    if (sources.d2c && sources.retail) out[`units_${g}`] = d2c.units[g] + retail.units[g]
+    // Samples are tracked separately (indicative).
+    if (sources.samples) out[`smpl_${g}`] = samples[g]
   }
   return out
+}
+
+/** The YYYY-MM months a parsed export actually covers, for error messages. */
+export function monthsCovered(rows: Array<Record<string, unknown>>, dateField: string): string[] {
+  const seen = new Set<string>()
+  for (const r of rows) {
+    const m = monthOf(r[dateField])
+    if (/^\d{4}-\d{2}$/.test(m)) seen.add(m)
+  }
+  return Array.from(seen).sort()
 }
 
 // ============================================================
@@ -173,10 +202,14 @@ export const RETAIL_MAP: Record<string, RetailMatch> = {
 }
 
 /**
- * Export `FG-` codes (Shopify / Upstock-resolved / sample tracker) →
- * the MRP product master's system SKU. Built from the exported product list
- * (odi-products.csv). Products not listed here (e.g. puffs/melts that already
- * use FG- codes in the master) fall through and match on their own code.
+ * LEGACY fallback: export `FG-` codes → the long `ODI-…` codes the product
+ * master used before it was renamed to FG- codes.
+ *
+ * The master now stores FG- codes directly, so the FG code itself is always
+ * tried FIRST (see `resolveProductSku`) and this table is only consulted for
+ * products that still carry an old code (currently the Carrot and Baby Cereal
+ * sachets). Do NOT translate blind — every entry here whose target no longer
+ * exists would silently drop that product's sales.
  */
 export const FG_TO_SYSTEM: Record<string, string> = {
   'FG-ODI-PCH-BRY':  'ODI-BABY-PURE-BERR-POUCH-120G',
@@ -203,7 +236,24 @@ export const FG_TO_SYSTEM: Record<string, string> = {
   'ODIMEAL':         'ODI-ODI-ORGA-MEAL-TUB-125G', // "NutriDense Meal Booster" → Meal Booster
 }
 
-/** Translate an export FG- code to the MRP system SKU (identity if unmapped). */
+/** Every sku_code an export FG- code could be stored under, best first:
+ *  the FG code itself, then its legacy long code. Used to build the lookup
+ *  query so both naming schemes can coexist in the product master. */
+export function candidateSkus(fgSku: string): string[] {
+  const legacy = FG_TO_SYSTEM[fgSku]
+  return legacy && legacy !== fgSku ? [fgSku, legacy] : [fgSku]
+}
+
+/** Pick the sku_code this FG- code actually exists under in the product
+ *  master, or null when the product isn't there at all. */
+export function resolveProductSku(fgSku: string, known: ReadonlyMap<string, unknown> | ReadonlySet<string>): string | null {
+  const has = (k: string) => (known instanceof Map ? known.has(k) : (known as ReadonlySet<string>).has(k))
+  return candidateSkus(fgSku).find(has) ?? null
+}
+
+/** Translate an export FG- code to its legacy system SKU (identity if unmapped).
+ *  @deprecated Prefer `resolveProductSku` — blind translation drops any product
+ *  whose master code has since been renamed to the FG- scheme. */
 export function toSystemSku(fgSku: string): string {
   return FG_TO_SYSTEM[fgSku] ?? fgSku
 }
@@ -325,9 +375,21 @@ export function writeoffsFromTracker(
   return out
 }
 
-/** "2026-07-01" → "July 2026" (sample tracker sheet name). */
+/** "2026-07-01" → "July 2026" (canonical sample tracker sheet name). */
 export function sampleSheetName(yearMonth: string): string {
   const [y, m] = yearMonth.split('-').map(Number)
   const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
   return `${names[m - 1]} ${y}`
+}
+
+/** The sample tracker's sheet for `yearMonth`, or null.
+ *  Tabs are named by hand and mix full and shortened months ("July 2026" but
+ *  "Aug 2026", "Sept 2026"), so match on the first three letters plus the year
+ *  — in 2- or 4-digit form — rather than requiring one exact spelling. */
+export function findSampleSheet(sheetNames: string[], yearMonth: string): string | null {
+  const [y, m] = yearMonth.split('-').map(Number)
+  const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const abbr = names[m - 1].slice(0, 3).toLowerCase()
+  const re = new RegExp(`^${abbr}[a-z]*\\.?\\s*'?(${y}|${String(y).slice(2)})$`, 'i')
+  return sheetNames.find((n) => re.test(n.trim())) ?? null
 }

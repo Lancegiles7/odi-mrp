@@ -48,7 +48,10 @@ export function BvaUploadActuals({ months, defaultMonth }: { months: MonthOpt[];
                 <select value={month} onChange={(e) => setMonth(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
                   {openMonths.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
                 </select>
-                <p className="text-[11px] text-gray-400 mt-1">Closed months aren&rsquo;t listed — unlock one first to re-import.</p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Files the results under this month <em>and</em> filters the exports to it — rows created in any other month are ignored.
+                </p>
+                <p className="text-[11px] text-gray-400">Closed months aren&rsquo;t listed — unlock one first to re-import.</p>
               </div>
 
               <FileField name="shopify" label="D2C · Shopify orders export" hint=".csv" />
@@ -62,10 +65,13 @@ export function BvaUploadActuals({ months, defaultMonth }: { months: MonthOpt[];
                 <div className="text-xs bg-emerald-50 border border-emerald-200 rounded px-3 py-2 space-y-1.5">
                   <div className="font-medium text-emerald-800">Saved ✓</div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-gray-700 tabular-nums">
-                    <span>D2C revenue: ${Math.round(done.wrote?.rev_d2c ?? 0).toLocaleString()}</span>
-                    <span>Retail revenue: ${Math.round(done.wrote?.rev_retail ?? 0).toLocaleString()}</span>
-                    <span>D2C orders: {done.wrote?.ord_d2c ?? 0}</span>
-                    <span>Retail orders: {done.wrote?.ord_retail ?? 0} (WW {done.wrote?.ord_retail_ww ?? 0})</span>
+                    <span>D2C revenue: {money(done.wrote?.rev_d2c)}</span>
+                    <span>Retail revenue: {money(done.wrote?.rev_retail)}</span>
+                    <span>D2C orders: {count(done.wrote?.ord_d2c)}</span>
+                    <span>Retail orders: {count(done.wrote?.ord_retail)} (WW {count(done.wrote?.ord_retail_ww)})</span>
+                  </div>
+                  <div className="text-[11px] text-gray-500">
+                    &ldquo;not updated&rdquo; = that export wasn&rsquo;t attached, so the month keeps its saved figure.
                   </div>
                   <div className="text-gray-700 pt-1 border-t border-emerald-100">
                     {done.productsMatched ?? 0} products matched (Products / Ingredients / Packaging tabs updated)
@@ -98,6 +104,12 @@ export function BvaUploadActuals({ months, defaultMonth }: { months: MonthOpt[];
     </>
   )
 }
+
+/** A line the import didn't write keeps its saved value — say so rather than
+ *  showing a zero the import never actually calculated. */
+const notUpdated = <span className="text-gray-400 italic">not updated</span>
+const money = (n: number | undefined) => (n == null ? notUpdated : `$${Math.round(n).toLocaleString()}`)
+const count = (n: number | undefined) => (n == null ? notUpdated : n.toLocaleString())
 
 function FileField({ name, label, hint }: { name: string; label: string; hint: string }) {
   return (
