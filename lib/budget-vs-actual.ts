@@ -133,6 +133,8 @@ export const SUMMARY_GROUPS: Array<{ key: string; label: string }> = [
   { key: 'units_tubs',    label: 'Tubs' },
   { key: 'units_snacks',  label: 'Snacks' },
   { key: 'units_pouches', label: 'Pouches' },
+  { key: 'units_puffs_melts', label: 'Puffs & Melts' },
+  { key: 'units_noodles', label: 'Noodles' },
 ]
 
 /** Variance amount + percent (actual − budget). Null-safe. */

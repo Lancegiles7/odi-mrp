@@ -7,9 +7,9 @@ import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import type { Channel, EntityType } from '@/lib/budget-vs-actual'
 import { fyMonths, fyStartFor } from '@/lib/budget-vs-actual'
 import {
-  d2cFromShopify, retailFromUpstock, samplesFromSheet,
-  actualsToFigureLines, sampleSheetName, perProductUnits, toSystemSku,
-  writeoffsFromTracker,
+  d2cFromShopify, retailFromUpstock, samplesFromSheet, monthOf,
+  actualsToFigureLines, sampleSheetName, perProductUnits, monthsCovered,
+  candidateSkus, resolveProductSku, writeoffsFromTracker,
 } from '@/lib/bva-import'
 
 const REVAL = '/reporting/budget-vs-actual'
@@ -57,28 +57,58 @@ export async function importBvaActuals(formData: FormData): Promise<{
     let samplesAoa: unknown[][] = []
     if (samples && samples.size > 0) {
       const wb = XLSX.read(await samples.arrayBuffer(), { type: 'array', raw: true })
-      const sheetName = wb.SheetNames.find((n) => n === sampleSheetName(yearMonth)) ?? wb.SheetNames[wb.SheetNames.length - 1]
+      // Exact sheet only — falling back to "the last sheet" silently files
+      // another month's samples against this one.
+      const wantSheet = sampleSheetName(yearMonth)
+      const sheetName = wb.SheetNames.find((n) => n.trim() === wantSheet)
+      if (!sheetName) {
+        return { ok: false, error: `The sample tracker has no "${wantSheet}" sheet (it has: ${wb.SheetNames.join(', ')}).` }
+      }
       samplesAoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: '' }) as unknown[][]
     }
 
+    // ── Guard: an attached export that holds nothing for the chosen month is
+    // almost always the wrong month picked. Writing it through would overwrite
+    // that month's saved actuals with zeros, so stop before saving anything.
+    const wrongMonth = (label: string, rows: Record<string, unknown>[], dateField: string): string | null => {
+      if (rows.length === 0) return null
+      if (rows.some((r) => monthOf(r[dateField]) === ym)) return null
+      const covered = monthsCovered(rows, dateField)
+      return `The ${label} has no rows for ${ym}${covered.length ? ` — it covers ${covered.join(', ')}` : ''}. Pick that month at the top, or attach the ${ym} export.`
+    }
+    const monthErr = wrongMonth('Shopify export', shopifyRows, 'Created at')
+                  ?? wrongMonth('Upstock export', upstockRows, 'Created Date')
+    if (monthErr) return { ok: false, error: monthErr }
+
     // ── Summary figures (revenue / orders / group units) → bva_figures ──
+    // Only the files actually attached get written — an unattached channel
+    // keeps its saved figure instead of being zeroed.
+    const sources = {
+      d2c:     shopifyRows.length > 0,
+      retail:  upstockRows.length > 0,
+      samples: samplesAoa.length > 0,
+    }
     const d2c    = d2cFromShopify(shopifyRows, ym)
     const retail = retailFromUpstock(upstockRows, ym)
     const samp   = samplesFromSheet(samplesAoa)
-    const lines  = actualsToFigureLines(d2c, retail, samp)
+    const lines  = actualsToFigureLines(d2c, retail, samp, sources)
 
     const { data: profile } = await supabase.from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
     const figRows = Object.entries(lines).map(([line_key, actual]) => ({
       year_month: yearMonth, line_key, actual, updated_at: new Date().toISOString(), updated_by: profile?.id ?? null,
     }))
-    const { error: figErr } = await supabase.from('bva_figures').upsert(figRows as never, { onConflict: 'year_month,line_key' })
-    if (figErr) return { ok: false, error: `Save failed: ${figErr.message}` }
+    if (figRows.length > 0) {
+      const { error: figErr } = await supabase.from('bva_figures').upsert(figRows as never, { onConflict: 'year_month,line_key' })
+      if (figErr) return { ok: false, error: `Save failed: ${figErr.message}` }
+    }
 
     // ── Per-product actuals (single units by channel) → product_actuals ──
     const pp = perProductUnits(shopifyRows, upstockRows, samplesAoa, ym)
     // Export uses FG- codes; the product master uses system SKUs — translate.
     const wantedFg = Array.from(new Set(Object.keys(pp.d2c).concat(Object.keys(pp.retail), Object.keys(pp.samples))))
-    const wantedSystem = Array.from(new Set(wantedFg.map(toSystemSku)))
+    // Look the products up under BOTH naming schemes — the master mostly uses
+    // FG- codes now, but a couple of products still carry the old long codes.
+    const wantedSystem = Array.from(new Set(wantedFg.flatMap(candidateSkus)))
     const { data: prods } = await supabase.from('products')
       .select('id, sku_code').in('sku_code', wantedSystem) as { data: Array<{ id: string; sku_code: string }> | null }
     const idBySku = new Map((prods ?? []).map((p) => [p.sku_code, p.id]))
@@ -92,7 +122,8 @@ export async function importBvaActuals(formData: FormData): Promise<{
     const paByKey = new Map<string, { product_id: string; channel: string; units: number }>()
     const addChannel = (map: Record<string, number>, channel: string) => {
       for (const [fgSku, units] of Object.entries(map)) {
-        const id = idBySku.get(toSystemSku(fgSku))
+        const sku = resolveProductSku(fgSku, idBySku)
+        const id = sku ? idBySku.get(sku) : undefined
         if (!id) { unmatchedSkus.push(fgSku); continue }
         const key = `${id}|${channel}`
         const existing = paByKey.get(key)
@@ -128,7 +159,7 @@ export async function importBvaActuals(formData: FormData): Promise<{
       const monthByNum = new Map<number, string>(fyMs.map((m) => [Number(m.slice(5, 7)), m]))
       const parsed = writeoffsFromTracker(aoa, monthByNum)
 
-      const woSystem = Array.from(new Set(parsed.map((r) => toSystemSku(r.fg))))
+      const woSystem = Array.from(new Set(parsed.flatMap((r) => candidateSkus(r.fg))))
       const { data: woProds } = woSystem.length
         ? await supabase.from('products').select('id, sku_code').in('sku_code', woSystem) as { data: Array<{ id: string; sku_code: string }> | null }
         : { data: [] as Array<{ id: string; sku_code: string }> }
@@ -142,7 +173,8 @@ export async function importBvaActuals(formData: FormData): Promise<{
       // Accumulate by (product, month): sum units, join distinct reasons.
       const woAcc = new Map<string, { product_id: string; year_month: string; units: number; reasons: string[] }>()
       for (const r of parsed) {
-        const id = woIdBySku.get(toSystemSku(r.fg))
+        const woSku = resolveProductSku(r.fg, woIdBySku)
+        const id = woSku ? woIdBySku.get(woSku) : undefined
         if (!id) { unmatchedSkus.push(r.fg); continue }
         if (lockedSet.has(r.year_month)) continue
         const key = `${id}|${r.year_month}`

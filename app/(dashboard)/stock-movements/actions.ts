@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { parseInwardsReceipts } from '@/lib/inwards-import'
-import { toSystemSku } from '@/lib/bva-import'
+import { candidateSkus, resolveProductSku } from '@/lib/bva-import'
 
 // ============================================================
 // importInwardsReceipts — parse the Inwards Finished Goods sheet and
@@ -32,7 +32,8 @@ export async function importInwardsReceipts(formData: FormData): Promise<{
       return { ok: false, error: 'No receipts found — the sheet needs SKU, Received date and Retail Units Received columns.' }
     }
 
-    const sysSkus = Array.from(new Set(parsed.map((p) => toSystemSku(p.fg))))
+    // Both naming schemes — the master mostly uses FG- codes, a few legacy ones remain.
+    const sysSkus = Array.from(new Set(parsed.flatMap((p) => candidateSkus(p.fg))))
     const { data: prods } = await supabase.from('products')
       .select('id, sku_code').in('sku_code', sysSkus) as { data: Array<{ id: string; sku_code: string }> | null }
     const idBySku = new Map((prods ?? []).map((p) => [p.sku_code, p.id]))
@@ -40,7 +41,8 @@ export async function importInwardsReceipts(formData: FormData): Promise<{
     const unmatched = new Set<string>()
     const inserts = parsed
       .map((p) => {
-        const id = idBySku.get(toSystemSku(p.fg))
+        const sku = resolveProductSku(p.fg, idBySku)
+        const id = sku ? idBySku.get(sku) : undefined
         if (!id) { unmatched.add(p.fg); return null }
         return {
           product_id: id, received_month: p.receivedMonth, received_date: p.receivedDate,
