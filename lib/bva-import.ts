@@ -282,10 +282,11 @@ export function resolveRetail(code: string, name: string): RetailMatch | null {
   return null
 }
 
-/** Australia launched on 30 Aug 2026 — from that day D2C orders shipping to
- *  AU are fulfilled from Australian stock and belong to the AU channel.
- *  Earlier AU orders went out on NZ stock, so they stay against NZ. */
-export const AU_FULFILMENT_FROM = '2026-08-30'
+/** Australia went live on 29 Aug 2026 — the first day of the Sydney expo, when
+ *  AU stock started being sold from. From that day D2C orders shipping to AU
+ *  are fulfilled from Australian stock and belong to the AU channel. Earlier AU
+ *  orders went out on NZ stock, so they stay against NZ. */
+export const AU_FULFILMENT_FROM = '2026-08-29'
 
 /** "2026-08-31 23:54:55 +1200" → "2026-08-31". */
 export function dayOf(s: unknown): string {
