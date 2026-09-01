@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Odi MRP — Standalone packaging items mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-gray-100 p-8">
+<div class="max-w-[1400px] mx-auto space-y-10">
+
+<header>
+  <h1 class="text-xl font-semibold">Packaging without a product — mockup</h1>
+  <p class="text-sm text-gray-600 mt-1">
+    Lets items like <strong>ecom branded boxes for D2C dispatch</strong> exist on their own. Today the form
+    blocks with &ldquo;Pick a product first.&rdquo; — every packaging SKU has to be attached to a product.
+  </p>
+</header>
+
+<!-- ============================================================ -->
+<!-- 1 · THE FORM — PRODUCT BECOMES OPTIONAL                      -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-start justify-between">
+    <div>
+      <h2 class="text-base font-semibold">1 · /packaging/new — product becomes optional</h2>
+      <p class="text-xs text-gray-500 mt-0.5">Same form, same rows. The product picker gains a &ldquo;no product&rdquo; option and stops being a blocker.</p>
+    </div>
+    <span class="text-[10px] px-2 py-1 bg-emerald-50 text-emerald-800 rounded">The main change</span>
+  </div>
+
+  <div class="p-5 space-y-6">
+
+    <!-- BEFORE -->
+    <div>
+      <div class="text-[11px] uppercase tracking-wider text-gray-400 mb-2">Today</div>
+      <div class="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-3">
+        <div class="bg-red-50 border border-red-200 rounded px-3 py-2 text-sm text-red-800">Pick a product first.</div>
+        <div>
+          <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Product this packaging is for</label>
+          <select class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white">
+            <option>— Pick a product —</option>
+          </select>
+        </div>
+        <p class="text-xs text-gray-500">No way through. An ecom box isn&rsquo;t &ldquo;for&rdquo; any single product, so there&rsquo;s nothing honest to pick.</p>
+      </div>
+    </div>
+
+    <!-- AFTER -->
+    <div>
+      <div class="text-[11px] uppercase tracking-wider text-gray-400 mb-2">Proposed</div>
+      <div class="border-2 border-emerald-300 rounded-lg p-4 space-y-4">
+
+        <div>
+          <label class="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">
+            Product this packaging is for <span class="text-gray-400 normal-case tracking-normal">(optional)</span>
+          </label>
+          <select class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white">
+            <option selected>— No product · standalone item —</option>
+            <option>Odi Baby Puree Organic Berry · FG-ODI-PCH-BRY</option>
+            <option>Odi Organic Brownie · FG-ODI-BITE-BRN</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1.5">
+            Each row below creates one packaging item. Pick a product to also link them to it &mdash; leave it on
+            &ldquo;no product&rdquo; for shared items like shippers, ecom boxes or tape.
+          </p>
+        </div>
+
+        <!-- Standalone explainer -->
+        <div class="bg-blue-50 border border-blue-200 rounded px-3 py-2 text-xs text-blue-900">
+          <strong>Standalone item.</strong> It won&rsquo;t appear in any product&rsquo;s unit cost, because per-unit cost
+          comes from the product link. It will show in the Packaging list under group
+          <span class="font-mono bg-white/60 px-1 rounded">Unassigned</span>, and you can link it to products later
+          from the product edit page.
+        </div>
+
+        <!-- Row table -->
+        <div class="overflow-x-auto border border-gray-200 rounded">
+          <table class="w-full text-xs">
+            <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+              <tr>
+                <th class="text-left px-2 py-2">SKU code</th>
+                <th class="text-left px-2 py-2">Name</th>
+                <th class="text-left px-2 py-2 w-[110px]">Type</th>
+                <th class="text-left px-2 py-2 w-[150px]">Supplier</th>
+                <th class="text-right px-2 py-2 w-[70px]">Price</th>
+                <th class="text-left px-2 py-2 w-[60px]">Cur</th>
+                <th class="text-right px-2 py-2 w-[70px]">Freight</th>
+                <th class="text-right px-2 py-2 w-[60px]">Qty</th>
+                <th class="text-left px-2 py-2 w-[130px]">Mode</th>
+                <th class="text-center px-2 py-2 w-[80px]">In cost?</th>
+                <th class="text-right px-2 py-2 w-[70px]">SOH</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-t border-gray-100">
+                <td class="px-2 py-1.5"><div class="border border-gray-200 rounded px-1.5 py-1 font-mono">BOX-ODI-ECOM-MED</div></td>
+                <td class="px-2 py-1.5"><div class="border border-gray-200 rounded px-1.5 py-1">Ecom Branded Box &mdash; Medium</div></td>
+                <td class="px-2 py-1.5"><div class="border border-gray-200 rounded px-1.5 py-1 text-gray-600">Other</div></td>
+                <td class="px-2 py-1.5"><div class="border border-gray-200 rounded px-1.5 py-1 text-gray-600">Opal Packaging ANZ</div></td>
+                <td class="px-2 py-1.5 text-right"><div class="border border-gray-200 rounded px-1.5 py-1 tabular-nums">.48</div></td>
+                <td class="px-2 py-1.5"><div class="border border-gray-200 rounded px-1.5 py-1 text-gray-600">AUD</div></td>
+                <td class="px-2 py-1.5"><div class="border border-gray-200 rounded px-1.5 py-1"></div></td>
+                <td class="px-2 py-1.5 text-right"><div class="border border-gray-200 rounded px-1.5 py-1 tabular-nums text-gray-300">&mdash;</div></td>
+                <td class="px-2 py-1.5"><div class="border border-gray-200 rounded px-1.5 py-1 text-gray-300">n/a</div></td>
+                <td class="px-2 py-1.5 text-center"><input type="checkbox" disabled class="opacity-40" /></td>
+                <td class="px-2 py-1.5 text-right"><div class="border border-gray-200 rounded px-1.5 py-1 tabular-nums">2,400</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex items-start gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          <span>&#9888;</span>
+          <div>
+            <strong>Qty, Mode and In&nbsp;cost? grey out when no product is picked.</strong>
+            All three describe the <em>link</em> between a packaging item and a product &mdash; how many go on one unit,
+            and whether that cost lands in the product&rsquo;s BOM. With no product there&rsquo;s nothing for them to describe,
+            so today&rsquo;s values would be silently discarded. Greying them out says so up front.
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2">
+          <button class="px-3 py-1.5 text-xs border border-gray-300 rounded-md">Cancel</button>
+          <button class="px-3 py-1.5 text-xs bg-gray-900 text-white rounded-md font-medium">Save 1 packaging item</button>
+        </div>
+        <p class="text-[11px] text-gray-400 text-right -mt-1">Button drops &ldquo;+ link to product&rdquo; when no product is picked.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 2 · WHERE IT SHOWS UP                                        -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">2 · Packaging list &mdash; already handles this</h2>
+    <p class="text-xs text-gray-500 mt-0.5">The list has an <span class="font-mono">Unassigned</span> group filter today. Standalone items land there with no code change.</p>
+  </div>
+  <div class="p-5">
+    <div class="flex gap-2 mb-3 text-xs">
+      <span class="px-2.5 py-1 rounded border border-gray-300">All groups</span>
+      <span class="px-2.5 py-1 rounded bg-gray-900 text-white">Unassigned</span>
+      <span class="px-2.5 py-1 rounded border border-gray-300">Pouches</span>
+      <span class="px-2.5 py-1 rounded border border-gray-300">Snacks (4B&rsquo;s)</span>
+    </div>
+    <table class="w-full text-xs border border-gray-200 rounded">
+      <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <tr>
+          <th class="text-left px-3 py-2">Code</th>
+          <th class="text-left px-3 py-2">Type</th>
+          <th class="text-left px-3 py-2">Name</th>
+          <th class="text-left px-3 py-2">Supplier</th>
+          <th class="text-right px-3 py-2">Price</th>
+          <th class="text-left px-3 py-2">Ccy</th>
+          <th class="text-right px-3 py-2">Loaded NZD</th>
+          <th class="text-right px-3 py-2">SOH</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t border-gray-100 bg-emerald-50/40">
+          <td class="px-3 py-2 font-mono">BOX-ODI-ECOM-MED</td>
+          <td class="px-3 py-2 text-gray-600">Other</td>
+          <td class="px-3 py-2">Ecom Branded Box &mdash; Medium</td>
+          <td class="px-3 py-2 text-gray-600">Opal Packaging ANZ</td>
+          <td class="px-3 py-2 text-right tabular-nums">$0.48</td>
+          <td class="px-3 py-2">AUD</td>
+          <td class="px-3 py-2 text-right tabular-nums">$0.58</td>
+          <td class="px-3 py-2 text-right tabular-nums">2,400</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3 · THE DECISION                                             -->
+<!-- ============================================================ -->
+<section class="bg-white border-2 border-amber-300 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-amber-100 bg-amber-50">
+    <h2 class="text-base font-semibold">3 · Packaging Demand &mdash; needs your call</h2>
+    <p class="text-xs text-amber-900 mt-0.5">This is the part that isn&rsquo;t automatic. Demand is calculated as <span class="font-mono">production units &times; qty per unit</span> &mdash; both of which come from a product link.</p>
+  </div>
+  <div class="p-5 space-y-4">
+
+    <p class="text-sm text-gray-700">A standalone ecom box has no product link, so it has <strong>no calculated demand</strong>. It appears on the Demand page with zeros as soon as it has stock on hand:</p>
+
+    <table class="w-full text-xs border border-gray-200 rounded">
+      <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <tr>
+          <th class="text-left px-3 py-2">Item</th>
+          <th class="text-right px-3 py-2">Opening</th>
+          <th class="text-right px-3 py-2">Sep</th>
+          <th class="text-right px-3 py-2">Oct</th>
+          <th class="text-right px-3 py-2">Nov</th>
+          <th class="text-right px-3 py-2">Dec</th>
+          <th class="text-right px-3 py-2">Closing</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-2">Ecom Branded Box &mdash; Medium</td>
+          <td class="px-3 py-2 text-right tabular-nums">2,400</td>
+          <td class="px-3 py-2 text-right tabular-nums text-gray-300">0</td>
+          <td class="px-3 py-2 text-right tabular-nums text-gray-300">0</td>
+          <td class="px-3 py-2 text-right tabular-nums text-gray-300">0</td>
+          <td class="px-3 py-2 text-right tabular-nums text-gray-300">0</td>
+          <td class="px-3 py-2 text-right tabular-nums">2,400</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="grid grid-cols-3 gap-3 pt-1">
+      <div class="border border-gray-200 rounded-lg p-3">
+        <div class="text-xs font-semibold mb-1">A · Leave it manual</div>
+        <p class="text-[11px] text-gray-600">Track stock, no forecast. You watch the SOH number and reorder on feel. Nothing more to build.</p>
+      </div>
+      <div class="border-2 border-emerald-300 rounded-lg p-3">
+        <div class="text-xs font-semibold mb-1">B · Drive it off D2C orders <span class="text-emerald-700">&larr; suggested</span></div>
+        <p class="text-[11px] text-gray-600">One box per D2C order. The D2C order forecast already exists, so demand becomes <span class="font-mono">orders &times; 1</span>. Needs a &ldquo;consumed per order&rdquo; field on the item.</p>
+      </div>
+      <div class="border border-gray-200 rounded-lg p-3">
+        <div class="text-xs font-semibold mb-1">C · Later</div>
+        <p class="text-[11px] text-gray-600">Ship the create-without-product change now, decide forecasting once you see how the boxes actually get used.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="text-xs text-gray-500 pb-4">
+  Scope if approved: product optional on <span class="font-mono">/packaging/new</span> &middot; link-only fields grey out
+  &middot; server action stops requiring a product. No database change &mdash; <span class="font-mono">product_packaging</span>
+  is already a separate table, so a packaging row without a link is valid today.
+</footer>
+
+</div>
+</body>
+</html>

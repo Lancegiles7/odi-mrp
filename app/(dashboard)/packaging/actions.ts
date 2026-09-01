@@ -236,8 +236,13 @@ export interface BatchCreateRow {
   original_order_qty: number | null
 }
 
+/** Create packaging items, optionally linking each to a product.
+ *  `product_id` is null for standalone items — shared packaging like ecom
+ *  dispatch boxes or tape that isn't part of any one product's BOM. Qty,
+ *  entry mode and include_in_cost describe the product link, so they are
+ *  ignored when there is no product to link to. */
 export async function batchCreatePackagingForProduct(input: {
-  product_id: string
+  product_id: string | null
   original_order_date: string | null
   rows: BatchCreateRow[]
 }): Promise<{ ok: boolean; error?: string; created?: number }> {
@@ -245,8 +250,8 @@ export async function batchCreatePackagingForProduct(input: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'Not authenticated' }
 
-  if (!input.product_id) return { ok: false, error: 'Pick a product first' }
-  const valid = input.rows.filter((r) => r.sku_code.trim() && r.name.trim() && r.entry_value > 0)
+  const productId = input.product_id || null
+  const valid = input.rows.filter((r) => r.sku_code.trim() && r.name.trim() && (!productId || r.entry_value > 0))
   if (valid.length === 0) return { ok: false, error: 'Add at least one packaging row with SKU, name and qty.' }
 
   const { data: profile } = await supabase
@@ -293,11 +298,14 @@ export async function batchCreatePackagingForProduct(input: {
     }
     newPackagingIds.push(pak.id)
 
+    // Standalone item — nothing to link it to.
+    if (!productId) continue
+
     const qty = resolveQuantityPerUnit(r.entry_mode, r.entry_value)
     const { error: linkErr } = await supabase
       .from('product_packaging')
       .insert({
-        product_id:        input.product_id,
+        product_id:        productId,
         packaging_id:      pak.id,
         quantity_per_unit: qty,
         entry_mode:        r.entry_mode,
@@ -307,12 +315,14 @@ export async function batchCreatePackagingForProduct(input: {
     if (linkErr) return { ok: false, error: linkErr.message }
   }
 
-  await recomputeProductPackagingCost(supabase, input.product_id)
+  if (productId) {
+    await recomputeProductPackagingCost(supabase, productId)
+    revalidatePath(`/products/${productId}`)
+    revalidatePath(`/products/${productId}/edit`)
+  }
 
   revalidatePath('/packaging')
   revalidatePath('/packaging/demand')
-  revalidatePath(`/products/${input.product_id}`)
-  revalidatePath(`/products/${input.product_id}/edit`)
   return { ok: true, created: newPackagingIds.length }
 }
 

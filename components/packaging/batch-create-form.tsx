@@ -30,6 +30,8 @@ const blankRow = (): BatchCreateRow => ({
   include_in_cost: true, current_soh: null, original_order_qty: null,
 })
 
+const LINK_ONLY = 'Describes how the packaging attaches to a product — pick a product to set it.'
+
 function resolveQty(mode: EntryMode, value: number): number {
   if (!value || value <= 0) return 0
   return mode === 'per_group' ? 1 / value : value
@@ -68,20 +70,26 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
     setLinksLoading(false)
   }
 
+  // No product picked = standalone items (ecom dispatch boxes, tape, shippers).
+  // Qty / mode / include-in-cost describe the product link, so they don't apply.
+  const standalone = !productId
+
   function onSave() {
     setError(null)
-    if (!productId) { setError('Pick a product first.'); return }
-    const validRows = rows.filter((r) => r.sku_code.trim() && r.name.trim() && r.entry_value > 0)
-    if (validRows.length === 0) { setError('Add at least one row with SKU, name and qty.'); return }
+    const validRows = rows.filter((r) => r.sku_code.trim() && r.name.trim() && (standalone || r.entry_value > 0))
+    if (validRows.length === 0) {
+      setError(standalone ? 'Add at least one row with a SKU and name.' : 'Add at least one row with SKU, name and qty.')
+      return
+    }
 
     start(async () => {
       const res = await batchCreatePackagingForProduct({
-        product_id:          productId,
+        product_id:          productId || null,
         original_order_date: originalDate || null,
         rows:                validRows,
       })
       if (!res.ok) { setError(res.error ?? 'Save failed'); return }
-      router.push(`/products/${productId}/edit`)
+      router.push(standalone ? '/packaging' : `/products/${productId}/edit`)
       router.refresh()
     })
   }
@@ -94,13 +102,15 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
 
       {/* Product picker */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Product this packaging is for</label>
+        <label className="block text-[11px] uppercase tracking-wider text-gray-500 mb-1">
+          Product this packaging is for <span className="normal-case tracking-normal text-gray-400">(optional)</span>
+        </label>
         <select
           value={productId}
           onChange={(e) => onProductChange(e.target.value)}
           className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
         >
-          <option value="">— Pick a product —</option>
+          <option value="">— No product · standalone item —</option>
           {products.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}{p.sku_code ? ` · ${p.sku_code}` : ''}
@@ -108,9 +118,20 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
           ))}
         </select>
         <p className="text-[11px] text-gray-500 mt-1">
-          Each row below creates one packaging item and links it to this product. You can also add packaging from the catalogue or product edit page later — this is the fast path when setting up a product&apos;s packaging from scratch.
+          Each row below creates one packaging item. Pick a product to link them to it as well — leave it on
+          &ldquo;no product&rdquo; for shared items like ecom dispatch boxes, shippers or tape. You can link a
+          standalone item to products later from the product edit page.
         </p>
       </div>
+
+      {standalone && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
+          <span className="font-semibold">Standalone item.</span> It won&rsquo;t appear in any product&rsquo;s unit
+          cost — per-unit cost comes from the product link. It shows in the Packaging list under group
+          <span className="font-mono bg-white/60 px-1 rounded mx-1">Unassigned</span>, and on Packaging Demand once it
+          has stock on hand (with no forecast demand, since that&rsquo;s also derived from product links).
+        </div>
+      )}
 
       {productId && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -133,7 +154,9 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
 
       {/* Batch table */}
       <div>
-        <div className="text-[11px] uppercase tracking-wider text-gray-500 mb-2">New packaging items for this product</div>
+        <div className="text-[11px] uppercase tracking-wider text-gray-500 mb-2">
+          {standalone ? 'New standalone packaging items' : 'New packaging items for this product'}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs border border-gray-200 rounded-md overflow-hidden min-w-[1280px]">
             <thead>
@@ -155,7 +178,7 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={i} className={`border-t border-gray-100 ${!r.include_in_cost ? 'bg-amber-50/40' : ''}`}>
+                <tr key={i} className={`border-t border-gray-100 ${!standalone && !r.include_in_cost ? 'bg-amber-50/40' : ''}`}>
                   <td className="px-2 py-1.5">
                     <input value={r.sku_code} onChange={(e) => update(i, { sku_code: e.target.value })}
                       className="w-full text-xs border border-gray-200 rounded px-1.5 py-1 font-mono"
@@ -197,25 +220,28 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
                       className="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
                   </td>
                   <td className="px-2 py-1.5">
-                    <input type="number" step="any" min={0} value={r.entry_value}
+                    <input type="number" step="any" min={0} value={standalone ? '' : r.entry_value}
                       onChange={(e) => update(i, { entry_value: e.target.value === '' ? 0 : Number(e.target.value) })}
-                      className="w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums" />
+                      disabled={standalone} title={standalone ? LINK_ONLY : undefined}
+                      className={`w-full text-right text-xs border border-gray-200 rounded px-1.5 py-1 tabular-nums ${standalone ? 'bg-gray-50 text-gray-300' : ''}`} />
                   </td>
                   <td className="px-2 py-1.5">
                     <select value={r.entry_mode}
                       onChange={(e) => update(i, { entry_mode: e.target.value as EntryMode })}
-                      className="w-full text-xs border border-gray-200 rounded px-1.5 py-1">
+                      disabled={standalone} title={standalone ? LINK_ONLY : undefined}
+                      className={`w-full text-xs border border-gray-200 rounded px-1.5 py-1 ${standalone ? 'bg-gray-50 text-gray-300' : ''}`}>
                       <option value="per_pack">per product</option>
                       <option value="per_group">products per packaging</option>
                     </select>
-                    {r.entry_mode === 'per_group' && r.entry_value > 0 && (
+                    {!standalone && r.entry_mode === 'per_group' && r.entry_value > 0 && (
                       <div className="text-[10px] text-gray-400 mt-0.5 tabular-nums">→ {resolveQty(r.entry_mode, r.entry_value).toFixed(4)} per product</div>
                     )}
                   </td>
                   <td className="px-2 py-1.5 text-center">
-                    <input type="checkbox" checked={r.include_in_cost}
+                    <input type="checkbox" checked={!standalone && r.include_in_cost}
                       onChange={(e) => update(i, { include_in_cost: e.target.checked })}
-                      className="rounded border-gray-300" />
+                      disabled={standalone} title={standalone ? LINK_ONLY : undefined}
+                      className={`rounded border-gray-300 ${standalone ? 'opacity-40' : ''}`} />
                   </td>
                   <td className="px-2 py-1.5">
                     <input type="number" step="any" min={0} value={r.current_soh ?? ''}
@@ -238,7 +264,11 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
         </div>
         <div className="flex items-center justify-between mt-2">
           <button onClick={addRow} className="text-xs text-blue-600 hover:underline">+ Add another packaging item</button>
-          <p className="text-[11px] text-gray-500">Untick <span className="font-medium">In cost?</span> for items linked only for demand (cost excluded from per-unit BOM).</p>
+          <p className="text-[11px] text-gray-500">
+            {standalone
+              ? 'Qty, Mode and In cost? describe a product link, so they don\u2019t apply to standalone items.'
+              : <>Untick <span className="font-medium">In cost?</span> for items linked only for demand (cost excluded from per-unit BOM).</>}
+          </p>
         </div>
       </div>
 
@@ -253,7 +283,9 @@ export function BatchCreateForm({ products, suppliers, defaultProduct }: Props) 
         <Link href="/packaging" className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50">Cancel</Link>
         <button onClick={onSave} disabled={pending}
           className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:opacity-50">
-          {pending ? 'Saving…' : `Save ${rows.length} packaging item${rows.length === 1 ? '' : 's'} + link to ${productLabel}`}
+          {pending
+            ? 'Saving…'
+            : `Save ${rows.length} packaging item${rows.length === 1 ? '' : 's'}${standalone ? '' : ` + link to ${productLabel}`}`}
         </button>
       </div>
     </div>

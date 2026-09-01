@@ -26,13 +26,14 @@ export default async function NewPackagingPage({ searchParams }: PageProps) {
       <nav className="flex items-center gap-2 text-sm text-gray-500 mb-4">
         <Link href="/packaging" className="hover:text-gray-900">Packaging</Link>
         <span>/</span>
-        <span className="text-gray-900">New (product-first)</span>
+        <span className="text-gray-900">New</span>
       </nav>
 
       <h1 className="text-2xl font-semibold mb-1">New packaging items</h1>
       <p className="text-sm text-gray-500 mb-5">
-        Pick the product these will go on, then add a row per packaging item. Each row creates one
-        packaging SKU and links it to the product. Need to edit a single existing item? Open it from the
+        Add a row per packaging item — each row creates one packaging SKU. Pick a product to link them to it
+        at the same time, or leave that blank for shared items like ecom dispatch boxes. Need to edit a single
+        existing item? Open it from the
         <Link href="/packaging" className="underline mx-1">Packaging list</Link>.
       </p>
 
