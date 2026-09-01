@@ -104,7 +104,7 @@ export async function importBvaActuals(formData: FormData): Promise<{
     // ── Per-product actuals (single units by channel) → product_actuals ──
     const pp = perProductUnits(shopifyRows, upstockRows, samplesAoa, ym)
     // Export uses FG- codes; the product master uses system SKUs — translate.
-    const wantedFg = Array.from(new Set(Object.keys(pp.d2c).concat(Object.keys(pp.retail), Object.keys(pp.samples))))
+    const wantedFg = Array.from(new Set(Object.keys(pp.d2c).concat(Object.keys(pp.d2cAu), Object.keys(pp.retail), Object.keys(pp.samples))))
     // Look the products up under BOTH naming schemes — the master mostly uses
     // FG- codes now, but a couple of products still carry the old long codes.
     const wantedSystem = Array.from(new Set(wantedFg.flatMap(candidateSkus)))
@@ -131,6 +131,7 @@ export async function importBvaActuals(formData: FormData): Promise<{
       }
     }
     addChannel(pp.d2c, 'nz_d2c')
+    addChannel(pp.d2cAu, 'au_d2c')
     addChannel(pp.retail, 'nz_retail')
     addChannel(pp.samples, 'nz_samples')
 
