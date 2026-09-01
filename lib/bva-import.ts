@@ -282,8 +282,19 @@ export function resolveRetail(code: string, name: string): RetailMatch | null {
   return null
 }
 
+/** Australia launched on 30 Aug 2026 — from that day D2C orders shipping to
+ *  AU are fulfilled from Australian stock and belong to the AU channel.
+ *  Earlier AU orders went out on NZ stock, so they stay against NZ. */
+export const AU_FULFILMENT_FROM = '2026-08-30'
+
+/** "2026-08-31 23:54:55 +1200" → "2026-08-31". */
+export function dayOf(s: unknown): string {
+  return String(s ?? '').trim().slice(0, 10)
+}
+
 export interface PerProduct {
-  d2c: Record<string, number>      // sku → single units
+  d2c: Record<string, number>      // sku → single units (NZ-fulfilled)
+  d2cAu: Record<string, number>    // AU-fulfilled, from AU_FULFILMENT_FROM
   retail: Record<string, number>
   samples: Record<string, number>
   unmatchedRetail: string[]        // Upstock codes we couldn't resolve
@@ -292,20 +303,33 @@ export interface PerProduct {
 /** Per-product single-unit totals by channel for `ym`, keyed by FG sku. */
 export function perProductUnits(shopify: Row[], upstock: Row[], samplesAoa: unknown[][], ym: string): PerProduct {
   const d2c: Record<string, number> = {}
+  const d2cAu: Record<string, number> = {}
   const retail: Record<string, number> = {}
   const samples: Record<string, number> = {}
   const unmatched = new Set<string>()
 
-  // D2C — Shopify line items (singles), carry month down the order's rows.
+  // D2C — Shopify line items (singles). An order spans several rows and only
+  // its first row carries the shipping address, so the destination is carried
+  // down the rest of the order (keyed on Name — "Created at" repeats on every
+  // row, so it can't mark where an order starts).
   let cur: string | null = null
+  let curName = ''
+  let curDay = ''
+  let curAu = false
   for (const r of shopify) {
     const created = str(r['Created at'])
-    if (created) cur = monthOf(created)
+    if (created) { cur = monthOf(created); curDay = dayOf(created) }
+    const name = str(r['Name'])
+    if (name && name !== curName) { curName = name; curAu = false }
+    const country = (str(r['Shipping Country']) || str(r['Billing Country'])).toUpperCase()
+    if (country) curAu = country === 'AU' && curDay >= AU_FULFILMENT_FROM
     if (str(r['Cancelled at'])) continue
     if (cur !== ym) continue
     const sku = str(r['Lineitem sku'])
     const qty = num(r['Lineitem quantity'])
-    if (sku && qty) d2c[sku] = (d2c[sku] ?? 0) + qty
+    if (!sku || !qty) continue
+    const bucket = curAu ? d2cAu : d2c
+    bucket[sku] = (bucket[sku] ?? 0) + qty
   }
 
   // Retail — Upstock, mapped to FG sku × pack size.
@@ -332,7 +356,7 @@ export function perProductUnits(shopify: Row[], upstock: Row[], samplesAoa: unkn
     }
   }
 
-  return { d2c, retail, samples, unmatchedRetail: Array.from(unmatched) }
+  return { d2c, d2cAu, retail, samples, unmatchedRetail: Array.from(unmatched) }
 }
 
 const MONTH_NUM: Record<string, number> = {
