@@ -12,7 +12,7 @@ import { candidateSkus, resolveProductSku } from '@/lib/bva-import'
 // PO/manual receipts are left untouched.
 // ============================================================
 export async function importInwardsReceipts(formData: FormData): Promise<{
-  ok: boolean; error?: string; imported?: number; unmatched?: string[]
+  ok: boolean; error?: string; imported?: number; skippedPo?: number; unmatched?: string[]
 }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -51,17 +51,43 @@ export async function importInwardsReceipts(formData: FormData): Promise<{
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
 
-    // Replace the file-sourced rows (the sheet is the source of truth); leave
-    // PO/manual receipts alone.
+    // A delivery receipted against a PO in the MRP is usually still listed in
+    // the Inwards Master too, and both write a receipt row — which is how July
+    // came to count every tub and sachet twice. Drop the sheet row when a PO
+    // receipt already covers the same product, month and quantity; anything the
+    // POs don't cover (transfers, older stock) still comes through the sheet.
+    const { data: poRows } = await supabase.from('finished_goods_receipts')
+      .select('product_id, received_month, units')
+      .eq('source', 'po_receipt') as { data: Array<{ product_id: string; received_month: string; units: number }> | null }
+    const key = (productId: string, month: string, units: number) =>
+      `${productId}|${String(month).slice(0, 7)}|${Number(units).toFixed(3)}`
+    // Counted, not just flagged: two identical PO receipts should mask two
+    // identical sheet rows, and no more.
+    const poLeft = new Map<string, number>()
+    for (const r of poRows ?? []) {
+      const k = key(r.product_id, r.received_month, r.units)
+      poLeft.set(k, (poLeft.get(k) ?? 0) + 1)
+    }
+    const kept: typeof inserts = []
+    let skippedPo = 0
+    for (const row of inserts) {
+      const k = key(row.product_id, row.received_month, row.units)
+      const left = poLeft.get(k) ?? 0
+      if (left > 0) { poLeft.set(k, left - 1); skippedPo++; continue }
+      kept.push(row)
+    }
+
+    // Replace the file-sourced rows (the sheet is the source of truth for what
+    // it covers); leave PO/manual receipts alone.
     const { error: delErr } = await supabase.from('finished_goods_receipts').delete().eq('source', 'inwards_upload')
     if (delErr) return { ok: false, error: `Couldn't clear previous inwards rows: ${delErr.message}` }
-    if (inserts.length > 0) {
-      const { error: insErr } = await supabase.from('finished_goods_receipts').insert(inserts as never)
+    if (kept.length > 0) {
+      const { error: insErr } = await supabase.from('finished_goods_receipts').insert(kept as never)
       if (insErr) return { ok: false, error: `Save failed: ${insErr.message}` }
     }
 
     revalidatePath('/stock-movements')
-    return { ok: true, imported: inserts.length, unmatched: Array.from(unmatched) }
+    return { ok: true, imported: kept.length, skippedPo, unmatched: Array.from(unmatched) }
   } catch (e) {
     return { ok: false, error: `Could not read the file: ${(e as Error).message}` }
   }
