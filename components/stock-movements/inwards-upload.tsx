@@ -39,7 +39,7 @@ export function InwardsUpload() {
             <form ref={formRef} action={submit} className="px-5 py-4 space-y-4 text-sm">
               <div>
                 <label className="block text-xs font-medium text-gray-700">Inwards Finished Goods · sheet</label>
-                <p className="text-[11px] text-gray-400 mb-1.5">.xlsx · reads SKU, Received date and Retail Units Received. Each arrival lands in its received month. Re-uploading replaces the file&rsquo;s rows.</p>
+                <p className="text-[11px] text-gray-400 mb-1.5">.xlsx · reads SKU, Received date and Retail Units Received. Each arrival lands in its received month. Re-uploading replaces the file&rsquo;s rows, and any delivery already receipted against a PO is skipped.</p>
                 <input type="file" name="inwards" accept=".xlsx,.xls,.csv" required
                   className="block w-full text-xs file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" />
               </div>
@@ -50,6 +50,11 @@ export function InwardsUpload() {
                 <div className="text-xs bg-emerald-50 border border-emerald-200 rounded px-3 py-2 space-y-1">
                   <div className="font-medium text-emerald-800">Saved ✓</div>
                   <div className="text-gray-700">{done.imported ?? 0} receipts imported.</div>
+                  {!!done.skippedPo && (
+                    <div className="text-gray-700">
+                      {done.skippedPo} row{done.skippedPo === 1 ? '' : 's'} skipped &mdash; already receipted against a PO in the MRP, so counting the sheet row too would double the stock.
+                    </div>
+                  )}
                   {!!done.unmatched?.length && (
                     <div className="text-amber-700">⚠ Unmatched SKUs (skipped): {done.unmatched.join(', ')}</div>
                   )}
