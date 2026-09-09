@@ -150,8 +150,8 @@ CREATE POLICY price_history_select ON public.price_history
 DROP POLICY IF EXISTS price_history_admin_write ON public.price_history;
 CREATE POLICY price_history_admin_write ON public.price_history
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.user_profiles p WHERE p.id = auth.uid() AND p.role = 'admin'))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.user_profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
+  USING (public.current_user_role() = 'admin')
+  WITH CHECK (public.current_user_role() = 'admin');
 
 -- ── Carry across the ingredient history we already have ─────
 INSERT INTO public.price_history (
