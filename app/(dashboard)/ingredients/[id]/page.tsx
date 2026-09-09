@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ROLES, INGREDIENT_CERTIFICATIONS } from '@/lib/constants'
 import { StatusBadge } from '@/components/ingredients/status-badge'
-import { PriceHistory } from '@/components/ingredients/price-history'
+import { PriceHistoryPanel } from '@/components/price-history/price-history-panel'
+import type { PriceChange } from '@/lib/price-history'
 import { DeleteIngredientButton } from '@/components/ingredients/delete-ingredient-button'
 import { IngredientDocuments } from '@/components/ingredients/ingredient-documents'
 import type { UploadedDoc } from '@/app/(dashboard)/ingredients/[id]/documents/actions'
@@ -14,7 +15,6 @@ import type {
   IngredientCertification,
   IngredientDocType,
   IngredientWithSupplier,
-  IngredientPriceHistory,
 } from '@/lib/types/database.types'
 
 const CERT_BY_VALUE = new Map(INGREDIENT_CERTIFICATIONS.map((c) => [c.value, c]))
@@ -33,7 +33,7 @@ export default async function IngredientDetailPage({ params, searchParams }: Pag
     .from('user_profiles').select('roles(name)').eq('id', user?.id ?? '').maybeSingle() as { data: { roles: { name: string } | null } | null }
   const isAdmin = profile?.roles?.name === ROLES.ADMIN
 
-  const [{ data: ingredient }, { data: history }, { count: usedInCount }] = await Promise.all([
+  const [{ data: ingredient }, { data: history }, { data: profiles }, { count: usedInCount }] = await Promise.all([
     supabase
       .from('ingredients')
       .select(`
@@ -47,11 +47,14 @@ export default async function IngredientDetailPage({ params, searchParams }: Pag
       .eq('id', params.id)
       .single() as unknown as Promise<{ data: IngredientWithSupplier | null }>,
     supabase
-      .from('ingredient_price_history')
+      .from('price_history')
       .select('*')
-      .eq('ingredient_id', params.id)
+      .eq('entity_type', 'ingredient').eq('entity_id', params.id)
       .order('changed_at', { ascending: false })
-      .limit(50) as unknown as Promise<{ data: IngredientPriceHistory[] | null }>,
+      .limit(50) as unknown as Promise<{ data: PriceChange[] | null }>,
+    supabase
+      .from('user_profiles')
+      .select('id, full_name') as unknown as Promise<{ data: Array<{ id: string; full_name: string | null }> | null }>,
     supabase
       .from('bom_items')
       .select('id', { count: 'exact', head: true })
@@ -105,6 +108,7 @@ export default async function IngredientDetailPage({ params, searchParams }: Pag
     sharedCount = count ?? 0
   }
 
+  const namesByUser = Object.fromEntries((profiles ?? []).map((p) => [p.id, p.full_name ?? 'Unknown user']))
   const latest = history?.[0] ?? null
 
   // ── Documents ─────────────────────────────────────────────────
@@ -272,7 +276,7 @@ export default async function IngredientDetailPage({ params, searchParams }: Pag
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 p-5 col-span-2">
-          <PriceHistory history={history ?? []} />
+          <PriceHistoryPanel history={history ?? []} namesByUser={namesByUser} />
         </div>
       </div>
 

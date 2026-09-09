@@ -7,6 +7,8 @@ import { PackagingProductsBom } from '@/components/packaging/packaging-products-
 import { DeletePackagingButton } from '@/components/packaging/delete-packaging-button'
 import { updatePackaging } from '@/app/(dashboard)/packaging/actions'
 import type { FxRates } from '@/lib/packaging-cost'
+import { PriceHistoryPanel } from '@/components/price-history/price-history-panel'
+import type { PriceChange } from '@/lib/price-history'
 
 export const metadata: Metadata = { title: 'Packaging item' }
 
@@ -18,7 +20,7 @@ interface PageProps {
 export default async function EditPackagingPage({ params, searchParams }: PageProps) {
   const supabase = createClient()
 
-  const [{ data }, { data: suppliers }, { data: settings }, { data: usedIn }, { data: balance }, { data: allProducts }] = await Promise.all([
+  const [{ data }, { data: suppliers }, { data: settings }, { data: usedIn }, { data: balance }, { data: allProducts }, { data: priceHistory }, { data: profiles }] = await Promise.all([
     supabase.from('packaging')
       .select('id, sku_code, name, type, unit_of_measure, description, supplier_id, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price, currency, fx_rate_override, freight_per_unit_nzd, opening_stock_override, reorder_point, is_active, notes, original_order_qty, original_order_date, original_order_notes, current_soh, current_soh_as_of')
       .eq('id', params.id)
@@ -30,6 +32,12 @@ export default async function EditPackagingPage({ params, searchParams }: PagePr
       .eq('packaging_id', params.id) as { data: Array<{ product_id: string; quantity_per_unit: number; entry_mode: string | null; entry_value: number | null; include_in_cost: boolean; notes: string | null; market: string | null }> | null },
     supabase.from('inventory_balances').select('quantity_on_hand').eq('packaging_id', params.id).maybeSingle() as { data: { quantity_on_hand: number } | null },
     supabase.from('products').select('id, sku_code, name').order('name') as { data: Array<{ id: string; sku_code: string | null; name: string }> | null },
+    supabase.from('price_history')
+      .select('*')
+      .eq('entity_type', 'packaging').eq('entity_id', params.id)
+      .order('changed_at', { ascending: false })
+      .limit(50) as { data: PriceChange[] | null },
+    supabase.from('user_profiles').select('id, full_name') as { data: Array<{ id: string; full_name: string | null }> | null },
   ])
 
   if (!data) notFound()
@@ -52,6 +60,15 @@ export default async function EditPackagingPage({ params, searchParams }: PagePr
           savedAt={searchParams.saved === '1'}
           error={searchParams.error}
           initial={data}
+        />
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-5 mb-5">
+        <h2 className="text-sm font-semibold mb-1">Price history</h2>
+        <p className="text-xs text-gray-500 mb-4">Every change to what this item costs to buy.</p>
+        <PriceHistoryPanel
+          history={priceHistory ?? []}
+          namesByUser={Object.fromEntries((profiles ?? []).map((p) => [p.id, p.full_name ?? 'Unknown user']))}
         />
       </div>
 

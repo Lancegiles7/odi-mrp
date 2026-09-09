@@ -55,6 +55,12 @@ export function PackagingForm({
   const [fxOverride, setFxOverride] = useState<string>(initial.fx_rate_override?.toString() ?? '')
   const [freight, setFreight]   = useState<string>(initial.freight_per_unit_nzd?.toString() ?? '')
 
+  // Only an existing item whose price or freight actually moved needs a reason.
+  const priceMoved = !!initial.id && (
+    (price.trim()   === '' ? null : Number(price))   !== (initial.price ?? null) ||
+    (freight.trim() === '' ? null : Number(freight)) !== (initial.freight_per_unit_nzd ?? null)
+  )
+
   const fxFromTable = fxRates[currency] ?? 1
   const fxRate = fxOverride.trim() === '' ? fxFromTable : (Number(fxOverride) || fxFromTable)
 
@@ -171,6 +177,20 @@ export function PackagingForm({
             <input name="reorder_point" type="number" step="any" min={0} defaultValue={initial.reorder_point ?? ''} className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm text-right tabular-nums" />
           </Field>
         </div>
+
+        {priceMoved && (
+          <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2.5">
+            <label className="block text-xs font-medium text-amber-900 mb-1">
+              Why is this price changing?
+            </label>
+            <input name="price_change_reason" required maxLength={200}
+              placeholder="e.g. supplier increase, new freight rate, correcting a typo"
+              className="w-full border border-amber-300 rounded-md px-2 py-1.5 text-sm bg-white" />
+            <p className="text-[11px] text-amber-800 mt-1">
+              Saved against this change in the price log — it&rsquo;s what makes the history readable later.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ORIGINAL ORDER */}

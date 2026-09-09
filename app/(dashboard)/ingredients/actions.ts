@@ -134,6 +134,8 @@ interface IngredientPayload {
   status: IngredientStatus
   price: number | null
   freight: number | null
+  /** Transient — the trigger copies it into price_history and clears it. */
+  price_change_reason: string | null
   total_loaded_cost: number | null
   total_loaded_cost_au: number | null
   unit_of_measure: string | null
@@ -199,6 +201,7 @@ async function buildPayloadFromForm(
     lead_time:          str(formData.get('lead_time')),
     status:             ((formData.get('status') as IngredientStatus) || 'confirmed'),
     price,
+    price_change_reason: str(formData.get('price_change_reason')),
     freight,
     total_loaded_cost,
     total_loaded_cost_au: parseNumeric(formData.get('total_loaded_cost_au')),
@@ -222,8 +225,10 @@ async function buildPayloadFromForm(
 }
 
 /**
- * Append a price-history row when pricing changed (or on initial insert).
- * Called by the app layer so changed_by is always accurate.
+ * @deprecated Superseded by the price_history trigger (migration 062), which
+ * captures every price change including imports and direct edits. Retained
+ * only so the legacy ingredient_price_history table keeps its shape; no longer
+ * called. Delete once nothing reads the old table.
  */
 async function logPriceHistory(
   supabase: ReturnType<typeof createClient>,
@@ -286,7 +291,6 @@ export async function createIngredient(formData: FormData) {
     redirect('/ingredients/new?error=server')
   }
 
-  await logPriceHistory(supabase, created.id, payload, 'initial', createdBy)
 
   revalidatePath('/ingredients')
   redirect(returnTo ?? '/ingredients')
@@ -328,9 +332,6 @@ export async function updateIngredient(id: string, formData: FormData) {
     redirect(`/ingredients/${id}/edit?error=server`)
   }
 
-  if (before && pricingChanged(before, payload)) {
-    await logPriceHistory(supabase, id, payload, 'manual_update', changedBy)
-  }
 
   revalidatePath('/ingredients')
   revalidatePath(`/ingredients/${id}`)
@@ -400,9 +401,6 @@ export async function importIngredients(rows: ImportRow[]): Promise<ImportResult
         result.errors.push({ row: i + 1, sku_code: skuNormalised, error: error.message })
       } else {
         result.updated++
-        if (before && pricingChanged(before, payload)) {
-          await logPriceHistory(supabase, existingId, payload, 'import', createdBy)
-        }
       }
     } else {
       const { data: created, error } = await supabase
@@ -417,8 +415,7 @@ export async function importIngredients(rows: ImportRow[]): Promise<ImportResult
       } else {
         result.created++
         existingMap.set(skuNormalised, created.id)
-        await logPriceHistory(supabase, created.id, payload, 'initial', createdBy)
-      }
+            }
     }
   }
 
