@@ -82,6 +82,7 @@ const NAV_GROUPS = [
     label: 'Reporting',
     items: [
       { name: 'Budget vs Actual', href: '/reporting/budget-vs-actual' },
+      { name: 'Price changes',    href: '/price-changes' },
     ],
   },
 ]

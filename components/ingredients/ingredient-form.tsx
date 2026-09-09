@@ -52,6 +52,12 @@ export function IngredientForm({
 
   const [price, setPrice] = useState(ingredient?.price?.toString() ?? '')
   const [freight, setFreight] = useState(ingredient?.freight?.toString() ?? '')
+
+  // Only an existing ingredient whose price or freight actually moved needs a reason.
+  const priceMoved = !!ingredient?.id && (
+    (price.trim()   === '' ? null : Number(price))   !== (ingredient.price ?? null) ||
+    (freight.trim() === '' ? null : Number(freight)) !== (ingredient.freight ?? null)
+  )
   const [currency, setCurrency] = useState<CurrencyCode>(
     (((ingredient as unknown as { currency?: string })?.currency as CurrencyCode) ?? 'NZD'),
   )
@@ -399,6 +405,25 @@ export function IngredientForm({
             <p className="text-xs text-gray-400 mt-1">Override if needed</p>
           </div>
         </div>
+
+        {priceMoved && (
+          <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2.5">
+            <label htmlFor="price_change_reason" className="block text-sm font-medium text-amber-900 mb-1">
+              Why is this price changing?
+            </label>
+            <input
+              id="price_change_reason"
+              name="price_change_reason"
+              required
+              maxLength={200}
+              placeholder="e.g. supplier increase, new freight rate, correcting a typo"
+              className="w-full px-3 py-2 border border-amber-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <p className="text-xs text-amber-800 mt-1">
+              Saved against this change in the price log &mdash; it&rsquo;s what makes the history readable later.
+            </p>
+          </div>
+        )}
 
         {/* Australian landed cost — for dual-made products (e.g. VMC). Optional. */}
         <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4">

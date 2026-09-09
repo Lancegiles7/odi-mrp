@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Odi MRP — Price change tracker mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-gray-100 p-8">
+<div class="max-w-[1400px] mx-auto space-y-10">
+
+<header>
+  <h1 class="text-xl font-semibold">Price change tracker — proposal</h1>
+  <p class="text-sm text-gray-600 mt-1 max-w-4xl">
+    One record of every price change across ingredients, packaging, finished goods and PO lines &mdash;
+    with a master log and a history panel on each item. Nothing here is built yet.
+  </p>
+</header>
+
+<!-- ============================================================ -->
+<!-- WHERE PRICES LIVE TODAY                                      -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">1 &middot; What we have today</h2>
+    <p class="text-xs text-gray-500 mt-0.5">Ingredients already keep a price history. Nothing else does.</p>
+  </div>
+  <div class="p-5">
+    <table class="w-full text-xs border border-gray-200 rounded">
+      <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <tr>
+          <th class="text-left px-3 py-2">Where a price lives</th>
+          <th class="text-left px-3 py-2">Fields</th>
+          <th class="text-left px-3 py-2 w-[210px]">History today</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-2 font-medium">Ingredients</td>
+          <td class="px-3 py-2 text-gray-600">price · freight · loaded cost NZD/AUD · currency</td>
+          <td class="px-3 py-2"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Yes &mdash; 102 rows</span></td>
+        </tr>
+        <tr class="border-t border-gray-100 bg-amber-50/40">
+          <td class="px-3 py-2 font-medium">Packaging</td>
+          <td class="px-3 py-2 text-gray-600">price · freight · loaded cost NZD · currency</td>
+          <td class="px-3 py-2"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">None</span></td>
+        </tr>
+        <tr class="border-t border-gray-100 bg-amber-50/40">
+          <td class="px-3 py-2 font-medium">Products</td>
+          <td class="px-3 py-2 text-gray-600">RRP NZ · RRP AU · toll · margin · other · freight</td>
+          <td class="px-3 py-2"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">None</span></td>
+        </tr>
+        <tr class="border-t border-gray-100 bg-amber-50/40">
+          <td class="px-3 py-2 font-medium">Recipe lines (BOM)</td>
+          <td class="px-3 py-2 text-gray-600">price override on a single line</td>
+          <td class="px-3 py-2"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">None</span></td>
+        </tr>
+        <tr class="border-t border-gray-100 bg-amber-50/40">
+          <td class="px-3 py-2 font-medium">PO lines</td>
+          <td class="px-3 py-2 text-gray-600">unit cost as ordered</td>
+          <td class="px-3 py-2"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">None</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- THE ARCHITECTURE CALL                                        -->
+<!-- ============================================================ -->
+<section class="bg-white border-2 border-emerald-300 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-emerald-100 bg-emerald-50">
+    <h2 class="text-base font-semibold">2 &middot; The one decision that matters: where the tracking happens</h2>
+  </div>
+  <div class="p-5 space-y-4">
+    <div class="grid grid-cols-2 gap-4">
+      <div class="border border-gray-200 rounded-lg p-4">
+        <div class="text-sm font-semibold mb-1">Log it in the app</div>
+        <p class="text-xs text-gray-600 mb-2">What the ingredients history does now: each save writes a history row alongside.</p>
+        <p class="text-[11px] text-gray-500"><strong class="text-gray-700">Problem:</strong> it only catches changes that go through that one screen. We can already see the leaks.</p>
+      </div>
+      <div class="border-2 border-emerald-300 rounded-lg p-4">
+        <div class="text-sm font-semibold mb-1">Log it in the database <span class="text-emerald-700 text-xs">&larr; recommended</span></div>
+        <p class="text-xs text-gray-600 mb-2">The database itself writes a history row whenever a price column changes, no matter what changed it.</p>
+        <p class="text-[11px] text-gray-500"><strong class="text-gray-700">Nothing can bypass it</strong> &mdash; screens, imports, FX updates, or SQL run by hand.</p>
+      </div>
+    </div>
+
+    <div class="bg-amber-50 border border-amber-200 rounded p-3">
+      <div class="text-xs font-semibold text-amber-900 mb-1.5">Two leaks that exist right now, in the ingredient history we already have</div>
+      <ul class="text-[11px] text-amber-900 space-y-1">
+        <li>&middot; <strong>Changing the FX rate in Settings</strong> re-prices every ingredient and every packaging item, and writes <em>no</em> history at all. The loaded costs silently move.</li>
+        <li>&middot; <strong>No ingredient price change has been logged since July</strong> &mdash; either nothing changed, or it changed through a path that doesn&rsquo;t log. Today we can&rsquo;t tell which.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MASTER TRACKER                                               -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">3 &middot; Master tracker &mdash; <span class="font-mono text-sm">/price-changes</span></h2>
+    <p class="text-xs text-gray-500 mt-0.5">Every price change in one list. Filter, then export.</p>
+  </div>
+  <div class="p-5 space-y-3">
+    <div class="flex flex-wrap gap-2 text-xs items-center">
+      <select class="border border-gray-300 rounded px-2 py-1.5"><option>All types</option><option>Ingredients</option><option>Packaging</option><option>Finished goods</option></select>
+      <select class="border border-gray-300 rounded px-2 py-1.5"><option>All suppliers</option></select>
+      <select class="border border-gray-300 rounded px-2 py-1.5"><option>Last 90 days</option><option>This FY</option><option>All time</option></select>
+      <label class="flex items-center gap-1.5 text-gray-600 ml-1"><input type="checkbox" checked /> Hide FX re-costing</label>
+      <button class="ml-auto px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50">Export CSV</button>
+    </div>
+
+    <table class="w-full text-xs border border-gray-200 rounded">
+      <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+        <tr>
+          <th class="text-left px-3 py-2 w-[100px]">Date</th>
+          <th class="text-left px-3 py-2 w-[95px]">Type</th>
+          <th class="text-left px-3 py-2">Item</th>
+          <th class="text-left px-3 py-2 w-[110px]">Field</th>
+          <th class="text-right px-3 py-2 w-[85px]">From</th>
+          <th class="text-right px-3 py-2 w-[85px]">To</th>
+          <th class="text-right px-3 py-2 w-[70px]">Change</th>
+          <th class="text-left px-3 py-2 w-[130px]">Who</th>
+          <th class="text-left px-3 py-2 w-[110px]">Source</th>
+        </tr>
+      </thead>
+      <tbody class="tabular-nums">
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-2 text-gray-600">9 Sep 2026</td>
+          <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px]">Packaging</span></td>
+          <td class="px-3 py-2">Ecom Branded Box &mdash; Medium <span class="font-mono text-gray-400">BOX-ODI-ECOM-MED</span></td>
+          <td class="px-3 py-2 text-gray-600">Price (AUD)</td>
+          <td class="px-3 py-2 text-right text-gray-500">$0.48</td>
+          <td class="px-3 py-2 text-right font-medium">$0.52</td>
+          <td class="px-3 py-2 text-right text-red-700">+8.3%</td>
+          <td class="px-3 py-2 text-gray-600">Lance Giles</td>
+          <td class="px-3 py-2 text-gray-500">Packaging screen</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-2 text-gray-600">4 Sep 2026</td>
+          <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px]">Finished good</span></td>
+          <td class="px-3 py-2">Odi Organic Brownie <span class="font-mono text-gray-400">FG-ODI-BITE-BRN</span></td>
+          <td class="px-3 py-2 text-gray-600">RRP (NZ)</td>
+          <td class="px-3 py-2 text-right text-gray-500">$9.99</td>
+          <td class="px-3 py-2 text-right font-medium">$10.99</td>
+          <td class="px-3 py-2 text-right text-emerald-700">+10.0%</td>
+          <td class="px-3 py-2 text-gray-600">Lance Giles</td>
+          <td class="px-3 py-2 text-gray-500">Product edit</td>
+        </tr>
+        <tr class="border-t border-gray-100 bg-gray-50/70">
+          <td class="px-3 py-2 text-gray-600">1 Sep 2026</td>
+          <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 text-[10px]">FX rate</span></td>
+          <td class="px-3 py-2 text-gray-700" colspan="2">AUD &rarr; NZD re-costing &mdash; <strong>84 items</strong> re-priced <span class="text-blue-600 underline cursor-pointer">view all</span></td>
+          <td class="px-3 py-2 text-right text-gray-500">1.18</td>
+          <td class="px-3 py-2 text-right font-medium">1.20</td>
+          <td class="px-3 py-2 text-right text-gray-500">+1.7%</td>
+          <td class="px-3 py-2 text-gray-600">Lance Giles</td>
+          <td class="px-3 py-2 text-gray-500">Settings</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-2 text-gray-600">28 Aug 2026</td>
+          <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded bg-green-100 text-green-800 text-[10px]">Ingredient</span></td>
+          <td class="px-3 py-2">Organic Rolled Oats</td>
+          <td class="px-3 py-2 text-gray-600">Price / kg</td>
+          <td class="px-3 py-2 text-right text-gray-500">$3.20</td>
+          <td class="px-3 py-2 text-right font-medium">$3.55</td>
+          <td class="px-3 py-2 text-right text-red-700">+10.9%</td>
+          <td class="px-3 py-2 text-gray-600">Anne</td>
+          <td class="px-3 py-2 text-gray-500">Ingredient screen</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-2 text-gray-600">20 Aug 2026</td>
+          <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 text-[10px]">PO line</span></td>
+          <td class="px-3 py-2">Quinoa Puffs pouch <span class="font-mono text-gray-400">PO-2026-141</span></td>
+          <td class="px-3 py-2 text-gray-600">Unit cost</td>
+          <td class="px-3 py-2 text-right text-gray-500">$0.29</td>
+          <td class="px-3 py-2 text-right font-medium">$0.31</td>
+          <td class="px-3 py-2 text-right text-red-700">+6.9%</td>
+          <td class="px-3 py-2 text-gray-600">Lucy</td>
+          <td class="px-3 py-2 text-gray-500">PO edit</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="text-[11px] text-gray-500">
+      The FX row is <strong>one line standing in for 84 individual re-costings</strong>. Without that collapse, a single FX
+      change would bury every real price change under hundreds of rows.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PER-ITEM PANEL                                               -->
+<!-- ============================================================ -->
+<section class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="text-base font-semibold">4 &middot; On the item itself</h2>
+    <p class="text-xs text-gray-500 mt-0.5">The same panel the ingredient page already has, reused on packaging and products.</p>
+  </div>
+  <div class="p-5">
+    <div class="border border-gray-200 rounded-lg p-4 max-w-2xl">
+      <div class="flex items-baseline justify-between mb-3">
+        <div>
+          <div class="text-sm font-semibold">Ecom Branded Box &mdash; Medium</div>
+          <div class="text-[11px] text-gray-500 font-mono">BOX-ODI-ECOM-MED &middot; Opal Packaging ANZ</div>
+        </div>
+        <div class="text-right">
+          <div class="text-lg font-semibold tabular-nums">$0.62</div>
+          <div class="text-[10px] text-gray-500">loaded NZD</div>
+        </div>
+      </div>
+      <svg viewBox="0 0 400 90" class="w-full h-20 mb-2">
+        <path d="M5,70 L100,68 L200,66 L300,30 L395,22 L395,90 L5,90 Z" fill="#d1fae5" />
+        <path d="M5,70 L100,68 L200,66 L300,30 L395,22" fill="none" stroke="#059669" stroke-width="2" />
+        <circle cx="395" cy="22" r="3.5" fill="#059669" />
+      </svg>
+      <table class="w-full text-xs">
+        <thead class="text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+          <tr><th class="text-left py-1.5">Date</th><th class="text-right">Price</th><th class="text-right">Freight</th><th class="text-right">Loaded NZD</th><th class="text-left pl-3">Reason</th><th class="text-left">Who</th></tr>
+        </thead>
+        <tbody class="tabular-nums">
+          <tr class="border-b border-gray-50"><td class="py-1.5">9 Sep 2026</td><td class="text-right">A$0.52</td><td class="text-right">&mdash;</td><td class="text-right font-medium">$0.62</td><td class="pl-3 text-gray-600">Supplier increase</td><td class="text-gray-600">Lance</td></tr>
+          <tr class="border-b border-gray-50 text-gray-500"><td class="py-1.5">1 Sep 2026</td><td class="text-right">A$0.48</td><td class="text-right">&mdash;</td><td class="text-right">$0.58</td><td class="pl-3 italic">FX re-costing</td><td>Lance</td></tr>
+          <tr class="border-b border-gray-50"><td class="py-1.5">14 Aug 2026</td><td class="text-right">A$0.48</td><td class="text-right">&mdash;</td><td class="text-right">$0.57</td><td class="pl-3 text-gray-600">Initial</td><td class="text-gray-600">Lance</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DECISIONS                                                    -->
+<!-- ============================================================ -->
+<section class="bg-white border-2 border-amber-300 rounded-lg overflow-hidden">
+  <div class="px-5 py-3 border-b border-amber-100 bg-amber-50">
+    <h2 class="text-base font-semibold">5 &middot; Three things to decide before building</h2>
+  </div>
+  <div class="p-5 space-y-3 text-sm">
+    <div class="flex gap-3">
+      <span class="font-semibold text-gray-400">A</span>
+      <div>
+        <div class="font-medium">Do we track the price you agreed, the landed cost, or both?</div>
+        <p class="text-xs text-gray-600 mt-0.5">The agreed price only moves when a supplier changes it. The landed cost also moves every time FX moves. <strong>Suggest both</strong>, tagged, with FX collapsed in the master view.</p>
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <span class="font-semibold text-gray-400">B</span>
+      <div>
+        <div class="font-medium">Should a price change ask for a reason?</div>
+        <p class="text-xs text-gray-600 mt-0.5">A one-line note at save time (&ldquo;supplier increase&rdquo;, &ldquo;correcting a typo&rdquo;) is what makes the log worth reading in six months. It also adds a step to every save.</p>
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <span class="font-semibold text-gray-400">C</span>
+      <div>
+        <div class="font-medium">History starts the day we switch it on.</div>
+        <p class="text-xs text-gray-600 mt-0.5">Past changes can&rsquo;t be recovered &mdash; the old values were overwritten. We&rsquo;d seed a starting row for every item at today&rsquo;s price, and carry across the 102 ingredient rows we already have.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="text-xs text-gray-500 pb-4">
+  Build order if approved: database table + triggers (SQL run by hand first, per the usual process) &rarr; master tracker page &rarr;
+  history panel on packaging and products &rarr; reason prompt. Roughly one migration and three screens.
+</footer>
+
+</div>
+</body>
+</html>

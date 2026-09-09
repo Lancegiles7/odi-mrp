@@ -24,6 +24,8 @@ interface PackagingForm {
   currency: CurrencyCode
   fx_rate_override: number | null
   freight_per_unit_nzd: number | null
+  /** Transient — the trigger copies it into price_history and clears it. */
+  price_change_reason: string | null
 
   opening_stock_override: number | null
   reorder_point: number | null
@@ -71,6 +73,7 @@ function parsePayload(formData: FormData): PackagingForm | string {
     supplier_pack_size:     num(formData.get('supplier_pack_size')),
     supplier_pack_unit:     ((formData.get('supplier_pack_unit') as string | null) || '').trim() || null,
     price:                  num(formData.get('price')),
+    price_change_reason:    txt(formData.get('price_change_reason')),
     fx_rate_override:       num(formData.get('fx_rate_override')),
     freight_per_unit_nzd:   num(formData.get('freight_per_unit_nzd')),
     opening_stock_override: num(formData.get('opening_stock_override')),

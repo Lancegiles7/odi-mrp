@@ -36,6 +36,7 @@ export interface ProductFormData {
   wet_weight_g?: string
   rrp?: string
   rrp_au?: string
+  price_change_reason?: string
   unit_of_measure?: string
   description?: string
   packaging?: string
@@ -148,6 +149,8 @@ function buildProductPayload(data: ProductFormData) {
     wet_weight_g:    parseNum(data.wet_weight_g),
     rrp:             parseNum(data.rrp),
     rrp_au:          parseNum(data.rrp_au),
+    // Transient — the trigger copies it into price_history and clears it.
+    price_change_reason: data.price_change_reason?.trim() || null,
     unit_of_measure: data.unit_of_measure?.trim() || 'each',
     description:     data.description?.trim() || null,
     packaging:       parseNum(data.packaging),
@@ -188,6 +191,7 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     wet_weight_g:      formData.get('wet_weight_g') as string,
     rrp:               formData.get('rrp') as string,
     rrp_au:            formData.get('rrp_au') as string,
+    price_change_reason: formData.get('price_change_reason') as string,
     unit_of_measure:   formData.get('unit_of_measure') as string,
     description:       formData.get('description') as string,
     packaging:         formData.get('packaging') as string,

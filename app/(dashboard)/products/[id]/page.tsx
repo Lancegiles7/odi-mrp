@@ -16,6 +16,8 @@ interface PageProps {
   params: { id: string }
   searchParams: { restored?: string; error?: string }
 }
+import { PriceHistoryPanel } from '@/components/price-history/price-history-panel'
+import type { PriceChange } from '@/lib/price-history'
 
 export default async function ProductDetailPage({ params, searchParams }: PageProps) {
   const supabase = createClient()
@@ -24,7 +26,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
     .from('user_profiles').select('roles(name)').eq('id', user?.id ?? '').maybeSingle() as { data: { roles: { name: string } | null } | null }
   const isAdmin = profile?.roles?.name === ROLES.ADMIN
 
-  const [{ data: product }, settings, { data: packagingLinks }] = await Promise.all([
+  const [{ data: product }, settings, { data: packagingLinks }, { data: priceHistory }, { data: profiles }] = await Promise.all([
     supabase
       .from('products')
       .select(`
@@ -52,6 +54,13 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         include_in_cost: boolean
         packaging: { sku_code: string; name: string; type: string; total_loaded_cost_nzd: number | null } | null
       }> | null },
+    supabase.from('price_history')
+      .select('*')
+      .eq('entity_type', 'product').eq('entity_id', params.id)
+      .order('changed_at', { ascending: false })
+      .limit(50) as unknown as { data: PriceChange[] | null },
+    supabase.from('user_profiles')
+      .select('id, full_name') as unknown as { data: Array<{ id: string; full_name: string | null }> | null },
   ])
 
   if (!product) notFound()
@@ -352,6 +361,15 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             </div>
           </>
         )}
+      </div>
+
+      <div className="mt-5 bg-white border border-gray-200 rounded-lg p-5">
+        <h2 className="text-sm font-semibold mb-1">Price history</h2>
+        <p className="text-xs text-gray-500 mb-4">Changes to RRP and the entered cost lines for this product.</p>
+        <PriceHistoryPanel
+          history={priceHistory ?? []}
+          namesByUser={Object.fromEntries((profiles ?? []).map((p) => [p.id, p.full_name ?? 'Unknown user']))}
+        />
       </div>
     </div>
   )

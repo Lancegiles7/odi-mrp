@@ -29,10 +29,11 @@ function Field({
 }
 
 function NumberInput({
-  id, name, defaultValue, placeholder, prefix, suffix, step = 'any', allowNegative = false,
+  id, name, defaultValue, placeholder, prefix, suffix, step = 'any', allowNegative = false, onInput,
 }: {
   id?: string; name: string; defaultValue?: number | null; placeholder?: string
   prefix?: string; suffix?: string; step?: string; allowNegative?: boolean
+  onInput?: React.FormEventHandler<HTMLInputElement>
 }) {
   // Default step is 'any' so cost inputs accept the same 4-decimal
   // precision used everywhere else (loaded packaging cost, ingredient
@@ -48,6 +49,7 @@ function NumberInput({
         step={step}
         {...(allowNegative ? {} : { min: '0' })}
         defaultValue={defaultValue ?? ''}
+        onInput={onInput}
         placeholder={placeholder ?? '0.00'}
         className={`w-full ${prefix ? 'pl-7' : 'pl-3'} ${suffix ? 'pr-8' : 'pr-3'} py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900`}
       />
@@ -94,6 +96,9 @@ function MoneyInput({
 
 export function ProductForm({ product, action, errorMessage, fxRate }: ProductFormProps) {
   const isEdit = !!product
+  // A reason is only asked for when an RRP actually moves off its saved value.
+  const [rrpMoved, setRrpMoved] = useState(false)
+  const [rrpAuMoved, setRrpAuMoved] = useState(false)
   // apply_fx is retained on the row but no longer affects costing — the
   // form no longer renders a toggle (NZD is always the base, AU always
   // derived). We submit `true` so the column stays populated for the
@@ -164,11 +169,32 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
             {/* Freeze-dried wet input is now per-ingredient (Wet g column in the BOM editor),
                 not a single product-level weight. */}
             <Field id="rrp" label="RRP — NZ (inc GST)">
-              <NumberInput id="rrp" name="rrp" defaultValue={product?.rrp} prefix="$" placeholder="14.99" />
+              <NumberInput id="rrp" name="rrp" defaultValue={product?.rrp} prefix="$" placeholder="14.99"
+                onInput={(e) => setRrpMoved(Number(e.currentTarget.value || 0) !== Number(product?.rrp ?? 0))} />
             </Field>
             <Field id="rrp_au" label="RRP — AU (inc GST)">
-              <NumberInput id="rrp_au" name="rrp_au" defaultValue={product?.rrp_au ?? product?.rrp} prefix="A$" placeholder="14.99" />
+              <NumberInput id="rrp_au" name="rrp_au" defaultValue={product?.rrp_au ?? product?.rrp} prefix="A$" placeholder="14.99"
+                onInput={(e) => setRrpAuMoved(Number(e.currentTarget.value || 0) !== Number(product?.rrp_au ?? product?.rrp ?? 0))} />
             </Field>
+
+            {!!product?.id && (rrpMoved || rrpAuMoved) && (
+              <div className="col-span-2 bg-amber-50 border border-amber-200 rounded-md px-3 py-2.5">
+                <label htmlFor="price_change_reason" className="block text-sm font-medium text-amber-900 mb-1">
+                  Why is the RRP changing?
+                </label>
+                <input
+                  id="price_change_reason"
+                  name="price_change_reason"
+                  required
+                  maxLength={200}
+                  placeholder="e.g. cost increase passed on, promotional reset, matching competitor"
+                  className="w-full px-3 py-2 border border-amber-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <p className="text-xs text-amber-800 mt-1">
+                  Saved against this change in the price log &mdash; it&rsquo;s what makes the history readable later.
+                </p>
+              </div>
+            )}
 
             <Field id="hero_call_out" label="Hero callout" className="col-span-2">
               <input
