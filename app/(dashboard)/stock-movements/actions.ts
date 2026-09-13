@@ -92,3 +92,67 @@ export async function importInwardsReceipts(formData: FormData): Promise<{
     return { ok: false, error: `Could not read the file: ${(e as Error).message}` }
   }
 }
+
+// ============================================================
+// setStockAdjustment — manual month-end entry (wastage OR actual count, with a
+// comment) on the ingredient/packaging Stock Movements ledger. One row per
+// item / month / country; sending both sub-fields keeps them in step.
+// ============================================================
+export async function setStockAdjustment(input: {
+  entity_type: 'ingredient' | 'packaging'
+  entity_id: string
+  year_month: string
+  market: 'NZ' | 'AU'
+  field: 'wastage' | 'count'
+  units: number | null
+  comment: string | null
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+
+  const month = input.year_month.slice(0, 7) + '-01'
+  const comment = input.comment?.trim() || null
+
+  const { data: existing } = await supabase.from('stock_period_adjustments')
+    .select('id, wastage_units, wastage_comment, counted_units, count_comment')
+    .eq('entity_type', input.entity_type).eq('entity_id', input.entity_id)
+    .eq('year_month', month).eq('market', input.market)
+    .maybeSingle() as { data: { id: string; wastage_units: number; wastage_comment: string | null; counted_units: number | null; count_comment: string | null } | null }
+
+  const row = {
+    entity_type: input.entity_type,
+    entity_id:   input.entity_id,
+    year_month:  month,
+    market:      input.market,
+    wastage_units:   existing?.wastage_units ?? 0,
+    wastage_comment: existing?.wastage_comment ?? null,
+    counted_units:   existing?.counted_units ?? null,
+    count_comment:   existing?.count_comment ?? null,
+    created_by:  profile?.id ?? null,
+  }
+  if (input.field === 'wastage') {
+    row.wastage_units   = input.units != null && Number.isFinite(input.units) ? input.units : 0
+    row.wastage_comment = comment
+  } else {
+    row.counted_units = input.units != null && Number.isFinite(input.units) ? input.units : null
+    row.count_comment = comment
+  }
+
+  const empty = (!row.wastage_units) && !row.wastage_comment && row.counted_units == null && !row.count_comment
+  if (empty) {
+    if (existing) {
+      const { error } = await supabase.from('stock_period_adjustments').delete().eq('id', existing.id)
+      if (error) return { ok: false, error: error.message }
+    }
+  } else {
+    const { error } = await supabase.from('stock_period_adjustments')
+      .upsert(row as never, { onConflict: 'entity_type,entity_id,year_month,market' })
+    if (error) return { ok: false, error: error.message }
+  }
+
+  revalidatePath('/stock-movements')
+  return { ok: true }
+}
