@@ -146,10 +146,10 @@ function IngredientRows({ row, months, uomLabel }: { row: IngStockRow; months: s
   return (
     <>
       {nzActive && (
-        <MarketRow row={row} market="NZ" data={row.nz} cur="NZ$" months={months} uomLabel={uomLabel} head={expandBtn} showName />
+        <MarketRow row={row} market="NZ" data={row.nz} cur="NZ$" months={months} uomLabel={uomLabel} head={expandBtn} showName topDivider />
       )}
       {auActive && (
-        <MarketRow row={row} market="AU" data={row.au} cur="A$" months={months} uomLabel={uomLabel} head={nzActive ? undefined : expandBtn} showName={!nzActive} />
+        <MarketRow row={row} market="AU" data={row.au} cur="A$" months={months} uomLabel={uomLabel} head={nzActive ? undefined : expandBtn} showName={!nzActive} topDivider={!nzActive} />
       )}
       {showTotal && <MarketRow row={row} market="TOTAL" data={row.total} cur="NZ$" months={months} uomLabel={uomLabel} isTotal />}
       {open && drivers.map((d) => (
@@ -169,9 +169,9 @@ function IngredientRows({ row, months, uomLabel }: { row: IngStockRow; months: s
   )
 }
 
-function MarketRow({ row, market, data, cur, months, uomLabel, head, showName, isTotal }: {
+function MarketRow({ row, market, data, cur, months, uomLabel, head, showName, isTotal, topDivider }: {
   row: IngStockRow; market: 'NZ' | 'AU' | 'TOTAL'; data: IngMarketRow; cur: 'NZ$' | 'A$'
-  months: string[]; uomLabel: string; head?: React.ReactNode; showName?: boolean; isTotal?: boolean
+  months: string[]; uomLabel: string; head?: React.ReactNode; showName?: boolean; isTotal?: boolean; topDivider?: boolean
 }) {
   const badge = market === 'NZ'
     ? <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-800 text-white">NZ</span>
@@ -180,7 +180,9 @@ function MarketRow({ row, market, data, cur, months, uomLabel, head, showName, i
       : <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-700">TOTAL</span>
   const bg = market === 'AU' ? 'bg-sky-50/30' : isTotal ? 'bg-gray-50' : 'bg-white'
   const editable = market !== 'TOTAL'
-  const rowBorder = isTotal ? 'border-b-2 border-gray-300' : 'border-b border-gray-100'
+  // Solid divider above each ingredient block; thin separators between its market rows.
+  const topB = topDivider ? ' border-t-2 border-gray-300' : ''
+  const rowBorder = (isTotal ? 'border-b-2 border-gray-300' : 'border-b border-gray-100') + topB
 
   return (
     <tr className={`${bg}`}>
