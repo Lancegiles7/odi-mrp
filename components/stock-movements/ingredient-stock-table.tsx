@@ -193,7 +193,14 @@ function MarketRow({ row, market, data, cur, months, uomLabel, head, showName, i
         const c = data.cells[m]
         return (
           <Fragment key={m}>
-            <td className={`px-1.5 py-1 text-right text-emerald-700 ${rowBorder} ${i > 0 ? 'border-l-2 border-emerald-100' : ''}`}>{nf(c.inbound)}</td>
+            <td className={`px-1 py-0.5 text-right ${rowBorder} ${i > 0 ? 'border-l-2 border-emerald-100' : ''}`}>
+              {editable ? (
+                <div>
+                  <ManualCell entity={row.entity_id} market={market} month={m} field="inbound" units={c.inboundManual || null} comment={c.inboundComment} tone="inbound" uom={uomLabel} />
+                  {c.inboundPo > 0 && <div className="text-[8px] text-emerald-600 leading-none mt-0.5">+{nf(c.inboundPo)} PO</div>}
+                </div>
+              ) : <span className="text-emerald-700">{nf(c.inbound)}</span>}
+            </td>
             <td className={`px-1.5 py-1 text-right text-blue-700 ${rowBorder}`}>{nf(c.used)}</td>
             <td className={`px-1 py-0.5 text-right ${rowBorder}`}>
               {editable ? <ManualCell entity={row.entity_id} market={market} month={m} field="wastage" units={c.wastage || null} comment={c.wastageComment} tone="waste" uom={uomLabel} /> : nf(c.wastage)}
@@ -215,8 +222,8 @@ function MarketRow({ row, market, data, cur, months, uomLabel, head, showName, i
 /** Editable number + comment popover. Sends units and comment together so the
  *  server keeps both in step. */
 function ManualCell({ entity, market, month, field, units, comment, tone, uom, placeholderVal }: {
-  entity: string; market: 'NZ' | 'AU'; month: string; field: 'wastage' | 'count'
-  units: number | null; comment: string | null; tone: 'waste' | 'count'; uom: string; placeholderVal?: number
+  entity: string; market: 'NZ' | 'AU'; month: string; field: 'wastage' | 'count' | 'inbound'
+  units: number | null; comment: string | null; tone: 'waste' | 'count' | 'inbound'; uom: string; placeholderVal?: number
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -235,8 +242,14 @@ function ManualCell({ entity, market, month, field, units, comment, tone, uom, p
     })
   }
   const hasComment = (comment ?? '').trim().length > 0
-  const border = tone === 'waste' ? 'border-rose-200 focus:border-rose-400' : 'border-violet-200 focus:border-violet-400'
-  const text = tone === 'waste' ? 'text-rose-700' : (units != null ? 'text-violet-700 font-semibold' : 'text-gray-500')
+  const border = tone === 'waste' ? 'border-rose-200 focus:border-rose-400'
+    : tone === 'inbound' ? 'border-emerald-200 focus:border-emerald-400'
+    : 'border-violet-200 focus:border-violet-400'
+  const text = tone === 'waste' ? 'text-rose-700'
+    : tone === 'inbound' ? (units != null ? 'text-emerald-700 font-semibold' : 'text-gray-500')
+    : (units != null ? 'text-violet-700 font-semibold' : 'text-gray-500')
+  const cmtLabel = tone === 'waste' ? 'Why wasted' : tone === 'inbound' ? 'Received without a PO — note' : 'Why the count differs'
+  const cmtPlaceholder = tone === 'waste' ? 'e.g. spoiled at Brand Nation' : tone === 'inbound' ? 'e.g. sample stock in, no PO' : 'e.g. recount — 5kg short'
 
   return (
     <span className="inline-flex items-center gap-0.5 justify-end">
@@ -253,9 +266,9 @@ function ManualCell({ entity, market, month, field, units, comment, tone, uom, p
         <>
           <div className="fixed inset-0 z-40" onClick={() => { setOpenC(false); if (cmt !== (comment ?? '')) save(val, cmt) }} />
           <div style={{ position: 'fixed', top: pos.top, left: pos.left }} className="z-50 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-2.5">
-            <div className="text-[10px] font-semibold text-gray-600 mb-1">{tone === 'waste' ? 'Why wasted' : 'Why the count differs'}</div>
+            <div className="text-[10px] font-semibold text-gray-600 mb-1">{cmtLabel}</div>
             <textarea value={cmt} onChange={(e) => setCmt(e.target.value)} autoFocus
-              placeholder={tone === 'waste' ? 'e.g. spoiled at Brand Nation' : 'e.g. recount — 5kg short'}
+              placeholder={cmtPlaceholder}
               className="w-full text-xs border border-gray-200 rounded p-1.5 min-h-[52px] resize-y" />
             <div className="flex justify-end mt-1.5">
               <button type="button" onClick={() => { setOpenC(false); save(val, cmt) }} className="text-[11px] font-medium px-2.5 py-1 rounded bg-gray-900 text-white">Save</button>

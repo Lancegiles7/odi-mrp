@@ -25,7 +25,10 @@ export type Market = 'NZ' | 'AU'
 
 export interface IngDriver { product_id: string; sku: string; name: string; used: number }
 export interface IngCell {
-  inbound: number
+  inbound: number          // total in = PO arrivals + manual
+  inboundPo: number        // from open POs
+  inboundManual: number    // manually entered (no PO)
+  inboundComment: string | null
   used: number
   wastage: number
   system: number
@@ -104,8 +107,8 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
       .select('purchase_order_id, ingredient_id, quantity_ordered, quantity_received, unit_of_measure')
       .not('ingredient_id', 'is', null) as unknown as Promise<{ data: Array<{ purchase_order_id: string; ingredient_id: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string }> | null }>,
     supabase.from('stock_period_adjustments')
-      .select('entity_id, year_month, market, wastage_units, wastage_comment, counted_units, count_comment')
-      .eq('entity_type', 'ingredient') as unknown as Promise<{ data: Array<{ entity_id: string; year_month: string; market: string; wastage_units: number; wastage_comment: string | null; counted_units: number | null; count_comment: string | null }> | null }>,
+      .select('entity_id, year_month, market, wastage_units, wastage_comment, counted_units, count_comment, inbound_units, inbound_comment')
+      .eq('entity_type', 'ingredient') as unknown as Promise<{ data: Array<{ entity_id: string; year_month: string; market: string; wastage_units: number; wastage_comment: string | null; counted_units: number | null; count_comment: string | null; inbound_units: number; inbound_comment: string | null }> | null }>,
   ])
 
   // ── BOM lookups per market ──
@@ -188,7 +191,7 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
   }
 
   // ── Manual adjustments (wastage + counts) ──
-  interface Adj { wastage: number; wComment: string | null; counted: number | null; cComment: string | null }
+  interface Adj { wastage: number; wComment: string | null; counted: number | null; cComment: string | null; inbound: number; iComment: string | null }
   const adjBy = new Map<string, Adj>()   // key: ingId|market|month
   for (const a of adjustments ?? []) {
     const key = `${a.entity_id}|${a.market}|${a.year_month.slice(0, 10)}`
@@ -197,10 +200,12 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
       wComment: a.wastage_comment,
       counted: a.counted_units != null ? Number(a.counted_units) : null,
       cComment: a.count_comment,
+      inbound: Number(a.inbound_units) || 0,
+      iComment: a.inbound_comment,
     })
   }
   const adjOf = (ing: string, mk: Market, m: string): Adj =>
-    adjBy.get(`${ing}|${mk}|${m}`) ?? { wastage: 0, wComment: null, counted: null, cComment: null }
+    adjBy.get(`${ing}|${mk}|${m}`) ?? { wastage: 0, wComment: null, counted: null, cComment: null, inbound: 0, iComment: null }
 
   const supplierName = new Map((suppliers ?? []).map((s) => [s.id, s.name]))
 
@@ -219,16 +224,18 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
       const cells: Record<string, IngCell> = {}
       let prevEom = opening
       for (const m of months) {
-        const inbound = inboundMap.get(ing.id)?.get(m) ?? 0
-        const used = usedRow?.demandByMonth.get(m) ?? 0
+        const inboundPo = inboundMap.get(ing.id)?.get(m) ?? 0
         const adj = adjOf(ing.id, mk, m)
+        const inbound = inboundPo + adj.inbound
+        const used = usedRow?.demandByMonth.get(m) ?? 0
         const system = round(prevEom + inbound - used - adj.wastage, 3)
         const eom = adj.counted != null ? adj.counted : system
         const drivers: IngDriver[] = (usedRow?.products ?? [])
           .map((p) => ({ product_id: p.id, sku: p.sku_code, name: p.name, used: round(p.demandByMonth.get(m) ?? 0, 3) }))
           .filter((d) => d.used > 0)
         cells[m] = {
-          inbound: round(inbound, 3), used: round(used, 3), wastage: adj.wastage,
+          inbound: round(inbound, 3), inboundPo: round(inboundPo, 3), inboundManual: adj.inbound, inboundComment: adj.iComment,
+          used: round(used, 3), wastage: adj.wastage,
           system, counted: adj.counted, eom: round(eom, 3), value: round(eom * cost, 2),
           wastageComment: adj.wComment, countComment: adj.cComment, drivers,
         }
@@ -245,7 +252,9 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     for (const m of months) {
       const a = nz.cells[m], b = au.cells[m]
       totalCells[m] = {
-        inbound: round(a.inbound + b.inbound, 3), used: round(a.used + b.used, 3),
+        inbound: round(a.inbound + b.inbound, 3), inboundPo: round(a.inboundPo + b.inboundPo, 3),
+        inboundManual: round(a.inboundManual + b.inboundManual, 3), inboundComment: null,
+        used: round(a.used + b.used, 3),
         wastage: round(a.wastage + b.wastage, 3), system: round(a.system + b.system, 3),
         counted: null, eom: round(a.eom + b.eom, 3), value: round(a.value + b.value * fx, 2),
         wastageComment: null, countComment: null, drivers: [],

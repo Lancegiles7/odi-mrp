@@ -103,7 +103,7 @@ export async function setStockAdjustment(input: {
   entity_id: string
   year_month: string
   market: 'NZ' | 'AU'
-  field: 'wastage' | 'count'
+  field: 'wastage' | 'count' | 'inbound'
   units: number | null
   comment: string | null
 }): Promise<{ ok: boolean; error?: string }> {
@@ -117,10 +117,10 @@ export async function setStockAdjustment(input: {
   const comment = input.comment?.trim() || null
 
   const { data: existing } = await supabase.from('stock_period_adjustments')
-    .select('id, wastage_units, wastage_comment, counted_units, count_comment')
+    .select('id, wastage_units, wastage_comment, counted_units, count_comment, inbound_units, inbound_comment')
     .eq('entity_type', input.entity_type).eq('entity_id', input.entity_id)
     .eq('year_month', month).eq('market', input.market)
-    .maybeSingle() as { data: { id: string; wastage_units: number; wastage_comment: string | null; counted_units: number | null; count_comment: string | null } | null }
+    .maybeSingle() as { data: { id: string; wastage_units: number; wastage_comment: string | null; counted_units: number | null; count_comment: string | null; inbound_units: number; inbound_comment: string | null } | null }
 
   const row = {
     entity_type: input.entity_type,
@@ -131,17 +131,23 @@ export async function setStockAdjustment(input: {
     wastage_comment: existing?.wastage_comment ?? null,
     counted_units:   existing?.counted_units ?? null,
     count_comment:   existing?.count_comment ?? null,
+    inbound_units:   existing?.inbound_units ?? 0,
+    inbound_comment: existing?.inbound_comment ?? null,
     created_by:  profile?.id ?? null,
   }
+  const units = input.units != null && Number.isFinite(input.units) ? input.units : null
   if (input.field === 'wastage') {
-    row.wastage_units   = input.units != null && Number.isFinite(input.units) ? input.units : 0
+    row.wastage_units = units ?? 0
     row.wastage_comment = comment
+  } else if (input.field === 'inbound') {
+    row.inbound_units = units ?? 0
+    row.inbound_comment = comment
   } else {
-    row.counted_units = input.units != null && Number.isFinite(input.units) ? input.units : null
+    row.counted_units = units
     row.count_comment = comment
   }
 
-  const empty = (!row.wastage_units) && !row.wastage_comment && row.counted_units == null && !row.count_comment
+  const empty = (!row.wastage_units) && !row.wastage_comment && row.counted_units == null && !row.count_comment && (!row.inbound_units) && !row.inbound_comment
   if (empty) {
     if (existing) {
       const { error } = await supabase.from('stock_period_adjustments').delete().eq('id', existing.id)
