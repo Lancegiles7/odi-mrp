@@ -135,12 +135,23 @@ function IngredientRows({ row, months, uomLabel }: { row: IngStockRow; months: s
     return Array.from(byProduct.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [row, months])
 
+  // Only show a market's row when that market actually has activity (used in a
+  // recipe, received, counted or wasted). Total only when it's in BOTH.
+  const cellActive = (c: IngCell) => !!(c.used || c.inbound || c.wastage || c.counted != null)
+  const nzActive = row.nz.opening !== 0 || months.some((m) => cellActive(row.nz.cells[m]))
+  const auActive = row.au.opening !== 0 || months.some((m) => cellActive(row.au.cells[m]))
+  const showTotal = nzActive && auActive
+  const expandBtn = <button onClick={() => setOpen((v) => !v)} className="text-gray-400 hover:text-gray-700 mr-1">{open ? '▾' : '▸'}</button>
+
   return (
     <>
-      <MarketRow row={row} market="NZ" data={row.nz} cur="NZ$" months={months} uomLabel={uomLabel}
-        head={<button onClick={() => setOpen((v) => !v)} className="text-gray-400 hover:text-gray-700 mr-1">{open ? '▾' : '▸'}</button>} showName />
-      <MarketRow row={row} market="AU" data={row.au} cur="A$" months={months} uomLabel={uomLabel} />
-      <MarketRow row={row} market="TOTAL" data={row.total} cur="NZ$" months={months} uomLabel={uomLabel} isTotal />
+      {nzActive && (
+        <MarketRow row={row} market="NZ" data={row.nz} cur="NZ$" months={months} uomLabel={uomLabel} head={expandBtn} showName />
+      )}
+      {auActive && (
+        <MarketRow row={row} market="AU" data={row.au} cur="A$" months={months} uomLabel={uomLabel} head={nzActive ? undefined : expandBtn} showName={!nzActive} />
+      )}
+      {showTotal && <MarketRow row={row} market="TOTAL" data={row.total} cur="NZ$" months={months} uomLabel={uomLabel} isTotal />}
       {open && drivers.map((d) => (
         <tr key={d.sku} className="text-[11px]">
           <td className="sticky left-0 bg-emerald-50/40 pl-9 pr-3 py-1 text-gray-600 border-b border-gray-100">└ {d.name} <span className="text-gray-400 font-mono text-[9px]">{d.sku}</span></td>
