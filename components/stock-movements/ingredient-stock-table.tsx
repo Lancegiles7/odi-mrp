@@ -19,17 +19,24 @@ interface Props {
 export function IngredientStockTable({ ledger, group }: Props) {
   const { rows, months } = ledger
   const seedLabel = 'End Jul'
+  const [query, setQuery] = useState('')
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter((r) => r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q) || r.supplier_name.toLowerCase().includes(q))
+  }, [rows, query])
 
   const groups = useMemo(() => {
-    if (group !== 'supplier') return [{ key: 'all', name: null as string | null, rows }]
+    if (group !== 'supplier') return [{ key: 'all', name: null as string | null, rows: filtered }]
     const by = new Map<string, IngStockRow[]>()
-    for (const r of rows) {
+    for (const r of filtered) {
       const k = r.supplier_name
       if (!by.has(k)) by.set(k, [])
       by.get(k)!.push(r)
     }
     return Array.from(by.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([name, rs]) => ({ key: name, name, rows: rs }))
-  }, [group, rows])
+  }, [group, filtered])
 
   const minWidth = 240 + 74 + months.length * 6 * 58
 
@@ -42,7 +49,14 @@ export function IngredientStockTable({ ledger, group }: Props) {
           <Link href="/stock-movements?view=ingredients&group=supplier"
             className={`px-3 py-1.5 font-medium border-l border-gray-300 ${group === 'supplier' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>By supplier</Link>
         </div>
-        <span className="text-xs text-gray-500">
+        <div className="relative">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search ingredient, SKU or supplier…"
+            className="text-xs border border-gray-300 rounded-md pl-7 pr-6 py-1.5 w-64 focus:outline-none focus:ring-2 focus:ring-gray-300" />
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">⌕</span>
+          {query && <button onClick={() => setQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs">✕</button>}
+        </div>
+        {query && <span className="text-xs text-gray-500">{filtered.length} match{filtered.length === 1 ? '' : 'es'}</span>}
+        <span className="text-xs text-gray-500 hidden lg:inline">
           Opening + received − used − wastage = system · enter your month-end count to override · click a row to see the SKUs using it
         </span>
       </div>
@@ -50,6 +64,10 @@ export function IngredientStockTable({ ledger, group }: Props) {
       {rows.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
           Nothing to show yet — set an end-of-July count on an ingredient, or once production plans and POs exist the ledger fills in.
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
+          No ingredient matches “{query}”.
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
