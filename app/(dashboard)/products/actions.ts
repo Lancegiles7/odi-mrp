@@ -66,6 +66,7 @@ export interface ProductFormData {
 
 const VALID_GROUPS = new Set([
   'pouches', 'snacks_4bs', 'puffs_melts', 'tubs', 'sachets', 'noodles', 'vitamin_d',
+  'her_daily_dose',
 ])
 
 export interface BomItemInput {

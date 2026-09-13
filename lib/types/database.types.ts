@@ -911,6 +911,7 @@ export type ProductGroup =
   | 'sachets'
   | 'noodles'
   | 'vitamin_d'
+  | 'her_daily_dose'
 
 export type PriceChangeReason =
   | 'initial'
