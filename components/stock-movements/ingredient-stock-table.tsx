@@ -8,14 +8,15 @@ import type { IngStockLedger, IngStockRow, IngMarketRow, IngCell } from '@/lib/i
 
 const nf = (n: number) => (n === 0 ? '—' : Number(n.toFixed(n < 100 && n % 1 !== 0 ? 2 : 0)).toLocaleString())
 const money = (n: number, cur: 'NZ$' | 'A$') => (n ? `${cur}${Math.round(n).toLocaleString()}` : '—')
+const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const label = (m: string) => `${MON3[Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`
 
 interface Props {
   ledger: IngStockLedger
   group: 'flat' | 'supplier'
-  label: (m: string) => string
 }
 
-export function IngredientStockTable({ ledger, group, label }: Props) {
+export function IngredientStockTable({ ledger, group }: Props) {
   const { rows, months } = ledger
   const seedLabel = 'End Jul'
 

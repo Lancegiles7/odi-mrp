@@ -47,7 +47,7 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
       </div>
 
       {view === 'products' && <ProductsView label={monthLabel} />}
-      {view === 'ingredients' && <IngredientsView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} label={monthLabel} />}
+      {view === 'ingredients' && <IngredientsView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
       {view === 'packaging' && (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
           Packaging Stock Movements is next — it will mirror the Ingredients view exactly.
@@ -77,7 +77,7 @@ async function ProductsView({ label }: { label: (m: string) => string }) {
   )
 }
 
-async function IngredientsView({ group, label }: { group: 'flat' | 'supplier'; label: (m: string) => string }) {
+async function IngredientsView({ group }: { group: 'flat' | 'supplier' }) {
   const ledger = await loadIngredientStockLedger()
-  return <IngredientStockTable ledger={ledger} group={group} label={label} />
+  return <IngredientStockTable ledger={ledger} group={group} />
 }
