@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { receivePoLines, uploadReceiptCoa, removeReceiptCoa } from '@/app/(dashboard)/purchase-orders/actions'
+import { receivePoLines, receiveTransferLines, uploadReceiptCoa, removeReceiptCoa } from '@/app/(dashboard)/purchase-orders/actions'
 
 interface LineRow {
   id: string
@@ -26,6 +26,8 @@ interface Props {
   poId: string
   poNumber: string
   supplierName: string
+  // Transfer orders confirm qty + date only — no pricing, lot/COA or stock impact.
+  isTransfer?: boolean
   expectedDate: string | null
   lines: LineRow[]
 }
@@ -55,7 +57,7 @@ function daysUntil(iso: string): number | null {
   return Math.round((d.getTime() - today.getTime()) / 86_400_000)
 }
 
-export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines }: Props) {
+export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, expectedDate, lines }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -134,6 +136,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
       .filter((l) => {
         const s = state[l.id]
         return (s?.received ?? 0) !== l.quantity_received
+          || (isTransfer && !!s?.note.trim())
           || (s?.received_date ?? '') !== (l.saved_received_date ?? today)
           || (s?.lot_number ?? '') !== (l.saved_lot ?? '')
           || (s?.expiry_date ?? '') !== (l.saved_expiry ?? '')
@@ -161,7 +164,9 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
     }
 
     start(async () => {
-      const res = await receivePoLines({ po_id: poId, receipts })
+      const res = isTransfer
+        ? await receiveTransferLines({ po_id: poId, receipts })
+        : await receivePoLines({ po_id: poId, receipts })
       if (!res.ok) { setError(res.error ?? 'Save failed'); return }
       router.push(`/purchase-orders/${poId}`)
       router.refresh()
@@ -174,7 +179,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
         <div className="flex items-center gap-3">
           <Link href={`/purchase-orders/${poId}`} className="text-xs text-gray-500 hover:underline">← Back to PO</Link>
           <div>
-            <h1 className="text-base font-semibold">Receive — {poNumber}</h1>
+            <h1 className="text-base font-semibold">{isTransfer ? 'Receive transfer' : 'Receive'} — {poNumber}</h1>
             <p className="text-xs text-gray-500 mt-0.5">
               {supplierName}{expectedDate ? ` · expected ${expectedDate}` : ''}
             </p>
@@ -215,11 +220,13 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
               <th className="text-right px-3 py-2 font-medium">Ordered</th>
               <th className="text-right px-3 py-2 font-medium">Received</th>
               <th className="text-left px-3 py-2 font-medium">Date received</th>
-              <th className="text-right px-3 py-2 font-medium">PO price</th>
-              <th className="text-right px-3 py-2 font-medium">Invoice price</th>
-              <th className="text-left px-3 py-2 font-medium">Lot #</th>
-              <th className="text-left px-3 py-2 font-medium">Expiry</th>
-              <th className="text-left px-3 py-2 font-medium">COA</th>
+              {!isTransfer && (<>
+                <th className="text-right px-3 py-2 font-medium">PO price</th>
+                <th className="text-right px-3 py-2 font-medium">Invoice price</th>
+                <th className="text-left px-3 py-2 font-medium">Lot #</th>
+                <th className="text-left px-3 py-2 font-medium">Expiry</th>
+                <th className="text-left px-3 py-2 font-medium">COA</th>
+              </>)}
               <th className="text-left px-3 py-2 font-medium">Note</th>
             </tr>
           </thead>
@@ -274,6 +281,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
                       className="text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900"
                     />
                   </td>
+                  {!isTransfer && (<>
                   <td className="px-3 py-2 text-right tabular-nums text-gray-500">
                     {l.unit_cost != null ? `$${l.unit_cost.toFixed(2)}` : '—'}
                   </td>
@@ -343,6 +351,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
                     )}
                     {s.coa_error && <div className="text-[10px] text-red-700 mt-0.5">{s.coa_error}</div>}
                   </td>
+                  </>)}
                   <td className="px-3 py-2">
                     <input
                       value={s.note}
@@ -363,7 +372,9 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
           {willBePartial
             ? <>Status will move to <span className="font-semibold text-amber-800">Partial</span>.</>
             : <>Status will move to <span className="font-semibold text-emerald-700">Received</span>.</>}
-          {' '}On confirm, received qty moves into <b>Stock on Hand</b> at <b>Main Warehouse</b>; Lot&nbsp;#, Expiry and COA are saved against each receipt and shown in the PO&apos;s receipt history.
+          {isTransfer
+            ? <>{' '}Confirms what arrived at the destination site. Logistics record only — Stock on Hand isn&apos;t changed by transfers.</>
+            : <>{' '}On confirm, received qty moves into <b>Stock on Hand</b> at <b>Main Warehouse</b>; Lot&nbsp;#, Expiry and COA are saved against each receipt and shown in the PO&apos;s receipt history.</>}
         </div>
         <div className="flex gap-2 flex-shrink-0">
           <Link href={`/purchase-orders/${poId}`} className="px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50">Cancel</Link>
@@ -372,7 +383,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, expectedDate, lines 
             onClick={onSave}
             className="px-3 py-1.5 text-xs bg-emerald-700 text-white rounded-md hover:bg-emerald-800 disabled:opacity-50"
           >
-            {pending ? 'Saving…' : 'Confirm receipt + update SOH'}
+            {pending ? 'Saving…' : isTransfer ? 'Confirm receipt' : 'Confirm receipt + update SOH'}
           </button>
         </div>
       </div>

@@ -557,6 +557,70 @@ export async function receivePoLines(input: {
 }
 
 // ============================================================
+// Receive a TRANSFER order — confirms what arrived at the destination
+// site (qty + date + note). Logistics record only: no stock movements,
+// no finished-goods receipts, no opening-stock bumps (the goods already
+// exist in the MRP; moving them between sites is phase 2).
+// ============================================================
+export async function receiveTransferLines(input: {
+  po_id: string
+  receipts: Array<{
+    line_id: string
+    received: number          // TOTAL received for this line (edit-in-place)
+    received_date: string     // ISO yyyy-mm-dd
+    note: string | null
+  }>
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not_authenticated' }
+
+  const { data: po } = await supabase
+    .from('purchase_orders').select('po_type').eq('id', input.po_id).maybeSingle() as
+    { data: { po_type: string | null } | null }
+  if (po?.po_type !== 'transfer') return { ok: false, error: 'Not a transfer order' }
+
+  const { data: lines } = await supabase
+    .from('purchase_order_lines').select('id').eq('purchase_order_id', input.po_id) as
+    { data: Array<{ id: string }> | null }
+  const lineIds = new Set((lines ?? []).map((l) => l.id))
+
+  for (const r of input.receipts) {
+    if (!lineIds.has(r.line_id)) continue
+    const updates: Record<string, unknown> = {
+      quantity_received: Math.max(0, Number(r.received) || 0),
+      received_date:     /^\d{4}-\d{2}-\d{2}$/.test(r.received_date) ? r.received_date : null,
+    }
+    if (r.note?.trim()) updates.notes = r.note.trim()
+    const { error } = await supabase.from('purchase_order_lines').update(updates).eq('id', r.line_id)
+    if (error) {
+      return {
+        ok: false,
+        error: error.message.includes('received_date')
+          ? 'Database not ready for transfer receipts — run migration 065 in Supabase first.'
+          : error.message,
+      }
+    }
+  }
+
+  const { data: refreshed } = await supabase
+    .from('purchase_order_lines')
+    .select('quantity_ordered, quantity_received')
+    .eq('purchase_order_id', input.po_id) as { data: Array<{ quantity_ordered: number; quantity_received: number }> | null }
+  if (refreshed) {
+    const allFull = refreshed.every((l) => Number(l.quantity_received) >= Number(l.quantity_ordered))
+    const anyPartial = refreshed.some((l) => Number(l.quantity_received) > 0)
+    const nextStatus: POStatus = allFull ? 'received' : anyPartial ? 'partially_received' : 'submitted'
+    await supabase.from('purchase_orders').update({ status: nextStatus }).eq('id', input.po_id)
+  }
+
+  revalidatePath('/purchase-orders')
+  revalidatePath(`/purchase-orders/${input.po_id}`)
+  revalidatePath(`/purchase-orders/${input.po_id}/receive`)
+  return { ok: true }
+}
+
+// ============================================================
 // Correct received quantities — fix a mis-keyed receipt in-app,
 // without a manual DB reset. Product / 'other' lines can be set to any
 // value 0..ordered (they don't move inventory). Ingredient / packaging

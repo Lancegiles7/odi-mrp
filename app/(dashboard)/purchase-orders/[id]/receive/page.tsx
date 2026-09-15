@@ -16,12 +16,15 @@ interface POHeader {
   status: string
   expected_delivery_date: string | null
   supplier_id: string
+  po_type: string | null
+  destination_supplier_id: string | null
 }
 
 interface POLineRow {
   id: string
   ingredient_id: string | null
   product_id: string | null
+  packaging_id: string | null
   description: string | null
   quantity_ordered: number
   quantity_received: number
@@ -35,7 +38,7 @@ export default async function ReceivePoPage({ params }: PageProps) {
 
   const { data: po } = await supabase
     .from('purchase_orders')
-    .select('id, po_number, status, expected_delivery_date, supplier_id')
+    .select('id, po_number, status, expected_delivery_date, supplier_id, po_type, destination_supplier_id')
     .eq('id', params.id)
     .maybeSingle() as { data: POHeader | null }
 
@@ -48,18 +51,24 @@ export default async function ReceivePoPage({ params }: PageProps) {
 
   const { data: lines } = await supabase
     .from('purchase_order_lines')
-    .select('id, ingredient_id, product_id, description, quantity_ordered, quantity_received, unit_cost, unit_of_measure, notes')
+    .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, quantity_received, unit_cost, unit_of_measure, notes')
     .eq('purchase_order_id', params.id)
     .order('created_at') as { data: POLineRow[] | null }
 
-  const { data: supplier } = await supabase
+  const isTransfer = po.po_type === 'transfer'
+  const siteIds = [po.supplier_id, ...(isTransfer && po.destination_supplier_id ? [po.destination_supplier_id] : [])]
+  const { data: sites } = await supabase
     .from('suppliers')
-    .select('name')
-    .eq('id', po.supplier_id)
-    .maybeSingle() as { data: { name: string } | null }
+    .select('id, name')
+    .in('id', siteIds) as { data: Array<{ id: string; name: string }> | null }
+  const siteName = (id: string | null) => (sites ?? []).find((s) => s.id === id)?.name ?? '—'
+  const supplierName = isTransfer
+    ? `${siteName(po.supplier_id)} → ${siteName(po.destination_supplier_id)}`
+    : siteName(po.supplier_id)
 
   const ingIds  = (lines ?? []).filter((l) => l.ingredient_id).map((l) => l.ingredient_id!)
   const prodIds = (lines ?? []).filter((l) => l.product_id).map((l) => l.product_id!)
+  const pakIds  = (lines ?? []).filter((l) => l.packaging_id).map((l) => l.packaging_id!)
 
   const { data: ings } = ingIds.length
     ? await supabase.from('ingredients').select('id, sku_code, name').in('id', ingIds) as unknown as { data: Array<{ id: string; sku_code: string; name: string }> | null }
@@ -69,8 +78,22 @@ export default async function ReceivePoPage({ params }: PageProps) {
     ? await supabase.from('products').select('id, sku_code, name').in('id', prodIds) as unknown as { data: Array<{ id: string; sku_code: string; name: string }> | null }
     : { data: [] as Array<{ id: string; sku_code: string; name: string }> }
 
+  const { data: paks } = pakIds.length
+    ? await supabase.from('packaging').select('id, sku_code, name').in('id', pakIds) as unknown as { data: Array<{ id: string; sku_code: string; name: string }> | null }
+    : { data: [] as Array<{ id: string; sku_code: string; name: string }> }
+
   const ingMap  = new Map((ings  ?? []).map((i) => [i.id, i]))
   const prodMap = new Map((prods ?? []).map((p) => [p.id, p]))
+  const pakMap  = new Map((paks  ?? []).map((p) => [p.id, p]))
+
+  // Transfers keep their received date on the line (migration 065). Read in this
+  // transfer-only query so a migration lag can't break purchase-PO receiving.
+  const { data: transferDates } = isTransfer
+    ? await supabase.from('purchase_order_lines')
+        .select('id, received_date')
+        .eq('purchase_order_id', params.id) as { data: Array<{ id: string; received_date: string | null }> | null }
+    : { data: [] as Array<{ id: string; received_date: string | null }> }
+  const transferDateByLine = new Map((transferDates ?? []).map((r) => [r.id, r.received_date]))
 
   // Saved received date per line (from the finished-goods receipt log) so the
   // form shows the real date already on record instead of defaulting to today.
@@ -87,15 +110,19 @@ export default async function ReceivePoPage({ params }: PageProps) {
     label:
       l.ingredient_id ? (ingMap.get(l.ingredient_id)?.name ?? '—') :
       l.product_id    ? (prodMap.get(l.product_id)?.name   ?? '—') :
+      l.packaging_id  ? (pakMap.get(l.packaging_id)?.name  ?? '—') :
                          (l.description ?? '—'),
     sku:
       l.ingredient_id ? (ingMap.get(l.ingredient_id)?.sku_code ?? null) :
       l.product_id    ? (prodMap.get(l.product_id)?.sku_code   ?? null) :
+      l.packaging_id  ? (pakMap.get(l.packaging_id)?.sku_code  ?? null) :
                          null,
     quantity_ordered:  Number(l.quantity_ordered),
     quantity_received: Number(l.quantity_received),
     is_product:        !!l.product_id,
-    saved_received_date: savedByLine.get(l.id)?.received_date ?? null,
+    saved_received_date: isTransfer
+      ? (transferDateByLine.get(l.id) ?? null)
+      : (savedByLine.get(l.id)?.received_date ?? null),
     saved_lot:           savedByLine.get(l.id)?.batch_ref ?? null,
     saved_expiry:        savedByLine.get(l.id)?.expiry_date ?? null,
     saved_coa_path:      savedByLine.get(l.id)?.coa_file_path ?? null,
@@ -109,7 +136,8 @@ export default async function ReceivePoPage({ params }: PageProps) {
     <ReceiveForm
       poId={params.id}
       poNumber={po.po_number}
-      supplierName={supplier?.name ?? '—'}
+      supplierName={supplierName}
+      isTransfer={isTransfer}
       expectedDate={po.expected_delivery_date?.slice(0, 10) ?? null}
       lines={lineRows}
     />

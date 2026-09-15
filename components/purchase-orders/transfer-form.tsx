@@ -294,6 +294,12 @@ export function TransferForm(props: Props) {
           <h1 className="text-2xl font-semibold mt-1">{props.initialPoNumber}</h1>
         </div>
         <div className="flex items-center gap-2">
+          {props.mode === 'edit' && props.id && props.status && ['submitted', 'partially_received', 'received'].includes(props.status) && (
+            <Link href={`/purchase-orders/${props.id}/receive`}
+              className="text-sm font-medium px-3 py-1.5 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800">
+              {props.status === 'received' ? '📦 Edit receipt' : '📦 Receive transfer'}
+            </Link>
+          )}
           {props.mode === 'edit' && props.id && (
             <button type="button" disabled={pending} onClick={saveAndPrint}
               title={readOnly ? undefined : 'Saves your changes first, then opens the printable document'}
@@ -309,7 +315,7 @@ export function TransferForm(props: Props) {
 
       {readOnly && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600">
-          This transfer is {props.status} and can no longer be edited.
+          This transfer is {props.status?.replace('_', ' ')} and can no longer be edited — use {props.status === 'received' ? 'Edit receipt' : 'Receive transfer'} to change received quantities.
         </div>
       )}
 
