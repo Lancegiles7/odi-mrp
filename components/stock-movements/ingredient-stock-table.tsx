@@ -120,14 +120,17 @@ export function IngredientStockTable({ ledger, group }: Props) {
 
 function IngredientRows({ row, months, uomLabel }: { row: IngStockRow; months: string[]; uomLabel: string }) {
   const [open, setOpen] = useState(false)
-  // Combined drivers per product per month (NZ + AU) for the expand.
+  // Drivers per product per month for the expand. Keyed by MARKET + product:
+  // a dual-made product is a separate driver per build (the AU one is already
+  // named "… (AU)"), so an NZ build never gets folded into the AU line.
   const drivers = useMemo(() => {
-    const byProduct = new Map<string, { sku: string; name: string; byMonth: Record<string, number> }>()
+    const byProduct = new Map<string, { key: string; sku: string; name: string; byMonth: Record<string, number> }>()
     for (const m of months) {
       for (const mk of [row.nz, row.au]) {
         for (const d of mk.cells[m]?.drivers ?? []) {
-          if (!byProduct.has(d.product_id)) byProduct.set(d.product_id, { sku: d.sku, name: d.name, byMonth: {} })
-          const p = byProduct.get(d.product_id)!
+          const key = `${mk.market}|${d.product_id}`
+          if (!byProduct.has(key)) byProduct.set(key, { key, sku: d.sku, name: d.name, byMonth: {} })
+          const p = byProduct.get(key)!
           p.byMonth[m] = (p.byMonth[m] ?? 0) + d.used
         }
       }
@@ -153,7 +156,7 @@ function IngredientRows({ row, months, uomLabel }: { row: IngStockRow; months: s
       )}
       {showTotal && <MarketRow row={row} market="TOTAL" data={row.total} cur="NZ$" months={months} uomLabel={uomLabel} isTotal />}
       {open && drivers.map((d) => (
-        <tr key={d.sku} className="text-[11px]">
+        <tr key={d.key} className="text-[11px]">
           <td className="sticky left-0 bg-emerald-50/40 pl-9 pr-3 py-1 text-gray-600 border-b border-gray-100">└ {d.name} <span className="text-gray-400 font-mono text-[9px]">{d.sku}</span></td>
           <td className="sticky left-[240px] bg-emerald-50/40 border-b border-r-2 border-gray-300" />
           {months.map((m, i) => (
