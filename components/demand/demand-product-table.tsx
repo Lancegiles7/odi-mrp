@@ -28,6 +28,8 @@ interface Props {
   collapsed?: boolean
   /** Country filter — driven by the URL on the page. Defaults to 'all'. */
   countryFilter?: CountryFilter
+  /** Completed months shown in history mode — read-only, never editable. */
+  lockedMonths?: string[]
 }
 
 const NZ_CHANNELS_ORDERED  = DEMAND_CHANNELS.filter((c) => c.country === 'NZ')
@@ -41,8 +43,9 @@ function matchesFilter(channel: string, filter: CountryFilter): boolean {
 
 export function DemandProductTable({
   productId, productName, skuCode, months, initialData, collapsed = true,
-  countryFilter = 'all',
+  countryFilter = 'all', lockedMonths,
 }: Props) {
+  const locked = useMemo(() => new Set(lockedMonths ?? []), [lockedMonths])
   const [open, setOpen] = useState(!collapsed)
   const [data, setData] = useState<DemandProductData>(initialData)
   const [saving, setSaving] = useTransition()
@@ -115,6 +118,19 @@ export function DemandProductTable({
         </td>
         {months.map((m) => {
           const cell = cellValue(m, ch.value as DemandChannel)
+          // Completed months are history — shown, never edited.
+          if (locked.has(m)) {
+            return (
+              <td key={m} className="px-1 py-1 bg-gray-50/70">
+                <div
+                  className="w-full text-right px-1.5 py-1 text-xs tabular-nums text-gray-500"
+                  title={`${monthLabel(m)} is a completed month — read-only`}
+                >
+                  {cell.units ? cell.units.toLocaleString() : '—'}
+                </div>
+              </td>
+            )
+          }
           return (
             <td key={m} className="px-1 py-1">
               <input
@@ -176,7 +192,9 @@ export function DemandProductTable({
                 <tr className="text-[11px] uppercase tracking-wider text-gray-500 bg-gray-50">
                   <th className="text-left font-medium px-4 py-1.5 w-[140px]">Channel</th>
                   {months.map((m) => (
-                    <th key={m} className="text-right font-medium px-2 py-1.5 min-w-[64px]">{monthLabel(m)}</th>
+                    <th key={m} className={`text-right font-medium px-2 py-1.5 min-w-[64px] ${locked.has(m) ? 'bg-gray-100 text-gray-400' : ''}`}>
+                      {monthLabel(m)}
+                    </th>
                   ))}
                 </tr>
               </thead>
