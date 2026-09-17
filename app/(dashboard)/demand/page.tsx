@@ -6,10 +6,11 @@ import {
   PRODUCT_GROUPS, NZ_CHANNEL_SET, AUS_CHANNEL_SET, channelCountry,
   type ChannelCountry,
 } from '@/lib/constants'
-import { rollingMonths, indexDemand, monthLabel } from '@/lib/demand'
-import { getPlanningAnchor } from '@/lib/settings'
+import { indexDemand, monthLabel } from '@/lib/demand'
+import { getPlanningAnchor, getPlanningWindow } from '@/lib/settings'
 import { DemandProductTable, type DemandProductData, type CountryFilter } from '@/components/demand/demand-product-table'
 import { CompleteMonthButton } from '@/components/demand/complete-month-button'
+import { PlanningHistoryToggle } from '@/components/shared/planning-history-toggle'
 import type { DemandChannel, DemandForecast, ProductGroup } from '@/lib/types/database.types'
 
 export const metadata: Metadata = { title: 'Demand' }
@@ -23,7 +24,7 @@ interface ProductRow {
 }
 
 interface PageProps {
-  searchParams: { country?: string }
+  searchParams: { country?: string; history?: string }
 }
 
 function parseCountry(raw: string | undefined): CountryFilter {
@@ -37,7 +38,8 @@ export default async function DemandPage({ searchParams }: PageProps) {
   const supabase = createClient()
 
   const anchor = await getPlanningAnchor()
-  const months = rollingMonths(undefined, anchor)
+  const planning = await getPlanningWindow(searchParams.history === 'fy')
+  const months = planning.months
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
@@ -151,7 +153,9 @@ export default async function DemandPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-semibold">Demand</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)})
+            {planning.isHistory
+              ? <>Completed months included ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · closed months are read-only</>
+              : <>Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)})</>}
             {country !== 'all' && (
               <> · <span className="font-semibold text-gray-800">{country === 'NZ' ? 'NZ only' : 'AUS only'}</span></>
             )}
@@ -164,7 +168,10 @@ export default async function DemandPage({ searchParams }: PageProps) {
             <Link href="/demand?country=nz"  className={`${pillBase} border-l border-gray-300 ${pillActive('NZ')}`}>NZ</Link>
             <Link href="/demand?country=aus" className={`${pillBase} border-l border-gray-300 ${pillActive('AUS')}`}>AUS</Link>
           </div>
-          <CompleteMonthButton firstMonth={firstMonth} hasAnchorOverride={anchor.getTime() !== Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)} />
+          {planning.canShowHistory && (
+            <PlanningHistoryToggle isHistory={planning.isHistory} fromLabel={monthLabel(planning.fyStartMonth)} />
+          )}
+          <CompleteMonthButton firstMonth={planning.anchorMonth} hasAnchorOverride={anchor.getTime() !== Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)} />
           <Link
             href="/demand/import"
             className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800"
@@ -232,6 +239,7 @@ export default async function DemandPage({ searchParams }: PageProps) {
                   productName={p.name}
                   skuCode={p.sku_code}
                   months={months}
+                  lockedMonths={planning.lockedMonths}
                   initialData={dataFor(p.id)}
                   collapsed
                 />
@@ -259,6 +267,7 @@ export default async function DemandPage({ searchParams }: PageProps) {
                 productName={p.name}
                 skuCode={p.sku_code}
                 months={months}
+                lockedMonths={planning.lockedMonths}
                 initialData={dataFor(p.id)}
                 countryFilter={country}
                 collapsed

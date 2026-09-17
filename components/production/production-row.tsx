@@ -25,6 +25,10 @@ interface Props {
   market?: 'NZ' | 'AU'
   /** Show a small NZ/AU tag (used when a product is dual-made). */
   marketTag?: 'NZ' | 'AU'
+  /** Completed months shown in history mode. Display-only: they show what was
+   *  forecast/produced, and are left out of the running balance (which still
+   *  starts at the current opening stock). */
+  lockedMonths?: string[]
 }
 
 /**
@@ -38,8 +42,12 @@ export function ProductionRow({
   productId, skuCode, productName, manufacturer, isActive,
   openingStock, openingSource, months, forecastByMonth, productionByMonth,
   commentedCells, showManufacturerChip,
-  market = 'NZ', marketTag,
+  market = 'NZ', marketTag, lockedMonths,
 }: Props) {
+  const locked = useMemo(() => new Set(lockedMonths ?? []), [lockedMonths])
+  // The balance chain only ever runs over the live window — a look-back must
+  // not shift the balances people plan against.
+  const activeMonths = useMemo(() => months.filter((m) => !locked.has(m)), [months, locked])
   const [prod, setProd] = useState<Record<string, number>>(productionByMonth)
   const opening = openingStock
   const [saving, setSaving] = useTransition()
@@ -47,12 +55,12 @@ export function ProductionRow({
 
   const rows = useMemo(
     () => calcRollingBalance(
-      months,
+      activeMonths,
       opening,
       (m) => forecastByMonth[m] ?? 0,
       (m) => prod[m] ?? 0,
     ),
-    [months, opening, forecastByMonth, prod],
+    [activeMonths, opening, forecastByMonth, prod],
   )
 
   function commit(month: string, raw: string) {
@@ -106,6 +114,16 @@ export function ProductionRow({
         </span>
       </td>
 
+      {/* Completed months — forecast + what was produced, no balance. */}
+      {months.filter((m) => locked.has(m)).map((m) => (
+        <ClosedMonthCells
+          key={m}
+          month={m}
+          forecast={forecastByMonth[m] ?? 0}
+          production={prod[m] ?? 0}
+        />
+      ))}
+
       {rows.map((r) => {
         const negCls =
           r.state === 'red'   ? 'bg-red-50'
@@ -137,7 +155,7 @@ export function ProductionRow({
       {/* Total needed — sum of forecast across the rolling year. Lets the
           user see annual demand at a glance: needed − shortfall = covered. */}
       {(() => {
-        const totalNeeded = months.reduce((s, m) => s + (forecastByMonth[m] ?? 0), 0)
+        const totalNeeded = activeMonths.reduce((s, m) => s + (forecastByMonth[m] ?? 0), 0)
         return (
           <td className="px-2 text-right text-xs tabular-nums text-gray-600 bg-gray-50 border-l border-gray-200">
             {totalNeeded > 0 ? totalNeeded.toLocaleString() : <span className="text-gray-300">—</span>}
@@ -159,6 +177,30 @@ export function ProductionRow({
         )
       })()}
     </tr>
+  )
+}
+
+/** One completed month: read-only forecast + production, no balance. */
+function ClosedMonthCells({
+  month, forecast, production,
+}: {
+  month: string
+  forecast: number
+  production: number
+}) {
+  const title = `${monthLabel(month)} is a completed month — read-only`
+  return (
+    <>
+      <td className="px-2 text-right text-xs text-gray-500 border-l border-gray-200 tabular-nums bg-gray-50" style={{ height: 36 }} title={title}>
+        {forecast ? forecast.toLocaleString() : <span className="text-gray-300">0</span>}
+      </td>
+      <td className="px-1 text-right text-xs text-gray-500 tabular-nums bg-gray-50" style={{ height: 36 }} title={title}>
+        {production ? production.toLocaleString() : <span className="text-gray-300">0</span>}
+      </td>
+      <td className="px-2 text-right text-xs text-gray-300 tabular-nums bg-gray-50" style={{ height: 36 }} title="Balance is only tracked from the current planning month">
+        —
+      </td>
+    </>
   )
 }
 

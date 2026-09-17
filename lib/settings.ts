@@ -5,6 +5,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { AppSettings } from '@/lib/types/database.types'
+import { rollingMonths, monthKey } from '@/lib/demand'
 
 export const DEFAULT_FX_RATE = 1.2
 export const DEFAULT_GST_NZ = 0.15
@@ -63,4 +64,66 @@ export async function getPlanningAnchor(): Promise<Date> {
   }
   const now = new Date()
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+}
+
+// ============================================================
+// Planning window — which months the planning screens show.
+//
+// Normally that's the rolling 12 months from the anchor (see
+// getPlanningAnchor): completing a month moves the anchor forward and the
+// closed month disappears. `history` mode prepends the closed months back
+// to the start of the financial year so they can be LOOKED AT — those
+// months are display-only, and the live/editable window is unchanged.
+// ============================================================
+
+/** Odi's financial year starts 1 April (0-based month index). */
+export const FY_START_MONTH_INDEX = 3
+
+/** First day of the financial year that `today` falls in (UTC). */
+export function fiscalYearStart(today: Date = new Date()): Date {
+  const y = today.getUTCFullYear()
+  const inNewFy = today.getUTCMonth() >= FY_START_MONTH_INDEX
+  return new Date(Date.UTC(inNewFy ? y : y - 1, FY_START_MONTH_INDEX, 1))
+}
+
+export interface PlanningWindow {
+  /** Every month to render, oldest first. */
+  months: string[]
+  /** First month of the live planning window — where editing starts. */
+  anchorMonth: string
+  /** Closed months shown only in history mode. Display-only. */
+  lockedMonths: string[]
+  /** True when the caller asked for history AND there is history to show. */
+  isHistory: boolean
+  /** False when the anchor is already at/behind the FY start (nothing to show). */
+  canShowHistory: boolean
+  /** First month of the current financial year. */
+  fyStartMonth: string
+}
+
+export async function getPlanningWindow(showHistory = false): Promise<PlanningWindow> {
+  const anchor  = await getPlanningAnchor()
+  const fyStart = fiscalYearStart()
+  const forward = rollingMonths(undefined, anchor)
+
+  const base = {
+    anchorMonth:  forward[0],
+    canShowHistory: fyStart.getTime() < anchor.getTime(),
+    fyStartMonth: monthKey(fyStart),
+  }
+
+  if (!showHistory || !base.canShowHistory) {
+    return { ...base, months: forward, lockedMonths: [], isHistory: false }
+  }
+
+  const locked: string[] = []
+  for (
+    let d = fyStart;
+    d.getTime() < anchor.getTime();
+    d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
+  ) {
+    locked.push(monthKey(d))
+  }
+
+  return { ...base, months: [...locked, ...forward], lockedMonths: locked, isHistory: true }
 }

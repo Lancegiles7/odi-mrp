@@ -4,11 +4,12 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import {
-  rollingMonths, indexDemand, indexProduction,
+  indexDemand, indexProduction,
   getGrandTotal, getCountryTotal, getProductionCell, monthLabel, calcRollingBalance,
 } from '@/lib/demand'
 import { loadStockLedger, closingStockAt } from '@/lib/stock-movements-data'
-import { getPlanningAnchor } from '@/lib/settings'
+import { getPlanningWindow } from '@/lib/settings'
+import { PlanningHistoryToggle } from '@/components/shared/planning-history-toggle'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
@@ -45,13 +46,16 @@ interface ProdLine {
 }
 
 interface PageProps {
-  searchParams: { view?: string; manufacturer?: string }
+  searchParams: { view?: string; manufacturer?: string; history?: string }
 }
 
 export default async function ProductionPage({ searchParams }: PageProps) {
   const supabase = createClient()
-  const anchor = await getPlanningAnchor()
-  const months = rollingMonths(undefined, anchor)
+  const planning = await getPlanningWindow(searchParams.history === 'fy')
+  const months = planning.months
+  // Balances, shortfalls and totals stay on the live window — a look-back
+  // shows what was forecast/produced but never moves the planning numbers.
+  const activeMonths = planning.months.filter((m) => !planning.lockedMonths.includes(m))
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
@@ -140,10 +144,10 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   // view-all uses the filtered set so the strip respects the manufacturer
   // filter.
   function shortfallCountsFor(items: ProdLine[]) {
-    const totals = new Map<string, number>(months.map((m) => [m, 0]))
-    const shorts = new Map<string, number>(months.map((m) => [m, 0]))
+    const totals = new Map<string, number>(activeMonths.map((m) => [m, 0]))
+    const shorts = new Map<string, number>(activeMonths.map((m) => [m, 0]))
     for (const ln of items) {
-      const rolling = calcRollingBalance(months, ln.opening, (m) => ln.forecastByMonth[m] ?? 0, (m) => ln.productionByMonth[m] ?? 0)
+      const rolling = calcRollingBalance(activeMonths, ln.opening, (m) => ln.forecastByMonth[m] ?? 0, (m) => ln.productionByMonth[m] ?? 0)
       for (const r of rolling) {
         if (r.forecast > 0)    totals.set(r.month, (totals.get(r.month) ?? 0) + 1)
         if (r.state === 'red') shorts.set(r.month, (shorts.get(r.month) ?? 0) + 1)
@@ -170,7 +174,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     let n = 0
     for (const ln of items) {
       let bal = ln.opening
-      for (const m of months) {
+      for (const m of activeMonths) {
         bal = bal + (ln.productionByMonth[m] ?? 0) - (ln.forecastByMonth[m] ?? 0)
         if (bal < 0) n++
       }
@@ -187,10 +191,15 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       <div>
         <h1 className="text-2xl font-semibold">Production schedule</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · Balance = prev + production − forecast
+          {planning.isHistory
+            ? <>Completed months included ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · closed months are read-only, balances run from {monthLabel(planning.anchorMonth)}</>
+            : <>Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · Balance = prev + production − forecast</>}
         </p>
       </div>
       <div className="flex gap-2 items-center">
+        {planning.canShowHistory && (
+          <PlanningHistoryToggle isHistory={planning.isHistory} fromLabel={monthLabel(planning.fyStartMonth)} />
+        )}
         <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
           <Link
             href="/production"
@@ -240,7 +249,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           <span>Opening stock = closing (EOM) of the last closed month from Stock Movements{closedMonthLabel ? ` (${closedMonthLabel})` : ''}.</span>
         </div>
 
-        <MonthlyShortfallStrip months={months} totalsByMonth={pageCounts.totals} shortByMonth={pageCounts.shorts} />
+        <MonthlyShortfallStrip months={activeMonths} totalsByMonth={pageCounts.totals} shortByMonth={pageCounts.shorts} />
 
         {Array.from(manufacturers.entries()).map(([key, items]) => {
           const label = key === UNASSIGNED ? 'Manufacturer not set' : key
@@ -261,7 +270,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
               </summary>
 
               <div className="border-t border-gray-100 overflow-x-auto">
-                <table className="w-full text-xs table-fixed" style={{ minWidth: 3000 }}>
+                <table className="w-full text-xs table-fixed" style={{ minWidth: 600 + months.length * 200 }}>
                   <colgroup>
                     <col style={{ width: 280 }} />
                     <col style={{ width: 100 }} />
@@ -309,6 +318,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                           openingStock={ln.opening}
                           openingSource={closedMonthLabel}
                           months={months}
+                          lockedMonths={planning.lockedMonths}
                           forecastByMonth={ln.forecastByMonth}
                           productionByMonth={ln.productionByMonth}
                           commentedCells={commentedCells}
@@ -335,8 +345,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     products: new Set(filtered.map((ln) => ln.product.id)).size,
     active:   filtered.filter((ln) => ln.product.is_active).length,
     inactive: filtered.filter((ln) => !ln.product.is_active).length,
-    forecast: filtered.reduce((s, ln) => s + months.reduce((a, m) => a + (ln.forecastByMonth[m] ?? 0), 0), 0),
-    production: filtered.reduce((s, ln) => s + months.reduce((a, m) => a + (ln.productionByMonth[m] ?? 0), 0), 0),
+    forecast: filtered.reduce((s, ln) => s + activeMonths.reduce((a, m) => a + (ln.forecastByMonth[m] ?? 0), 0), 0),
+    production: filtered.reduce((s, ln) => s + activeMonths.reduce((a, m) => a + (ln.productionByMonth[m] ?? 0), 0), 0),
     shortfalls: shortfallCount(filtered),
     opening:    filtered.reduce((s, ln) => s + ln.opening, 0),
   }
@@ -361,11 +371,11 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         <Tile label="Opening stock" value={totals.opening.toLocaleString()} sub="units on hand" />
       </div>
 
-      <MonthlyShortfallStrip months={months} totalsByMonth={filteredCounts.totals} shortByMonth={filteredCounts.shorts} />
+      <MonthlyShortfallStrip months={activeMonths} totalsByMonth={filteredCounts.totals} shortByMonth={filteredCounts.shorts} />
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs table-fixed" style={{ minWidth: 3100 }}>
+          <table className="w-full text-xs table-fixed" style={{ minWidth: 700 + months.length * 200 }}>
             <colgroup>
               <col style={{ width: 280 }} />
               <col style={{ width: 110 }} />
@@ -416,6 +426,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                     openingStock={ln.opening}
                     openingSource={closedMonthLabel}
                     months={months}
+                    lockedMonths={planning.lockedMonths}
                     forecastByMonth={ln.forecastByMonth}
                     productionByMonth={ln.productionByMonth}
                     commentedCells={commentedCells}
