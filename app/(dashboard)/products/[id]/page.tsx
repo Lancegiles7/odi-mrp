@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/utils'
-import { calcProductCostSummary, calcBomLineValues } from '@/lib/costing'
+import { calcProductCostSummary, calcBomLineValues, calcLinePriceAu } from '@/lib/costing'
 import { getAppSettings } from '@/lib/settings'
 import { PRODUCT_GROUP_LABELS, ROLES, packagingTypeLabel } from '@/lib/constants'
 import { DeleteProductButton } from '@/components/products/delete-product-button'
@@ -85,6 +85,19 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
   const summary   = calcProductCostSummary(product, bomItems, settings, auBomItems)
+
+  // An Australia-made product is costed on VMC's build, so the BOM shows that
+  // build: its own AU recipe where one exists (else the shared recipe, as the
+  // costing does), each line at its AU landed cost in AUD, totals in AUD with
+  // the NZD conversion alongside. NZ-made and dual products are unchanged.
+  const auMade    = summary.au_made
+  const fxAud     = Number(settings.fx_rates.AUD) || 1
+  const wastage   = Number(product.wastage_pct ?? 0)
+  const shownBom  = auMade && auBomItems.length > 0 ? auBom : activeBom
+  const shownItems: BomItemWithIngredient[] = auMade && auBomItems.length > 0 ? auBomItems : bomItems
+  // AU line cost for one pack (AUD), incl. the product's contingency — sums to the per-pack subtotal.
+  const auLine    = (item: BomItemWithIngredient) => calcLinePriceAu(item, fxAud) * (1 + wastage)
+  const auPerPack = Math.round(shownItems.reduce((t, i) => t + calcLinePriceAu(i, fxAud), 0) * (1 + wastage) * 100) / 100
   const typeLabel = product.product_type ? PRODUCT_GROUP_LABELS[product.product_type] ?? product.product_type : null
 
   // BOM ingredient lines are shown in their supplier currency; the totals are
@@ -119,7 +132,12 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
           <h1 className="mt-2 text-2xl font-semibold text-gray-900">{product.name}</h1>
           <div className="mt-1 flex items-center gap-2 text-xs">
             {typeLabel && <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">{typeLabel}</span>}
-            {summary.is_dual_manufacture && (
+            {summary.au_made && (
+              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-800">
+                Made in Australia · {product.manufacturer_au ?? product.manufacturer ?? 'VMC'}
+              </span>
+            )}
+            {summary.is_dual_manufacture && !summary.au_made && (
               <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700">
                 Dual build · {product.manufacturer ?? 'NZ'} + {product.manufacturer_au ?? 'VMC'}
               </span>
@@ -200,14 +218,16 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             rrp={product.rrp}
             gp={summary.gp_nz} gpAmount={summary.gp_nz_amount}
             cost={summary.nz_grand_total} cos={summary.cos_nz}
-            maker={product.manufacturer}
+            maker={summary.au_made ? (product.manufacturer_au ?? product.manufacturer) : product.manufacturer}
+            tag={summary.au_made ? '= A$ × FX' : undefined}
           />
           <MarketCard
             name="Australia" currency="AUD" headerClass="bg-[#1e3a5f]" sym="A$"
             rrp={product.rrp_au ?? product.rrp}
             gp={summary.gp_au} gpAmount={summary.gp_au_amount}
             cost={summary.au_grand_total} cos={summary.cos_au}
-            maker={summary.is_dual_manufacture ? product.manufacturer_au : product.manufacturer}
+            maker={(summary.is_dual_manufacture || summary.au_made) ? product.manufacturer_au ?? product.manufacturer : product.manufacturer}
+            tag={summary.au_made ? 'source' : undefined}
           />
         </div>
 
@@ -229,7 +249,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         freightAu={Number(product.freight_au ?? product.freight) || 0} freightAuCurrency={product.freight_au_currency ?? 'NZD'}
         rrpExNz={summary.rrp_ex_gst_nz}
         rrpExAu={summary.rrp_ex_gst_au}
-        isDual={summary.is_dual_manufacture}
+        isDual={summary.is_dual_manufacture || summary.au_made}
         auIngredientTotal={summary.au_ingredient_total}
         auToll={summary.au_toll}
         manufacturerNz={product.manufacturer}
@@ -242,19 +262,31 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
           <div>
             <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Bill of materials</h3>
             <div className="text-xs text-gray-500 mt-0.5">
-              {bomItems.length} ingredient{bomItems.length === 1 ? '' : 's'}{activeBom ? ` · Version ${activeBom.version} (active)` : ''}
-              {uniformForeign && <span className="text-gray-400"> · prices in {uniformForeign}, converted to NZD</span>}
+              {shownItems.length} ingredient{shownItems.length === 1 ? '' : 's'}{shownBom ? ` · Version ${shownBom.version} (active)` : ''}
+              {auMade
+                ? <span className="text-gray-400"> · VMC build, AU landed costs in AUD, converted to NZD</span>
+                : uniformForeign && <span className="text-gray-400"> · prices in {uniformForeign}, converted to NZD</span>}
             </div>
           </div>
           <div className="text-right bg-[#f0f4ec] border border-[#dbe7cf] rounded-lg px-4 py-2">
-            <div className="text-[11px] text-[#3b6d11]">Total ingredients · NZD</div>
-            <div className="text-xl font-bold text-[#27500a] tabular-nums">{formatCurrency(summary.ingredient_total)}</div>
-            {uniformForeign && (
-              <div className="text-[11px] text-gray-500">from {fSym}{nativePerServing.toFixed(2)} {uniformForeign}</div>
+            {auMade ? (
+              <>
+                <div className="text-[11px] text-[#3b6d11]">Total ingredients · AUD</div>
+                <div className="text-xl font-bold text-[#27500a] tabular-nums">A${summary.au_ingredient_total.toFixed(2)}</div>
+                <div className="text-[11px] text-gray-500">= {formatCurrency(summary.au_ingredient_total * fxAud)} NZD at {fxAud.toFixed(2)}</div>
+              </>
+            ) : (
+              <>
+                <div className="text-[11px] text-[#3b6d11]">Total ingredients · NZD</div>
+                <div className="text-xl font-bold text-[#27500a] tabular-nums">{formatCurrency(summary.ingredient_total)}</div>
+                {uniformForeign && (
+                  <div className="text-[11px] text-gray-500">from {fSym}{nativePerServing.toFixed(2)} {uniformForeign}</div>
+                )}
+              </>
             )}
           </div>
         </div>
-        {bomItems.length === 0 ? (
+        {shownItems.length === 0 ? (
           <p className="p-5 text-sm text-gray-500">
             No ingredients yet. <Link href={`/products/${params.id}/edit`} className="underline">Open the editor</Link> to add some.
           </p>
@@ -269,22 +301,27 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                   <th className="text-right font-medium px-5 py-2 text-blue-600">Wet g</th>
                   <th className="text-right font-medium px-5 py-2">% of wt</th>
                   <th className="text-right font-medium px-5 py-2">Serve (g)</th>
-                  <th className="text-right font-medium px-5 py-2">$/kg <span className="text-gray-400 normal-case">(supplier)</span></th>
+                  <th className="text-right font-medium px-5 py-2">$/kg <span className="text-gray-400 normal-case">({auMade ? 'AU landed' : 'supplier'})</span></th>
                   <th className="text-right font-medium px-5 py-2">
-                    $/unit <span className="text-gray-400 normal-case">(supplier{product.wastage_pct > 0 ? ` · incl. ${(product.wastage_pct * 100).toFixed(1)}%` : ''})</span>
+                    $/unit <span className="text-gray-400 normal-case">({auMade ? 'AUD' : 'supplier'}{product.wastage_pct > 0 ? ` · incl. ${(product.wastage_pct * 100).toFixed(1)}%` : ''})</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {bomItems.map((item) => {
+                {shownItems.map((item) => {
                   const calc = calcBomLineValues(item, product.size_g ?? 0, product.serving_size ?? 0)
-                  // Per-line price shown in the ingredient's supplier currency.
-                  const cur        = item.ingredients.currency ?? 'NZD'
+                  // Per-line price: the supplier currency for an NZ build; the AU
+                  // landed cost (AUD, incl. freight to Australia) for an AU-made one.
+                  const cur        = auMade ? 'AUD' : (item.ingredients.currency ?? 'NZD')
                   const sym        = curSym(cur)
-                  const nativePerKg   = item.price_override ?? item.ingredients.price ?? 0
+                  const nativePerKg   = auMade
+                    ? (item.ingredients.total_loaded_cost_au ?? Number(item.price_override ?? item.ingredients.total_loaded_cost ?? 0) / fxAud)
+                    : (item.price_override ?? item.ingredients.price ?? 0)
                   // $/unit includes the product's contingency, so the lines sum
                   // straight to the subtotal (no separate wastage line).
-                  const nativePerUnit = calc.unit_in_kg * nativePerKg * (1 + Number(product.wastage_pct ?? 0))
+                  const nativePerUnit = auMade
+                    ? auLine(item)
+                    : calc.unit_in_kg * nativePerKg * (1 + Number(product.wastage_pct ?? 0))
                   return (
                     <tr key={item.id}>
                       <td className="px-5 py-2.5">
@@ -318,12 +355,21 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                     {product.wastage_pct > 0 && <span className="ml-1 text-[10px] text-gray-400 font-normal">incl. {(product.wastage_pct * 100).toFixed(1)}% contingency</span>}
                   </td>
                   <td className="px-5 py-2 text-right tabular-nums">
-                    {bomItems.reduce((s, i) => s + Number(i.quantity_g || 0), 0).toFixed(2)}
+                    {shownItems.reduce((s, i) => s + Number(i.quantity_g || 0), 0).toFixed(2)}
                   </td>
                   <td colSpan={4}></td>
                   <td className="px-5 py-2 text-right font-semibold tabular-nums">
-                    {uniformForeign && <span className="text-gray-500 font-normal">{fSym}{nativePerPack.toFixed(2)} → </span>}
-                    {formatCurrency(summary.ingredient_total_per_pack)}<span className="text-[10px] text-gray-400 font-normal"> NZD</span>
+                    {auMade ? (
+                      <>
+                        <span className="text-gray-500 font-normal">A${auPerPack.toFixed(2)} → </span>
+                        {formatCurrency(auPerPack * fxAud)}<span className="text-[10px] text-gray-400 font-normal"> NZD</span>
+                      </>
+                    ) : (
+                      <>
+                        {uniformForeign && <span className="text-gray-500 font-normal">{fSym}{nativePerPack.toFixed(2)} → </span>}
+                        {formatCurrency(summary.ingredient_total_per_pack)}<span className="text-[10px] text-gray-400 font-normal"> NZD</span>
+                      </>
+                    )}
                   </td>
                 </tr>
 
@@ -335,14 +381,25 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                         × Serving multiplier ({summary.serving_multiplier.toFixed(2)}× — serving {product.serving_size} g ÷ pack {product.size_g} g)
                       </td>
                       <td className="px-5 py-2 text-right text-xs tabular-nums">
-                        {formatCurrency(summary.ingredient_total - summary.ingredient_total_per_pack)}
+                        {auMade
+                          ? `A$${(summary.au_ingredient_total - auPerPack).toFixed(2)}`
+                          : formatCurrency(summary.ingredient_total - summary.ingredient_total_per_pack)}
                       </td>
                     </tr>
                     <tr>
                       <td colSpan={7} className="px-5 py-2 font-medium">Ingredient total (per serving)</td>
                       <td className="px-5 py-2 text-right font-semibold tabular-nums">
-                        {uniformForeign && <span className="text-gray-500 font-normal">{fSym}{nativePerServing.toFixed(2)} → </span>}
-                        {formatCurrency(summary.ingredient_total)}<span className="text-[10px] text-gray-400 font-normal"> NZD</span>
+                        {auMade ? (
+                          <>
+                            <span className="text-gray-500 font-normal">A${summary.au_ingredient_total.toFixed(2)} → </span>
+                            {formatCurrency(summary.au_ingredient_total * fxAud)}<span className="text-[10px] text-gray-400 font-normal"> NZD</span>
+                          </>
+                        ) : (
+                          <>
+                            {uniformForeign && <span className="text-gray-500 font-normal">{fSym}{nativePerServing.toFixed(2)} → </span>}
+                            {formatCurrency(summary.ingredient_total)}<span className="text-[10px] text-gray-400 font-normal"> NZD</span>
+                          </>
+                        )}
                       </td>
                     </tr>
                   </>
@@ -432,17 +489,19 @@ function LineItem({ label, value }: { label: string; value: number | null }) {
 
 // Per-market cost card: RRP (inc GST) → GP (% · $) → Cost ($ · %).
 function MarketCard({
-  name, currency, headerClass, sym, rrp, gp, gpAmount, cost, cos, maker,
+  name, currency, headerClass, sym, rrp, gp, gpAmount, cost, cos, maker, tag,
 }: {
   name: string; currency: string; headerClass: string; sym: string
   rrp: number | null; gp: number | null; gpAmount: number | null
-  cost: number; cos: number | null; maker?: string | null
+  cost: number; cos: number | null; maker?: string | null; tag?: string
 }) {
   const money = (v: number) => `${sym}${Number(v).toFixed(2)}`
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <div className={`${headerClass} text-white px-3.5 py-2 text-sm font-semibold flex items-baseline justify-between`}>
-        <span>{name} <span className="text-xs text-white/50 font-normal">{currency}</span></span>
+        <span>{name} <span className="text-xs text-white/50 font-normal">{currency}</span>
+          {tag && <span className="ml-1.5 text-[10px] uppercase tracking-wide bg-white/20 rounded px-1.5 py-0.5 align-middle">{tag}</span>}
+        </span>
         {maker && <span className="text-[11px] text-white/70 font-normal">{maker}</span>}
       </div>
       <div className="p-3.5">
