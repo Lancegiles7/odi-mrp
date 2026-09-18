@@ -408,8 +408,10 @@ export async function addAuBuild(productId: string): Promise<{ ok: boolean; erro
 // ============================================================
 // copyRecipe — make one build's recipe match the other's.
 // Replaces the target build's ingredient lines with a copy of the source's
-// SAVED lines (packaging is untouched). The new lines go in before the old
-// ones are removed, so a failed copy never leaves the target recipe empty.
+// SAVED lines (packaging is untouched). A recipe can't hold the same
+// ingredient twice, so the old lines must go before the new ones are written;
+// they're read in full first and put back if the copy fails, so a failed copy
+// never leaves the target recipe empty.
 // ============================================================
 export async function copyRecipe(
   productId: string,
@@ -429,26 +431,31 @@ export async function copyRecipe(
   const dst = from === 'NZ' ? au : nz
   if (!src || !dst) return { ok: false, error: 'Both an NZ and an AU recipe are needed to copy between them.' }
 
+  const cols = 'ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order'
   const { data: srcItems, error: readErr } = await supabase
-    .from('bom_items')
-    .select('ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order')
-    .eq('bom_id', src.id) as { data: Array<Record<string, unknown>> | null; error: { message: string } | null }
+    .from('bom_items').select(cols).eq('bom_id', src.id) as
+    { data: Array<Record<string, unknown>> | null; error: { message: string } | null }
   if (readErr) return { ok: false, error: readErr.message }
 
-  const { data: oldItems } = await supabase
-    .from('bom_items').select('id').eq('bom_id', dst.id) as { data: Array<{ id: string }> | null }
+  // Snapshot the target's current lines so they can be restored on failure.
+  const { data: oldItems, error: oldErr } = await supabase
+    .from('bom_items').select(cols).eq('bom_id', dst.id) as
+    { data: Array<Record<string, unknown>> | null; error: { message: string } | null }
+  if (oldErr) return { ok: false, error: oldErr.message }
+
+  const { error: delErr } = await supabase.from('bom_items').delete().eq('bom_id', dst.id)
+  if (delErr) return { ok: false, error: delErr.message }
 
   if (srcItems && srcItems.length > 0) {
     const { error: insErr } = await supabase
       .from('bom_items')
       .insert(srcItems.map((it) => ({ ...it, bom_id: dst.id })))
-    if (insErr) return { ok: false, error: insErr.message }
-  }
-
-  const oldIds = (oldItems ?? []).map((i) => i.id)
-  if (oldIds.length > 0) {
-    const { error: delErr } = await supabase.from('bom_items').delete().in('id', oldIds)
-    if (delErr) return { ok: false, error: delErr.message }
+    if (insErr) {
+      if (oldItems && oldItems.length > 0) {
+        await supabase.from('bom_items').insert(oldItems.map((it) => ({ ...it, bom_id: dst.id })))
+      }
+      return { ok: false, error: `Copy failed, recipe left as it was: ${insErr.message}` }
+    }
   }
 
   revalidatePath(`/products/${productId}`)
