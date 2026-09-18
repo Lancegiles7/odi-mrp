@@ -244,6 +244,8 @@ export type Database = {
           price: number | null
           freight: number | null
           total_loaded_cost: number | null
+          price_au: number | null
+          freight_au: number | null
           total_loaded_cost_au: number | null
           is_organic: boolean
           category: string
@@ -268,6 +270,8 @@ export type Database = {
           price?: number | null
           freight?: number | null
           total_loaded_cost?: number | null
+          price_au?: number | null
+          freight_au?: number | null
           total_loaded_cost_au?: number | null
           is_organic?: boolean
           category?: string
@@ -292,6 +296,8 @@ export type Database = {
           price?: number | null
           freight?: number | null
           total_loaded_cost?: number | null
+          price_au?: number | null
+          freight_au?: number | null
           total_loaded_cost_au?: number | null
           is_organic?: boolean
           category?: string
