@@ -7,6 +7,7 @@ import { ProductForm } from '@/components/products/product-form'
 import { BomEditor } from '@/components/products/bom-editor'
 import { ProductPackagingBom } from '@/components/packaging/product-packaging-bom'
 import { AuBuildButton } from '@/components/products/au-build-button'
+import { CopyRecipeButton } from '@/components/products/copy-recipe-button'
 import { getAppSettings } from '@/lib/settings'
 import type {
   BomItemWithIngredient,
@@ -126,16 +127,22 @@ export default async function EditProductPage({ params, searchParams }: PageProp
             <h3 className="text-sm font-semibold text-gray-900">Ingredients / BOM</h3>
             {nzBom && <p className="text-xs text-gray-400 mt-0.5">Version {nzBom.version} (active)</p>}
           </div>
+          <div className="flex items-center gap-2">
+          {hasAuBuild && nzBom && <CopyRecipeButton productId={params.id} from="AU" />}
           <Link
             href={`/ingredients/new?return_to=${encodeURIComponent(`/products/${params.id}/edit`)}`}
             className="text-sm px-2.5 py-1 border border-gray-900 bg-gray-900 text-white rounded-md hover:bg-gray-800"
           >
             + Create new ingredient
           </Link>
+          </div>
         </div>
 
         {nzBom ? (
           <BomEditor
+            // Keyed on its saved lines so a copy from the other recipe remounts
+            // the editor with the new lines instead of keeping the old state.
+            key={nzItems.map((i) => i.id).join()}
             bomId={nzBom.id}
             initialItems={nzItems}
             ingredients={allIngredients}
@@ -175,9 +182,11 @@ export default async function EditProductPage({ params, searchParams }: PageProp
                 <h3 className="text-sm font-semibold text-gray-900">Ingredients / BOM — AU</h3>
                 <p className="text-xs text-gray-400 mt-0.5">Seeded from NZ · edit only what VMC sources differently</p>
               </div>
+              {nzBom && <CopyRecipeButton productId={params.id} from="NZ" />}
             </div>
             {auBom && (
               <BomEditor
+                key={auItems.map((i) => i.id).join()}
                 bomId={auBom.id}
                 initialItems={auItems}
                 ingredients={allIngredients}

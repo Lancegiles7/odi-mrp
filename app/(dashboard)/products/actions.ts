@@ -406,6 +406,57 @@ export async function addAuBuild(productId: string): Promise<{ ok: boolean; erro
 }
 
 // ============================================================
+// copyRecipe — make one build's recipe match the other's.
+// Replaces the target build's ingredient lines with a copy of the source's
+// SAVED lines (packaging is untouched). The new lines go in before the old
+// ones are removed, so a failed copy never leaves the target recipe empty.
+// ============================================================
+export async function copyRecipe(
+  productId: string,
+  from: 'NZ' | 'AU',
+): Promise<{ ok: boolean; error?: string; copied?: number }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  // Untagged rows count as the NZ build.
+  const { data: boms } = await supabase
+    .from('boms').select('id, market').eq('product_id', productId).eq('is_active', true) as
+    { data: Array<{ id: string; market: string | null }> | null }
+  const nz = (boms ?? []).find((b) => (b.market ?? 'NZ') === 'NZ')
+  const au = (boms ?? []).find((b) => b.market === 'AU')
+  const src = from === 'NZ' ? nz : au
+  const dst = from === 'NZ' ? au : nz
+  if (!src || !dst) return { ok: false, error: 'Both an NZ and an AU recipe are needed to copy between them.' }
+
+  const { data: srcItems, error: readErr } = await supabase
+    .from('bom_items')
+    .select('ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order')
+    .eq('bom_id', src.id) as { data: Array<Record<string, unknown>> | null; error: { message: string } | null }
+  if (readErr) return { ok: false, error: readErr.message }
+
+  const { data: oldItems } = await supabase
+    .from('bom_items').select('id').eq('bom_id', dst.id) as { data: Array<{ id: string }> | null }
+
+  if (srcItems && srcItems.length > 0) {
+    const { error: insErr } = await supabase
+      .from('bom_items')
+      .insert(srcItems.map((it) => ({ ...it, bom_id: dst.id })))
+    if (insErr) return { ok: false, error: insErr.message }
+  }
+
+  const oldIds = (oldItems ?? []).map((i) => i.id)
+  if (oldIds.length > 0) {
+    const { error: delErr } = await supabase.from('bom_items').delete().in('id', oldIds)
+    if (delErr) return { ok: false, error: delErr.message }
+  }
+
+  revalidatePath(`/products/${productId}`)
+  revalidatePath(`/products/${productId}/edit`)
+  return { ok: true, copied: srcItems?.length ?? 0 }
+}
+
+// ============================================================
 // removeAuBuild — drop the AU build entirely (back to NZ-only).
 // ============================================================
 export async function removeAuBuild(productId: string): Promise<{ ok: boolean; error?: string }> {
