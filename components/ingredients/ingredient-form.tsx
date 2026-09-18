@@ -53,11 +53,6 @@ export function IngredientForm({
   const [price, setPrice] = useState(ingredient?.price?.toString() ?? '')
   const [freight, setFreight] = useState(ingredient?.freight?.toString() ?? '')
 
-  // Only an existing ingredient whose price or freight actually moved needs a reason.
-  const priceMoved = !!ingredient?.id && (
-    (price.trim()   === '' ? null : Number(price))   !== (ingredient.price ?? null) ||
-    (freight.trim() === '' ? null : Number(freight)) !== (ingredient.freight ?? null)
-  )
   const [currency, setCurrency] = useState<CurrencyCode>(
     (((ingredient as unknown as { currency?: string })?.currency as CurrencyCode) ?? 'NZD'),
   )
@@ -68,6 +63,12 @@ export function IngredientForm({
     (ingredient as unknown as { fx_rate_override?: number | null })?.fx_rate_override?.toString() ?? '',
   )
   const [totalLoaded, setTotalLoaded] = useState(ingredient?.total_loaded_cost?.toString() ?? '')
+  const [priceAu, setPriceAu] = useState(
+    (ingredient as unknown as { price_au?: number | null })?.price_au?.toString() ?? '',
+  )
+  const [freightAu, setFreightAu] = useState(
+    (ingredient as unknown as { freight_au?: number | null })?.freight_au?.toString() ?? '',
+  )
   const [loadedAu, setLoadedAu] = useState(
     (ingredient as unknown as { total_loaded_cost_au?: number | null })?.total_loaded_cost_au?.toString() ?? '',
   )
@@ -75,12 +76,48 @@ export function IngredientForm({
   const fxFromTable = fxRates[currency] ?? 1
   const effectiveFx = fxOverride.trim() === '' ? fxFromTable : (Number(fxOverride) || fxFromTable)
 
+  // AUD per 1 NZD comes from the settings AUD rate (NZD per 1 AUD), never the
+  // per-ingredient override — that override belongs to the purchase currency.
+  const fxAud = fxRates.AUD ?? 1
+
+  // The purchase price expressed in AUD. An AUD buy is already AUD; anything
+  // else goes to NZD at this ingredient's effective rate, then to AUD.
+  const pricedInAud = (() => {
+    const p = parseFloat(price)
+    if (isNaN(p)) return null
+    if (currency === 'AUD') return p
+    return fxAud > 0 ? (p * effectiveFx) / fxAud : p
+  })()
+
+  // Only an AU price or freight that was actually entered drives the AU landed
+  // cost. Both blank leaves whatever is in the box alone, so ingredients set up
+  // before this screen existed keep their hand-typed figure as an override.
+  const auEntered = priceAu.trim() !== '' || freightAu.trim() !== ''
+
+  // Only an existing ingredient whose entered prices actually moved needs a
+  // reason — NZ or AU, since both now feed a cost build.
+  const num = (v: string) => (v.trim() === '' ? null : Number(v))
+  const ingAu = ingredient as unknown as { price_au?: number | null; freight_au?: number | null }
+  const priceMoved = !!ingredient?.id && (
+    num(price)     !== (ingredient.price ?? null)   ||
+    num(freight)   !== (ingredient.freight ?? null) ||
+    num(priceAu)   !== (ingAu?.price_au ?? null)    ||
+    num(freightAu) !== (ingAu?.freight_au ?? null)
+  )
+
   useEffect(() => {
     const p = parseFloat(price)
     const f = parseFloat(freight)
     const loaded = (isNaN(p) ? 0 : p * effectiveFx) + (isNaN(f) ? 0 : f)
     if (!isNaN(p) || !isNaN(f)) setTotalLoaded(loaded.toFixed(2))
   }, [price, freight, effectiveFx])
+
+  useEffect(() => {
+    if (!auEntered) return
+    const pa = priceAu.trim() === '' ? (pricedInAud ?? 0) : (parseFloat(priceAu) || 0)
+    const fa = parseFloat(freightAu)
+    setLoadedAu((pa + (isNaN(fa) ? 0 : fa)).toFixed(4))
+  }, [priceAu, freightAu, pricedInAud, auEntered])
 
   const cancelHref = returnTo ? returnTo : '/ingredients'
 
@@ -347,6 +384,11 @@ export function IngredientForm({
           </div>
         </div>
 
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">New Zealand build</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">NZD</span>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1.5">Price <span className="ml-1 text-xs text-gray-400">({currency})</span></label>
@@ -364,10 +406,11 @@ export function IngredientForm({
                 className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
               />
             </div>
+            <p className="text-xs text-gray-400 mt-1">What you pay the supplier, in their currency.</p>
           </div>
 
           <div>
-            <label htmlFor="freight" className="block text-sm font-medium text-gray-700 mb-1.5">Freight <span className="ml-1 text-xs text-gray-400">(NZD)</span></label>
+            <label htmlFor="freight" className="block text-sm font-medium text-gray-700 mb-1.5">Freight to NZ <span className="ml-1 text-xs text-gray-400">(NZD)</span></label>
             <div className="relative">
               <span className="absolute left-3 top-2 text-sm text-gray-400">$</span>
               <input
@@ -382,11 +425,12 @@ export function IngredientForm({
                 className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
               />
             </div>
+            <p className="text-xs text-gray-400 mt-1">Cost of getting it to the NZ factory, in NZD.</p>
           </div>
 
           <div>
             <label htmlFor="total_loaded_cost" className="block text-sm font-medium text-gray-700 mb-1.5">
-              Total Loaded Cost <span className="ml-1 text-xs text-gray-400">(NZD · price × FX + freight)</span>
+              NZ landed cost <span className="ml-1 text-xs text-gray-400">(NZD · price × FX + freight)</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-2 text-sm text-gray-400">$</span>
@@ -425,36 +469,99 @@ export function IngredientForm({
           </div>
         )}
 
-        {/* Australian landed cost — for dual-made products (e.g. VMC). Optional. */}
-        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="sm:col-span-1">
-            <label htmlFor="total_loaded_cost_au" className="block text-sm font-medium text-gray-700 mb-1.5">
-              AU landed cost <span className="ml-1 text-xs text-gray-400">(AUD · optional)</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-sm text-gray-400">A$</span>
-              <input
-                id="total_loaded_cost_au"
-                name="total_loaded_cost_au"
-                type="number"
-                step="0.0001"
-                min="0"
-                value={loadedAu}
-                onChange={(e) => setLoadedAu(e.target.value)}
-                placeholder="—"
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              />
+        {/* Australian build — mirrors the NZ block above. Used when a product is
+            made in Australia (e.g. by VMC). Leave it all blank and the AU build
+            falls back to the NZ landed cost converted at FX. */}
+        <div className="mt-5 pt-5 border-t border-gray-100">
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Australian build</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">AUD</span>
+            <span className="text-[11px] text-gray-400">
+              Used when a product is made in Australia. Leave the whole block blank and the AU build uses the NZ cost converted at FX.
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="price_au" className="block text-sm font-medium text-gray-700 mb-1.5">
+                AU price <span className="ml-1 text-xs text-gray-400">(AUD · optional)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-sm text-gray-400">A$</span>
+                <input
+                  id="price_au"
+                  name="price_au"
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  value={priceAu}
+                  onChange={(e) => setPriceAu(e.target.value)}
+                  placeholder={pricedInAud != null ? pricedInAud.toFixed(4) : '0.00'}
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Blank = the same buy as NZ, shown converted. Fill it in only if the AU supplier charges something different.
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="freight_au" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Freight to AU <span className="ml-1 text-xs text-gray-400">(AUD)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-sm text-gray-400">A$</span>
+                <input
+                  id="freight_au"
+                  name="freight_au"
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  value={freightAu}
+                  onChange={(e) => setFreightAu(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Cost of getting it to the Australian factory, in AUD.</p>
+            </div>
+
+            <div>
+              <label htmlFor="total_loaded_cost_au" className="block text-sm font-medium text-gray-700 mb-1.5">
+                AU landed cost <span className="ml-1 text-xs text-gray-400">(AUD{auEntered ? ' · AU price + freight' : ' · optional'})</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-sm text-gray-400">A$</span>
+                <input
+                  id="total_loaded_cost_au"
+                  name="total_loaded_cost_au"
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  value={loadedAu}
+                  onChange={(e) => setLoadedAu(e.target.value)}
+                  placeholder="—"
+                  className={`w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 ${auEntered ? 'bg-gray-50' : ''}`}
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                {auEntered ? 'Override if needed' : 'Blank = AU build uses the NZ cost ÷ FX'}
+              </p>
             </div>
           </div>
-          <div className="sm:col-span-2 flex items-end">
-            <p className="text-xs text-gray-400 mb-1.5">
-              Cost in Australia (AUD) when this ingredient is sourced for a product made there (e.g. by VMC) — a different AU supplier, or the NZ cost plus freight to Australia. Leave blank and the AU build uses the NZ cost converted at FX.
+
+          {/* A zero here is taken literally — the ingredient would cost nothing
+              in the AU build. Blank is what falls back to the NZ cost. */}
+          {!auEntered && loadedAu.trim() !== '' && Number(loadedAu) === 0 && (
+            <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              An AU landed cost of zero means this ingredient is free in the Australian build. Clear the box entirely to fall back to the NZ cost instead.
             </p>
-          </div>
+          )}
         </div>
+
         {isEdit && (
           <p className="mt-3 text-xs text-gray-500">
-            A price change is recorded in the history ledger on save (any change to Price, Freight, or Total Loaded Cost).
+            A price change is recorded in the history ledger on save (any change to Price or Freight, NZ or AU).
           </p>
         )}
       </div>

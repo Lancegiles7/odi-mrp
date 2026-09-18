@@ -41,6 +41,7 @@ export const ENTITY_BADGE: Record<PriceEntity, string> = {
 export const FIELD_LABELS: Record<string, string> = {
   price:                'Price',
   freight:              'Freight',
+  price_au:             'Price (AU)',
   freight_per_unit_nzd: 'Freight per unit',
   cost_per_unit:        'Cost per unit',
   currency:             'Currency',

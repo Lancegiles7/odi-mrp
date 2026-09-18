@@ -137,6 +137,11 @@ interface IngredientPayload {
   /** Transient — the trigger copies it into price_history and clears it. */
   price_change_reason: string | null
   total_loaded_cost: number | null
+  /** Australian build — entered price + freight (AUD), and the landed cost
+   *  they derive. Blank price/freight leaves the landed cost as typed, so
+   *  ingredients set up before this screen existed keep their override. */
+  price_au: number | null
+  freight_au: number | null
   total_loaded_cost_au: number | null
   unit_of_measure: string | null
   description: string | null
@@ -174,16 +179,20 @@ async function buildPayloadFromForm(
   const currencyRaw = ((formData.get('currency') as string) ?? 'NZD').trim().toUpperCase()
   const currency = SUPPORTED_CURRENCIES_SET.has(currencyRaw) ? currencyRaw : 'NZD'
 
+  const priceAu   = parseNumeric(formData.get('price_au'))
+  const freightAu = parseNumeric(formData.get('freight_au'))
+
+  // Settings rates — needed for the purchase currency (unless overridden) and
+  // always for AUD, which converts the NZ buy into the Australian build.
+  const { getAppSettings } = await import('@/lib/settings')
+  const settings = await getAppSettings()
+
   // Resolve FX: per-ingredient override beats settings table
   let fx = 1
   if (currency !== 'NZD') {
-    if (fxOverride != null && fxOverride > 0) {
-      fx = fxOverride
-    } else {
-      const { getAppSettings } = await import('@/lib/settings')
-      const s = await getAppSettings()
-      fx = s.fx_rates[currency as keyof typeof s.fx_rates] ?? 1
-    }
+    fx = fxOverride != null && fxOverride > 0
+      ? fxOverride
+      : (settings.fx_rates[currency as keyof typeof settings.fx_rates] ?? 1)
   }
 
   // Authoritative total_loaded_cost = price × FX + freight (NZD)
@@ -192,6 +201,20 @@ async function buildPayloadFromForm(
   const total_loaded_cost = price == null && freight == null
     ? parseNumeric(formData.get('total_loaded_cost'))
     : Number(loadedNzd.toFixed(4))
+
+  // Australian landed cost = AU price + AU freight (AUD). The AU price falls
+  // back to the purchase price converted to AUD — an AUD buy is already AUD;
+  // anything else goes to NZD at this ingredient's rate, then to AUD at the
+  // settings AUD rate (never the per-ingredient override, which belongs to the
+  // purchase currency). With neither AU field entered we keep whatever landed
+  // cost was typed, so pre-existing overrides survive untouched.
+  const fxAud = Number(settings.fx_rates?.AUD) || 1
+  const priceInAud = price == null
+    ? null
+    : currency === 'AUD' ? price : (fxAud > 0 ? (price * fx) / fxAud : price)
+  const total_loaded_cost_au = priceAu == null && freightAu == null
+    ? parseNumeric(formData.get('total_loaded_cost_au'))
+    : Number((((priceAu ?? priceInAud ?? 0)) + (freightAu ?? 0)).toFixed(4))
 
   return {
     sku_code:           sku,
@@ -204,7 +227,9 @@ async function buildPayloadFromForm(
     price_change_reason: str(formData.get('price_change_reason')),
     freight,
     total_loaded_cost,
-    total_loaded_cost_au: parseNumeric(formData.get('total_loaded_cost_au')),
+    price_au:   priceAu,
+    freight_au: freightAu,
+    total_loaded_cost_au,
     unit_of_measure:    str(formData.get('unit_of_measure')),
     description:        str(formData.get('description')),
     is_organic:         (formData.get('is_organic') as string) !== 'false',
