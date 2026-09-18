@@ -336,11 +336,18 @@ export const INGREDIENT_STATUSES = [
 
 // Ingredient category — directly purchased vs supplied by a contract
 // manufacturer. Snack ingredients are priced in AUD. Add new buckets here
-// (and to the DB CHECK in migration 039) as other manufacturer groups appear.
+// (and to the DB CHECK, last widened in migration 069) as they appear.
 export const INGREDIENT_CATEGORIES = [
-  { value: 'purchased', label: 'Purchased', chip: 'bg-gray-100 text-gray-600'  },
-  { value: 'snack',     label: 'Snack',     chip: 'bg-amber-100 text-amber-800' },
+  { value: 'purchased',             label: 'Purchased',             chip: 'bg-gray-100 text-gray-600'  },
+  { value: 'snack',                 label: 'Snack',                 chip: 'bg-amber-100 text-amber-800' },
+  { value: 'manufacturer_supplied', label: 'Manufacturer supplied', chip: 'bg-sky-100 text-sky-800'     },
 ] as const
+
+// Only these are bought by Odi, so only these appear in procurement: Stock
+// Movements, Ingredient Demand, the dashboard ingredient strip and the PO
+// picker. Every other category is supplied by the manufacturer — it still
+// costs in the BOM, but there's nothing for Odi to order or count.
+export const PROCURED_INGREDIENT_CATEGORY = 'purchased'
 
 export const INGREDIENT_CATEGORY_LABELS: Record<string, string> =
   Object.fromEntries(INGREDIENT_CATEGORIES.map((c) => [c.value, c.label]))

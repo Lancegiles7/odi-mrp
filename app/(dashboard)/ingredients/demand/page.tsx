@@ -15,6 +15,7 @@ import { IngredientDemandRow } from '@/components/ingredients/ingredient-demand-
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 import { getIngredientOpeningStockSummary } from '@/lib/opening-stock-summary'
+import { PROCURED_INGREDIENT_CATEGORY } from '@/lib/constants'
 
 export const metadata: Metadata = { title: 'Ingredient demand' }
 
@@ -59,7 +60,9 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       .is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; size_g: number | null; wet_weight_g: number | null; wastage_pct: number | null }> | null }>,
     supabase.from('ingredients')
       .select('id, sku_code, name, unit_of_measure, supplier_id, opening_stock_override, opening_stock_override_au, is_active')
-      .eq('is_active', true) as unknown as Promise<{ data: Array<{
+      .eq('is_active', true)
+      // Only what Odi buys — manufacturer-supplied / snack ingredients have nothing to order.
+      .eq('category', PROCURED_INGREDIENT_CATEGORY) as unknown as Promise<{ data: Array<{
         id: string; sku_code: string; name: string; unit_of_measure: string | null;
         supplier_id: string | null; opening_stock_override: number | null; opening_stock_override_au: number | null; is_active: boolean
       }> | null }>,

@@ -7,6 +7,7 @@ import { loadSrtByProduct } from '@/lib/transfer-orders'
 import { ReceiptHistory } from '@/components/purchase-orders/receipt-history'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
 import { getAppSettings } from '@/lib/settings'
+import { PROCURED_INGREDIENT_CATEGORY } from '@/lib/constants'
 
 // Always render live data so a just-saved receipt shows immediately.
 export const dynamic = 'force-dynamic'
@@ -45,9 +46,9 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       .select('id, name, payment_terms, email, phone, currency')
       .order('name') as unknown as Promise<{ data: Array<{ id: string; name: string; payment_terms: string | null; email: string | null; phone: string | null; currency: string | null }> | null }>,
     supabase.from('ingredients')
-      .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price')
+      .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price, category')
       .eq('is_active', true)
-      .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_sku_code: string | null; supplier_pack_size: number | null; supplier_pack_unit: string | null; price: number | null }> | null }>,
+      .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_sku_code: string | null; supplier_pack_size: number | null; supplier_pack_unit: string | null; price: number | null; category: string | null }> | null }>,
     supabase.from('products')
       .select('id, sku_code, name')
       .is('deleted_at', null)
@@ -138,6 +139,13 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
   const settings = await getAppSettings()
   const fxRate = Number(settings.fx_rates?.AUD) || 1.2
 
+  // The picker offers only what Odi buys, but an ingredient already on this PO
+  // stays in the list so the existing line still shows its name and details.
+  const onThisPo = new Set((lines ?? []).map((l) => l.ingredient_id).filter(Boolean))
+  const orderableIngredients = (ingredients ?? []).filter(
+    (i) => (i.category ?? PROCURED_INGREDIENT_CATEGORY) === PROCURED_INGREDIENT_CATEGORY || onThisPo.has(i.id),
+  )
+
   const initialLines: POLineInput[] = (lines ?? []).map((l) => ({
     id: l.id,
     line_type:
@@ -177,7 +185,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       initialLines={initialLines}
       status={po.status}
       suppliers={suppliers ?? []}
-      ingredients={ingredients ?? []}
+      ingredients={orderableIngredients}
       products={products ?? []}
       packaging={packaging ?? []}
       deliveryAddresses={addresses ?? []}

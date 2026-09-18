@@ -189,7 +189,10 @@ export function IngredientForm({
               ))}
             </select>
             {category === 'snack' && (
-              <p className="text-xs text-gray-400 mt-1">Supplied by the snack manufacturer · priced in AUD.</p>
+              <p className="text-xs text-gray-400 mt-1">Supplied by the snack manufacturer · priced in AUD. Not ordered or stock-counted by Odi.</p>
+            )}
+            {category === 'manufacturer_supplied' && (
+              <p className="text-xs text-gray-400 mt-1">Bought by the manufacturer · still costs in the BOM, but left out of Stock Movements, Ingredient Demand and POs.</p>
             )}
           </div>
 

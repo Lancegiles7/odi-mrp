@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { POForm } from '@/components/purchase-orders/po-form'
 import { generatePoNumber } from '@/app/(dashboard)/purchase-orders/actions'
 import { getAppSettings } from '@/lib/settings'
+import { PROCURED_INGREDIENT_CATEGORY } from '@/lib/constants'
 
 export const metadata: Metadata = { title: 'New purchase order' }
 
@@ -18,6 +19,8 @@ export default async function NewPurchaseOrderPage() {
       .select('id, sku_code, name, unit_of_measure, supplier_sku_code, supplier_pack_size, supplier_pack_unit, price, currency')
       .eq('is_active', true)
       .is('deleted_at', null)
+      // Only what Odi buys — manufacturer-supplied / snack ingredients aren't ordered.
+      .eq('category', PROCURED_INGREDIENT_CATEGORY)
       .order('name') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_sku_code: string | null; supplier_pack_size: number | null; supplier_pack_unit: string | null; price: number | null; currency: string | null }> | null }>,
     supabase.from('products')
       .select('id, sku_code, name')
