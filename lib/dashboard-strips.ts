@@ -18,7 +18,7 @@ import {
 } from '@/lib/ingredient-demand'
 import { aggregatePackagingDemand, monthShortfallStates as pkgStates } from '@/lib/packaging-demand'
 import { calcProductCostSummary } from '@/lib/costing'
-import { PRODUCT_GROUPS } from '@/lib/constants'
+import { PRODUCT_GROUPS, PROCURED_INGREDIENT_CATEGORY } from '@/lib/constants'
 import type { SettingsSnapshot } from '@/lib/settings'
 import type { BomItemWithIngredient } from '@/lib/types/database.types'
 
@@ -95,7 +95,8 @@ export async function loadIngredientStrip(sb: SB, months: string[], first: strin
     all<Array<{ id: string; sku_code: string; name: string; size_g: number | null; wet_weight_g: number | null }>>(
       sb.from('products').select('id, sku_code, name, size_g, wet_weight_g, wastage_pct').is('deleted_at', null)),
     all<Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_id: string | null; opening_stock_override: number | null; is_active: boolean }>>(
-      sb.from('ingredients').select('id, sku_code, name, unit_of_measure, supplier_id, opening_stock_override, is_active').eq('is_active', true)),
+      sb.from('ingredients').select('id, sku_code, name, unit_of_measure, supplier_id, opening_stock_override, is_active').eq('is_active', true)
+        .eq('category', PROCURED_INGREDIENT_CATEGORY)),
     all<Array<{ id: string; name: string }>>(sb.from('suppliers').select('id, name')),
     all<Array<{ id: string; product_id: string; is_active: boolean; market: string | null }>>(sb.from('boms').select('id, product_id, is_active, market').eq('is_active', true)),
     all<Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null; unit_quantity: number | null }>>(

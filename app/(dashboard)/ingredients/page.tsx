@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/utils'
 import { StatusBadge } from '@/components/ingredients/status-badge'
 import { IngredientsSearch } from '@/components/ingredients/ingredients-search'
-import { INGREDIENT_CERTIFICATIONS } from '@/lib/constants'
+import { INGREDIENT_CERTIFICATIONS, INGREDIENT_CATEGORIES } from '@/lib/constants'
 import type { IngredientStatus, IngredientCertification, ProductGroup } from '@/lib/types/database.types'
 
 export const metadata: Metadata = { title: 'Ingredients' }
@@ -217,9 +217,12 @@ export default async function IngredientsPage({ searchParams }: PageProps) {
                       </td>
                       <td className="px-4 py-2.5 font-medium text-gray-900">
                         <Link href={`/ingredients/${ing.id}`} className="hover:underline">{ing.name}</Link>
-                        {ing.category === 'snack' && (
-                          <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800">Snack</span>
-                        )}
+                        {(() => {
+                          const cat = ing.category !== 'purchased' && INGREDIENT_CATEGORIES.find((c) => c.value === ing.category)
+                          return cat ? (
+                            <span className={`ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${cat.chip}`}>{cat.label}</span>
+                          ) : null
+                        })()}
                       </td>
                       <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">
                         {supplierName ?? <span className="text-gray-300">—</span>}

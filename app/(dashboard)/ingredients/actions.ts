@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { ROLES, SOFT_DELETE_WINDOW_DAYS } from '@/lib/constants'
+import { ROLES, SOFT_DELETE_WINDOW_DAYS, INGREDIENT_CATEGORIES } from '@/lib/constants'
 import type { IngredientStatus, PriceChangeReason } from '@/lib/types/database.types'
 
 // ============================================================
@@ -165,6 +165,7 @@ interface IngredientPayload {
 }
 
 const SUPPORTED_CURRENCIES_SET = new Set(['NZD', 'AUD', 'USD', 'EUR', 'GBP'])
+const INGREDIENT_CATEGORY_VALUES = new Set<string>(INGREDIENT_CATEGORIES.map((c) => c.value))
 
 async function buildPayloadFromForm(
   formData: FormData,
@@ -233,7 +234,8 @@ async function buildPayloadFromForm(
     unit_of_measure:    str(formData.get('unit_of_measure')),
     description:        str(formData.get('description')),
     is_organic:         (formData.get('is_organic') as string) !== 'false',
-    category:           ((formData.get('category') as string) === 'snack' ? 'snack' : 'purchased'),
+    category:           INGREDIENT_CATEGORY_VALUES.has(formData.get('category') as string)
+                          ? (formData.get('category') as string) : 'purchased',
     is_active:          true,
     supplier_sku_code:  str(formData.get('supplier_sku_code')),
     currency,
