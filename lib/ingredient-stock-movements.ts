@@ -164,6 +164,29 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
   for (const g of groupsNz) for (const r of g.ingredients) nzRowById.set(r.ingredient.id, r)
   for (const g of groupsAu) for (const r of g.ingredients) auRowById.set(r.ingredient.id, r)
 
+  // ── Every product whose recipe uses each ingredient, per build market ──
+  // So a row's product list shows what it's attached to even in months nothing
+  // is made (at 0), and an empty list really means "no recipe uses this".
+  // Named exactly as the demand pass names them (AU build = "… (AU)").
+  const productById = new Map((products ?? []).map((p) => [p.id, p]))
+  const attachedBy = (bomByProduct: Map<string, string>, label: string) => {
+    const out = new Map<string, Array<{ product_id: string; sku: string; name: string }>>()
+    for (const [pid, bomId] of Array.from(bomByProduct.entries())) {
+      const p = productById.get(pid)
+      if (!p) continue
+      for (const it of bomItemsByBom.get(bomId) ?? []) {
+        if (!out.has(it.ingredient_id)) out.set(it.ingredient_id, [])
+        const list = out.get(it.ingredient_id)!
+        if (!list.some((x) => x.product_id === pid)) {
+          list.push({ product_id: pid, sku: p.sku_code, name: label ? `${p.name} ${label}` : p.name })
+        }
+      }
+    }
+    return out
+  }
+  const attachedNz = attachedBy(activeBomByProduct, '')
+  const attachedAu = attachedBy(activeBomByProductAu, '(AU)')
+
   // ── Inbound (open-PO arrivals) per ingredient per market ──
   const ingById = new Map((ingredients ?? []).map((i) => [i.id, i]))
   const poMarketById = new Map<string, { market: Market; monthKey: string }>()
@@ -222,7 +245,17 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
 
     const buildMarket = (
       mk: Market, usedRow: Row | undefined, inboundMap: Map<string, Map<string, number>>, cost: number,
+      attached: Array<{ product_id: string; sku: string; name: string }>,
     ): IngMarketRow => {
+      // Every attached product, plus any product the demand pass used that
+      // isn't in the list (belt and braces — the two should always agree).
+      const usedProducts = usedRow?.products ?? []
+      const driverBase = [
+        ...attached,
+        ...usedProducts
+          .filter((p) => !attached.some((a) => a.product_id === p.id))
+          .map((p) => ({ product_id: p.id, sku: p.sku_code, name: p.name })),
+      ]
       const seed = adjOf(ing.id, mk, SEED_MONTH)
       const opening = seed.counted ?? 0
       const cells: Record<string, IngCell> = {}
@@ -234,9 +267,10 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
         const used = usedRow?.demandByMonth.get(m) ?? 0
         const system = round(prevEom + inbound - used - adj.wastage, 3)
         const eom = adj.counted != null ? adj.counted : system
-        const drivers: IngDriver[] = (usedRow?.products ?? [])
-          .map((p) => ({ product_id: p.id, sku: p.sku_code, name: p.name, used: round(p.demandByMonth.get(m) ?? 0, 3) }))
-          .filter((d) => d.used > 0)
+        const drivers: IngDriver[] = driverBase.map((d) => ({
+          ...d,
+          used: round(usedProducts.find((p) => p.id === d.product_id)?.demandByMonth.get(m) ?? 0, 3),
+        }))
         cells[m] = {
           inbound: round(inbound, 3), inboundPo: round(inboundPo, 3), inboundManual: adj.inbound, inboundComment: adj.iComment,
           used: round(used, 3), wastage: adj.wastage,
@@ -248,8 +282,8 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
       return { market: mk, opening, openingComment: seed.cComment, cells }
     }
 
-    const nz = buildMarket('NZ', nzRowById.get(ing.id), inboundNz, costNz)
-    const au = buildMarket('AU', auRowById.get(ing.id), inboundAu, costAu)
+    const nz = buildMarket('NZ', nzRowById.get(ing.id), inboundNz, costNz, attachedNz.get(ing.id) ?? [])
+    const au = buildMarket('AU', auRowById.get(ing.id), inboundAu, costAu, attachedAu.get(ing.id) ?? [])
 
     // Total = NZ + AU per column; value in NZD (AU converted at FX).
     const totalCells: Record<string, IngCell> = {}

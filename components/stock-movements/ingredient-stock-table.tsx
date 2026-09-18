@@ -155,6 +155,14 @@ function IngredientRows({ row, months, uomLabel }: { row: IngStockRow; months: s
         <MarketRow row={row} market="AU" data={row.au} cur="A$" months={months} uomLabel={uomLabel} head={nzActive ? undefined : expandBtn} showName={!nzActive} topDivider={!nzActive} />
       )}
       {showTotal && <MarketRow row={row} market="TOTAL" data={row.total} cur="NZ$" months={months} uomLabel={uomLabel} isTotal />}
+      {open && drivers.length === 0 && (
+        <tr className="text-[11px]">
+          <td className="sticky left-0 bg-amber-50/60 pl-9 pr-3 py-1.5 text-amber-800 border-b border-gray-100" colSpan={2}>
+            └ Not used in any recipe — nothing will use this stock up
+          </td>
+          <td colSpan={months.length * 6} className="bg-amber-50/40 border-b border-gray-100" />
+        </tr>
+      )}
       {open && drivers.map((d) => (
         <tr key={d.key} className="text-[11px]">
           <td className="sticky left-0 bg-emerald-50/40 pl-9 pr-3 py-1 text-gray-600 border-b border-gray-100">└ {d.name} <span className="text-gray-400 font-mono text-[9px]">{d.sku}</span></td>
@@ -162,7 +170,7 @@ function IngredientRows({ row, months, uomLabel }: { row: IngStockRow; months: s
           {months.map((m, i) => (
             <Fragment key={m}>
               <td className={`bg-emerald-50/30 border-b border-gray-100 ${i > 0 ? 'border-l-2 border-emerald-200' : ''}`} />
-              <td className="bg-emerald-50/30 border-b border-gray-100 px-1.5 text-right text-blue-700">{d.byMonth[m] ? nf(d.byMonth[m]) : ''}</td>
+              <td className={`bg-emerald-50/30 border-b border-gray-100 px-1.5 text-right ${d.byMonth[m] ? 'text-blue-700' : 'text-gray-300'}`}>{d.byMonth[m] ? nf(d.byMonth[m]) : '0'}</td>
               <td colSpan={4} className="bg-emerald-50/30 border-b border-gray-100" />
             </Fragment>
           ))}
