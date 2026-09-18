@@ -26,8 +26,12 @@ interface Props {
   // build — AU ingredient costs + VMC toll (both AUD) — instead of converting
   // the NZ figures, so this matches the AU cost-summary card exactly.
   isDual?: boolean
+  // Made in Australia only: BOTH views are VMC's build — the NZD view is that
+  // build converted plus NZ freight, matching the NZ cost card.
+  auMade?: boolean
   auIngredientTotal?: number       // AUD
   auToll?: number                  // AUD
+  packagingAu?: number             // NZD — the AU build's packaging rollup
   manufacturerNz?: string | null
   manufacturerAu?: string | null
 }
@@ -47,18 +51,22 @@ export function ProductCostOverview(props: Props) {
   const toView = (v: number, cur: string) =>
     cur === view ? v : view === 'NZD' ? v * fx : v / fx
 
-  // For a dual-made product the AUD view swaps in the Australian build's own
-  // ingredient cost + toll (already in AUD) rather than converting the NZ ones.
-  const dualAu = !!props.isDual && view === 'AUD'
+  // Which build this view is costed on. An Australia-made product is always
+  // VMC's build; a dual product uses VMC's build in the AUD view only. VMC's
+  // build swaps in its own ingredient cost, packaging and toll rather than
+  // converting the NZ ones — so this matches the market cards exactly.
+  const useAu = !!props.auMade || (!!props.isDual && view === 'AUD')
 
   const lines: Line[] = [
     { label: 'Ingredients (loaded)',
-      value:    dualAu ? (props.auIngredientTotal ?? props.ingredientTotal) : props.ingredientTotal,
-      currency: dualAu ? 'AUD' : 'NZD' },
-    { label: 'Packaging',            value: props.packaging,        currency: 'NZD' },
-    { label: dualAu ? 'Toll (VMC)' : 'Toll',
-      value:    dualAu ? (props.auToll ?? props.toll) : props.toll,
-      currency: dualAu ? 'AUD' : props.tollCurrency },
+      value:    useAu ? (props.auIngredientTotal ?? props.ingredientTotal) : props.ingredientTotal,
+      currency: useAu ? 'AUD' : 'NZD' },
+    { label: 'Packaging',
+      value:    useAu ? (props.packagingAu ?? props.packaging) : props.packaging,
+      currency: 'NZD' },
+    { label: useAu ? 'Toll (VMC)' : 'Toll',
+      value:    useAu ? (props.auToll ?? props.toll) : props.toll,
+      currency: useAu ? 'AUD' : props.tollCurrency },
     { label: 'Margin',               value: props.margin,           currency: props.marginCurrency },
     { label: 'Task / other',         value: props.other,            currency: props.otherCurrency },
     { label: 'Freight — NZ',         value: props.freightNz,        currency: props.freightNzCurrency, market: 'NZD' },
@@ -77,7 +85,7 @@ export function ProductCostOverview(props: Props) {
           <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Cost &amp; margin · whole BOM</h3>
           {props.isDual && (
             <span className="text-[11px] text-gray-500">
-              made by <span className="font-semibold text-gray-700">{view === 'AUD' ? (props.manufacturerAu || 'AU maker') : (props.manufacturerNz || 'NZ maker')}</span>
+              made by <span className="font-semibold text-gray-700">{useAu ? (props.manufacturerAu || 'AU maker') : (props.manufacturerNz || 'NZ maker')}</span>
             </span>
           )}
         </div>
@@ -135,7 +143,9 @@ export function ProductCostOverview(props: Props) {
 
       <p className="text-[11px] text-gray-400 mt-3">
         NZD view uses NZ freight &amp; NZ RRP; AUD view uses AU freight &amp; AU RRP.
-        {props.isDual && ' AUD view is the Australian build (AU ingredient costs + AU toll), not the NZ build converted.'}
+        {props.auMade
+          ? ' Made in Australia: both views are the VMC build (AU ingredient costs, packaging + toll) — NZD is that build converted, plus freight to NZ.'
+          : props.isDual && ' AUD view is the Australian build (AU ingredient costs, packaging + toll), not the NZ build converted.'}
         {' '}Blue figures are converted at FX {fx.toFixed(4)} (1 AUD = {fx.toFixed(2)} NZD).
       </p>
     </div>

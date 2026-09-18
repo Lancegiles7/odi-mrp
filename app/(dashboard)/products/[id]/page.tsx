@@ -250,6 +250,8 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         rrpExNz={summary.rrp_ex_gst_nz}
         rrpExAu={summary.rrp_ex_gst_au}
         isDual={summary.is_dual_manufacture || summary.au_made}
+        auMade={summary.au_made}
+        packagingAu={Number(product.packaging_au ?? product.packaging) || 0}
         auIngredientTotal={summary.au_ingredient_total}
         auToll={summary.au_toll}
         manufacturerNz={product.manufacturer}
