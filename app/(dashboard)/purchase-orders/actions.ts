@@ -151,6 +151,106 @@ export async function createPurchaseOrder(input: {
 // ============================================================
 // Update PO header + replace lines (only allowed while draft)
 // ============================================================
+// ============================================================
+// reversePoStock — undo every app-recorded receipt on a PO: delete its stock
+// movements, back the on-hand balance out, unwind the opening-stock bumps, and
+// clear finished-goods receipt logs. Returns the received quantities (per line)
+// so the caller can re-apply them after an edit — this is how editing a
+// received PO auto-corrects stock for a changed unit / quantity / ingredient.
+// Lines never received through the app (no movements/receipts) are untouched.
+// ============================================================
+async function reversePoStock(
+  supabase: ReturnType<typeof createClient>,
+  poId: string,
+  profileId: string | null,
+): Promise<{ reapply: Array<{ line_id: string; received: number }> }> {
+  const { data: po } = await supabase
+    .from('purchase_orders').select('po_number, market').eq('id', poId).maybeSingle() as { data: { po_number: string; market: string | null } | null }
+  const market: 'NZ' | 'AU' = po?.market === 'AU' ? 'AU' : 'NZ'
+  const openCol = market === 'AU' ? 'opening_stock_override_au' : 'opening_stock_override'
+
+  const { data: lines } = await supabase
+    .from('purchase_order_lines')
+    .select('id, ingredient_id, packaging_id, product_id, quantity_received, unit_of_measure')
+    .eq('purchase_order_id', poId) as { data: Array<{ id: string; ingredient_id: string | null; packaging_id: string | null; product_id: string | null; quantity_received: number; unit_of_measure: string }> | null }
+  const lineIds = (lines ?? []).map((l) => l.id)
+  if (lineIds.length === 0) return { reapply: [] }
+
+  const { data: movements } = await supabase
+    .from('stock_movements')
+    .select('id, ingredient_id, packaging_id, location_id, quantity, purchase_order_line_id')
+    .in('purchase_order_line_id', lineIds) as { data: Array<{ id: string; ingredient_id: string | null; packaging_id: string | null; location_id: string; quantity: number; purchase_order_line_id: string | null }> | null }
+  const { data: fgr } = await supabase
+    .from('finished_goods_receipts')
+    .select('purchase_order_line_id').eq('source', 'po_receipt').in('purchase_order_line_id', lineIds) as { data: Array<{ purchase_order_line_id: string | null }> | null }
+
+  // Item display UoM + current opening figures.
+  const ingIds = Array.from(new Set((lines ?? []).filter((l) => l.ingredient_id).map((l) => l.ingredient_id as string)))
+  const pakIds = Array.from(new Set((lines ?? []).filter((l) => l.packaging_id).map((l) => l.packaging_id as string)))
+  const { data: ingInfo } = ingIds.length
+    ? await supabase.from('ingredients').select(`id, unit_of_measure, ${openCol}`).in('id', ingIds) as { data: Array<Record<string, unknown>> | null }
+    : { data: [] as Array<Record<string, unknown>> }
+  const { data: pakInfo } = pakIds.length
+    ? await supabase.from('packaging').select(`id, unit_of_measure, ${openCol}`).in('id', pakIds) as { data: Array<Record<string, unknown>> | null }
+    : { data: [] as Array<Record<string, unknown>> }
+  const ingById = new Map((ingInfo ?? []).map((i) => [i.id as string, i]))
+  const pakById = new Map((pakInfo ?? []).map((p) => [p.id as string, p]))
+
+  // 1) Back out on-hand balances (grouped by item + location), then delete movements.
+  const balSub = new Map<string, number>()
+  for (const m of movements ?? []) {
+    const item = m.ingredient_id ? `i:${m.ingredient_id}` : `p:${m.packaging_id}`
+    const k = `${item}::${m.location_id}`
+    balSub.set(k, (balSub.get(k) ?? 0) + Number(m.quantity))
+  }
+  for (const [key, qty] of Array.from(balSub)) {
+    const [item, loc] = key.split('::')
+    const isIng = item.startsWith('i:'); const id = item.slice(2)
+    const base = supabase.from('inventory_balances').select('id, quantity_on_hand').eq('location_id', loc)
+    const { data: bal } = await (isIng ? base.eq('ingredient_id', id) : base.eq('packaging_id', id)).maybeSingle() as { data: { id: string; quantity_on_hand: number } | null }
+    if (bal) await supabase.from('inventory_balances').update({ quantity_on_hand: Number(bal.quantity_on_hand) - qty } as never).eq('id', bal.id)
+  }
+  const mvIds = (movements ?? []).map((m) => m.id)
+  if (mvIds.length) await supabase.from('stock_movements').delete().in('id', mvIds)
+  if ((fgr ?? []).length) await supabase.from('finished_goods_receipts').delete().eq('source', 'po_receipt').in('purchase_order_line_id', lineIds)
+
+  // 2) Unwind opening-stock bumps + zero the received qty on reversed lines.
+  const receivedLineIds = new Set<string>([
+    ...((movements ?? []).map((m) => m.purchase_order_line_id).filter(Boolean) as string[]),
+    ...((fgr ?? []).map((f) => f.purchase_order_line_id).filter(Boolean) as string[]),
+  ])
+  const openSub = new Map<string, number>()
+  const reapply: Array<{ line_id: string; received: number }> = []
+  for (const l of lines ?? []) {
+    if (!receivedLineIds.has(l.id)) continue
+    const recv = Number(l.quantity_received) || 0
+    const lineUom = (l.unit_of_measure ?? '').trim().toLowerCase()
+    if (l.ingredient_id) {
+      const itemUom = (ingById.get(l.ingredient_id)?.unit_of_measure as string | null) ?? null
+      const bump = lineUom === 'g' ? convertGramsToIngredientUom(recv, itemUom) : recv
+      openSub.set(`i:${l.ingredient_id}`, (openSub.get(`i:${l.ingredient_id}`) ?? 0) + bump)
+    } else if (l.packaging_id) {
+      const itemUom = (pakById.get(l.packaging_id)?.unit_of_measure as string | null) ?? null
+      const bump = lineUom === 'g' ? convertGramsToIngredientUom(recv, itemUom) : recv
+      openSub.set(`p:${l.packaging_id}`, (openSub.get(`p:${l.packaging_id}`) ?? 0) + bump)
+    }
+    await supabase.from('purchase_order_lines').update({ quantity_received: 0 } as never).eq('id', l.id)
+    if (recv > 0) reapply.push({ line_id: l.id, received: recv })
+  }
+  for (const [key, amt] of Array.from(openSub)) {
+    if (!amt) continue
+    const isIng = key.startsWith('i:'); const id = key.slice(2)
+    const prev = ((isIng ? ingById : pakById).get(id)?.[openCol] as number | null) ?? null
+    const newVal = (prev ?? 0) - amt
+    await supabase.from(isIng ? 'ingredients' : 'packaging').update({ [openCol]: newVal } as never).eq('id', id)
+    await supabase.from(isIng ? 'ingredient_opening_stock_history' : 'packaging_opening_stock_history').insert({
+      [isIng ? 'ingredient_id' : 'packaging_id']: id, previous_value: prev, new_value: newVal,
+      note: `Edit re-sync on ${po?.po_number ?? 'PO'}`, market, changed_by: profileId,
+    } as never)
+  }
+  return { reapply }
+}
+
 export async function updatePurchaseOrder(input: {
   id: string
   po_number: string
@@ -174,6 +274,8 @@ export async function updatePurchaseOrder(input: {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
 
   const isTransfer = input.po_type === 'transfer'
   if (isTransfer) {
@@ -181,14 +283,23 @@ export async function updatePurchaseOrder(input: {
     if (input.destination_supplier_id === input.supplier_id) return { ok: false, error: 'From and To sites must be different' }
   }
 
-  // Allow edits in draft or submitted state. Once any receipt has been
-  // recorded (partially_received) we lock the form to protect receipt history.
   const { data: existing } = await supabase
     .from('purchase_orders').select('status').eq('id', input.id).maybeSingle() as { data: { status: POStatus } | null }
   if (!existing) return { ok: false, error: 'PO not found' }
-  if (existing.status !== 'draft' && existing.status !== 'submitted') {
-    return { ok: false, error: `PO is ${existing.status} and can no longer be edited via this form.` }
-  }
+  if (existing.status === 'cancelled') return { ok: false, error: 'This PO is cancelled — re-open it before editing.' }
+
+  // Validate the incoming lines up front, before touching any stock.
+  const sanitised = input.lines.map((l) => sanitiseLine(l, input.id))
+  const lineErr = validateLines(sanitised)
+  if (lineErr) return { ok: false, error: lineErr }
+
+  // Editing a PO that already has receipts: reverse its stock first, apply the
+  // edit, then re-apply the received quantities so stock re-syncs to the new
+  // lines. This is what auto-corrects a wrong unit / quantity / ingredient.
+  const hadReceipts = existing.status === 'partially_received' || existing.status === 'received'
+  const { reapply } = hadReceipts
+    ? await reversePoStock(supabase, input.id, profile?.id ?? null)
+    : { reapply: [] as Array<{ line_id: string; received: number }> }
 
   const { error: hErr } = await supabase
     .from('purchase_orders')
@@ -212,23 +323,60 @@ export async function updatePurchaseOrder(input: {
     .eq('id', input.id)
   if (hErr) return { ok: false, error: hErr.message }
 
-  // Replace lines wholesale: simplest correct approach for draft edits
-  await supabase.from('purchase_order_lines').delete().eq('purchase_order_id', input.id)
-
-  const lineRows = input.lines.map((l) => sanitiseLine(l, input.id))
-  const lineErr = validateLines(lineRows)
-  if (lineErr) return { ok: false, error: lineErr }
-
-  if (lineRows.length > 0) {
-    const { error: lErr } = await supabase.from('purchase_order_lines').insert(lineRows)
-    if (lErr) return { ok: false, error: lErr.message }
+  // Lines in place — update existing by id, insert new, delete removed — so
+  // receipt links (stock movements) survive. quantity_received is owned by the
+  // receipt flow, so it's never overwritten here.
+  const { data: existingLines } = await supabase
+    .from('purchase_order_lines').select('id').eq('purchase_order_id', input.id) as { data: Array<{ id: string }> | null }
+  const existingIds = new Set((existingLines ?? []).map((l) => l.id))
+  const keepIds = new Set(input.lines.filter((l) => l.id && existingIds.has(l.id)).map((l) => l.id as string))
+  const toDelete = Array.from(existingIds).filter((id) => !keepIds.has(id))
+  if (toDelete.length) {
+    const { error } = await supabase.from('purchase_order_lines').delete().in('id', toDelete)
+    if (error) return { ok: false, error: error.message }
+  }
+  for (let i = 0; i < input.lines.length; i++) {
+    const l = input.lines[i]
+    const row = sanitised[i]
+    if (l.id && existingIds.has(l.id)) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { quantity_received, purchase_order_id, ...rest } = row
+      const { error } = await supabase.from('purchase_order_lines').update(rest as never).eq('id', l.id)
+      if (error) return { ok: false, error: error.message }
+    } else {
+      const { error } = await supabase.from('purchase_order_lines').insert(row as never)
+      if (error) return { ok: false, error: error.message }
+    }
   }
 
   await applySaveBackToIngredients(supabase, input.lines)
 
+  // Re-apply the reversed receipts against the (possibly edited) lines —
+  // recreates the movements/opening bumps in the corrected unit & market.
+  if (reapply.length) {
+    const res = await receivePoLines({
+      po_id: input.id,
+      received_date: input.expected_delivery_date ?? undefined,
+      receipts: reapply.map((r) => ({ line_id: r.line_id, received: r.received, invoice_unit_cost: null, note: null })),
+    })
+    if (!res.ok) return { ok: false, error: res.error }
+  }
+
+  // Recompute PO status from line receipts (covers non-reversed receipts too).
+  const { data: fresh } = await supabase
+    .from('purchase_order_lines').select('quantity_ordered, quantity_received').eq('purchase_order_id', input.id) as { data: Array<{ quantity_ordered: number; quantity_received: number }> | null }
+  if (fresh && fresh.length) {
+    const allFull = fresh.every((l) => Number(l.quantity_received) >= Number(l.quantity_ordered))
+    const anyPartial = fresh.some((l) => Number(l.quantity_received) > 0)
+    const next: POStatus = allFull ? 'received' : anyPartial ? 'partially_received' : (existing.status === 'draft' ? 'draft' : 'submitted')
+    await supabase.from('purchase_orders').update({ status: next }).eq('id', input.id)
+  }
+
   revalidatePath('/purchase-orders')
   revalidatePath(`/purchase-orders/${input.id}`)
   revalidatePath('/ingredients')
+  revalidatePath('/ingredients/demand')
+  revalidatePath('/stock-movements')
   return { ok: true }
 }
 
@@ -287,36 +435,25 @@ export async function deleteDraftPo(id: string): Promise<{ ok: boolean; error?: 
 }
 
 /**
- * Delete a PO at any status, as long as no stock movements reference its lines.
- * - draft / submitted / cancelled → deletable (lines cascade-delete by FK)
- * - partially_received / received → blocked, since stock_movements have already
- *   adjusted inventory. User must reverse the stock adjustment first.
+ * Delete a PO at any status. If it has recorded receipts, its stock is reversed
+ * first (movements, on-hand balance and opening-stock bumps unwound) so deleting
+ * a received PO leaves inventory clean — no orphaned adjustments.
  */
 export async function deletePurchaseOrder(id: string): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
 
   const { data: existing } = await supabase
     .from('purchase_orders').select('po_number, status').eq('id', id).maybeSingle() as { data: { po_number: string; status: POStatus } | null }
   if (!existing) return { ok: false, error: 'PO not found' }
 
-  // Find line IDs first so we can check for stock movement references
-  const { data: lines } = await supabase
-    .from('purchase_order_lines').select('id').eq('purchase_order_id', id) as { data: Array<{ id: string }> | null }
-  const lineIds = (lines ?? []).map((l) => l.id)
-
-  if (lineIds.length > 0) {
-    const { count } = await supabase
-      .from('stock_movements')
-      .select('id', { count: 'exact', head: true })
-      .in('purchase_order_line_id', lineIds)
-    if ((count ?? 0) > 0) {
-      return {
-        ok: false,
-        error: `Cannot delete: ${count} stock movement${count === 1 ? '' : 's'} reference${count === 1 ? 's' : ''} this PO's lines (inventory has already been adjusted). Reverse the receipts first, or cancel the PO and leave it in place for audit history.`,
-      }
-    }
+  // Reverse any recorded stock first, so the movements no longer reference the
+  // lines (which lets the cascade delete proceed) and inventory stays correct.
+  if (existing.status === 'partially_received' || existing.status === 'received') {
+    await reversePoStock(supabase, id, profile?.id ?? null)
   }
 
   // Lines cascade-delete via FK ON DELETE CASCADE (migration 001).
@@ -324,6 +461,8 @@ export async function deletePurchaseOrder(id: string): Promise<{ ok: boolean; er
   if (error) return { ok: false, error: error.message }
 
   revalidatePath('/purchase-orders')
+  revalidatePath('/ingredients/demand')
+  revalidatePath('/stock-movements')
   redirect('/purchase-orders')
 }
 

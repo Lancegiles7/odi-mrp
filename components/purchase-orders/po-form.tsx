@@ -135,10 +135,12 @@ export function POForm(props: POFormProps) {
 
   const isDraft       = props.status === 'draft'
   const isSubmitted   = props.status === 'submitted' || props.status === 'partially_received'
-  // Editable while draft or submitted-but-untouched. Once anything has been
-  // received (partially_received) we lock to protect receipt history; further
-  // edits go through the receive flow only.
-  const isEditable    = props.status === 'draft' || props.status === 'submitted'
+  // Editable at every status except cancelled. Editing a PO that already has
+  // receipts re-syncs its stock on save (the server reverses and re-applies the
+  // received quantities against the edited lines), so a wrong unit/qty/ingredient
+  // is corrected automatically rather than being locked.
+  const isEditable    = props.status !== 'cancelled'
+  const hasReceipts   = props.status === 'partially_received' || props.status === 'received'
   const supplier  = useMemo(
     () => props.suppliers.find((s) => s.id === supplierId) ?? null,
     [props.suppliers, supplierId],
@@ -253,7 +255,7 @@ export function POForm(props: POFormProps) {
 
   function onDelete() {
     if (!props.poId) return
-    if (!confirm(`Permanently delete PO ${poNumber}? This cannot be undone. (Blocked if any stock receipts have been recorded against it.)`)) return
+    if (!confirm(`Permanently delete PO ${poNumber}? This cannot be undone.${hasReceipts ? ' Any received stock on this PO will be reversed first.' : ''}`)) return
     setError(null)
     start(async () => {
       const res = await deleteDraftPo(props.poId!)
@@ -297,6 +299,12 @@ export function POForm(props: POFormProps) {
 
       {error && (
         <div className="px-5 py-2 text-xs text-red-700 bg-red-50 border-b border-red-200">{error}</div>
+      )}
+
+      {props.mode === 'edit' && hasReceipts && (
+        <div className="px-5 py-2 text-xs text-amber-800 bg-amber-50 border-b border-amber-200">
+          This PO has received stock. Saving your changes will re-sync stock (on-hand + opening) to match — e.g. fixing a unit or quantity corrects the stock automatically. The received quantities are kept.
+        </div>
       )}
 
       <div className="grid grid-cols-3 gap-0">
