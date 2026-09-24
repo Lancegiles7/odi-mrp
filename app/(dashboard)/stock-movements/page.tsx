@@ -5,6 +5,8 @@ import { loadIngredientStockLedger } from '@/lib/ingredient-stock-movements'
 import { StockMovementsTable } from '@/components/stock-movements/stock-movements-table'
 import { IngredientStockTable } from '@/components/stock-movements/ingredient-stock-table'
 import { InwardsUpload } from '@/components/stock-movements/inwards-upload'
+import { MonthlyNotes } from '@/components/stock-movements/monthly-notes'
+import { loadStockMovementNotes } from '@/app/(dashboard)/stock-movements/actions'
 
 export const metadata: Metadata = { title: 'Stock Movements' }
 // Always render fresh — receipts / write-offs / actuals / manual counts change
@@ -58,8 +60,12 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
 }
 
 async function ProductsView({ label }: { label: (m: string) => string }) {
-  const { rows, actualMonths, forecastMonths, actualThrough } = await loadStockLedger()
+  const [{ rows, actualMonths, forecastMonths, actualThrough }, notes] = await Promise.all([
+    loadStockLedger(),
+    loadStockMovementNotes('products'),
+  ])
   const lastActualLabel = actualThrough ? label(actualThrough) : null
+  const months = [...actualMonths, ...forecastMonths]
   return (
     <div className="space-y-3">
       <p className="text-sm text-gray-500">
@@ -73,11 +79,20 @@ async function ProductsView({ label }: { label: (m: string) => string }) {
       ) : (
         <StockMovementsTable rows={rows} actualMonths={actualMonths} forecastMonths={forecastMonths} label={label} />
       )}
+      {months.length > 0 && <MonthlyNotes scope="products" months={months} initial={notes} />}
     </div>
   )
 }
 
 async function IngredientsView({ group }: { group: 'flat' | 'supplier' }) {
-  const ledger = await loadIngredientStockLedger()
-  return <IngredientStockTable ledger={ledger} group={group} />
+  const [ledger, notes] = await Promise.all([
+    loadIngredientStockLedger(),
+    loadStockMovementNotes('ingredients'),
+  ])
+  return (
+    <div className="space-y-3">
+      <IngredientStockTable ledger={ledger} group={group} />
+      {ledger.months.length > 0 && <MonthlyNotes scope="ingredients" months={ledger.months} initial={notes} />}
+    </div>
+  )
 }

@@ -40,8 +40,33 @@ export function IngredientStockTable({ ledger, group }: Props) {
 
   const minWidth = 240 + 74 + months.length * 6 * 58
 
+  // Total stock holding $ = sum of every ingredient's EOM value (NZ + AUS in
+  // NZ$) — across ALL ingredients, independent of the search filter.
+  const monthTotal = (m: string) => rows.reduce((s, r) => s + (r.total.cells[m]?.value ?? 0), 0)
+  const todayMonth = new Date().toISOString().slice(0, 7) + '-01'
+  const currentMonth = months.includes(todayMonth) ? todayMonth : months[0]
+
   return (
     <div className="space-y-3">
+      {months.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-stretch gap-5 flex-wrap">
+          <div className="shrink-0">
+            <div className="text-[11px] uppercase tracking-wide text-gray-500">Total stock holding</div>
+            <div className="text-2xl font-semibold text-emerald-800 leading-tight">{money(monthTotal(currentMonth), 'NZ$')}</div>
+            <div className="text-[10px] text-gray-400">as at {label(currentMonth)} EOM · all ingredients (NZ + AUS in NZ$)</div>
+          </div>
+          <div className="flex-1 min-w-0 overflow-x-auto border-l border-gray-100 pl-4">
+            <div className="flex gap-2">
+              {months.map((m) => (
+                <div key={m} className={`text-right px-2 py-1 rounded shrink-0 ${m === currentMonth ? 'bg-emerald-50' : ''}`}>
+                  <div className="text-[9px] uppercase tracking-wide text-gray-400">{label(m)}</div>
+                  <div className="text-xs font-medium text-gray-700 tabular-nums">{money(monthTotal(m), 'NZ$')}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
           <Link href="/stock-movements?view=ingredients"

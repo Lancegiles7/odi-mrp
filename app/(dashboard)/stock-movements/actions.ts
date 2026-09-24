@@ -162,3 +162,50 @@ export async function setStockAdjustment(input: {
   revalidatePath('/stock-movements')
   return { ok: true }
 }
+
+// ============================================================
+// setStockMovementNote — free-text monthly note for a Stock Movements tab.
+// One row per scope (products|ingredients|packaging) × month. Blank clears it.
+// ============================================================
+export async function setStockMovementNote(input: {
+  scope: 'products' | 'ingredients' | 'packaging'
+  year_month: string
+  note: string | null
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+
+  const month = input.year_month.slice(0, 7) + '-01'
+  const note = input.note?.trim() || null
+
+  if (!note) {
+    const { error } = await supabase.from('stock_movement_notes')
+      .delete().eq('scope', input.scope).eq('year_month', month)
+    if (error) return { ok: false, error: error.message }
+  } else {
+    const { error } = await supabase.from('stock_movement_notes')
+      .upsert({ scope: input.scope, year_month: month, note, created_by: profile?.id ?? null } as never,
+        { onConflict: 'scope,year_month' })
+    if (error) return { ok: false, error: error.message }
+  }
+
+  revalidatePath('/stock-movements')
+  return { ok: true }
+}
+
+// Load the saved monthly notes for a Stock Movements tab, keyed by 'YYYY-MM-01'.
+export async function loadStockMovementNotes(
+  scope: 'products' | 'ingredients' | 'packaging',
+): Promise<Record<string, string>> {
+  const supabase = createClient()
+  const { data } = await supabase.from('stock_movement_notes')
+    .select('year_month, note').eq('scope', scope) as { data: Array<{ year_month: string; note: string | null }> | null }
+  const out: Record<string, string> = {}
+  for (const r of data ?? []) {
+    if (r.note) out[r.year_month.slice(0, 10)] = r.note
+  }
+  return out
+}
