@@ -32,6 +32,9 @@ export interface IngredientDemandInput {
     supplier_id: string | null
     opening_stock_override: number | null
     opening_stock_override_au?: number | null
+    /** Production yield allowance (fraction, e.g. 0.05 = 5%) — lifts this
+     *  ingredient's per-unit demand to cover loss in manufacture. */
+    yield_pct?: number | null
   }>
 
   /** suppliers keyed by id (supplier_id may be null on an ingredient) */
@@ -98,6 +101,7 @@ export interface IngredientRow {
     opening_stock_override: number | null
     opening_stock_override_au: number | null
     supplier_id: string | null
+    yield_pct: number
   }
   /** month → demand in the ingredient's display UOM */
   demandByMonth: Map<string, number>
@@ -175,6 +179,7 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
         opening_stock_override: ing.opening_stock_override,
         opening_stock_override_au: ing.opening_stock_override_au ?? null,
         supplier_id: ing.supplier_id,
+        yield_pct: ing.yield_pct ?? 0,
       },
       demandByMonth: new Map(months.map((m) => [m, 0])),
       totalDemand: 0,
@@ -223,11 +228,13 @@ export function aggregateIngredientDemand(input: IngredientDemandInput): Supplie
 
       // Count-priced ingredients procure on their unit count (default 1 unit);
       // weight ingredients procure on the WET input where set (freeze-dried),
-      // else the dry grams. Either way, lifted by the product's contingency %.
+      // else the dry grams. Lifted by the product's contingency % AND by this
+      // ingredient's own yield allowance (e.g. 5% on noodles for production loss).
       const isCount = isCountUom(row.ingredient.unit_of_measure)
+      const yieldMult = 1 + (Number(row.ingredient.yield_pct ?? 0) || 0)
       const perUnit = isCount
-        ? (Number(item.unit_quantity ?? 1) || 0) * wastage
-        : (Number(item.wet_quantity_g ?? item.quantity_g) || 0) * wastage
+        ? (Number(item.unit_quantity ?? 1) || 0) * wastage * yieldMult
+        : (Number(item.wet_quantity_g ?? item.quantity_g) || 0) * wastage * yieldMult
 
       const perProduct = {
         id: product.id,

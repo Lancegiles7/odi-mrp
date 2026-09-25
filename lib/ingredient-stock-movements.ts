@@ -91,12 +91,12 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
       .select('id, sku_code, name, wastage_pct, manufacture_market')
       .is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; wastage_pct: number | null; manufacture_market: string | null }> | null }>,
     supabase.from('ingredients')
-      .select('id, sku_code, name, unit_of_measure, supplier_id, total_loaded_cost, total_loaded_cost_au')
+      .select('id, sku_code, name, unit_of_measure, supplier_id, total_loaded_cost, total_loaded_cost_au, yield_pct')
       .eq('is_active', true)
       // Purchased ingredients only. Snack-category ingredients are supplied by
       // the snack manufacturer — Odi never holds that stock, so tracking it here
       // would show a stocktake nobody counts.
-      .eq('category', 'purchased') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_id: string | null; total_loaded_cost: number | null; total_loaded_cost_au: number | null }> | null }>,
+      .eq('category', 'purchased') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_id: string | null; total_loaded_cost: number | null; total_loaded_cost_au: number | null; yield_pct: number | null }> | null }>,
     supabase.from('suppliers').select('id, name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
     supabase.from('boms').select('id, product_id, is_active, market').eq('is_active', true) as unknown as Promise<{ data: Array<{ id: string; product_id: string; is_active: boolean; market: string | null }> | null }>,
     supabase.from('bom_items').select('bom_id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity') as unknown as Promise<{ data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null; unit_quantity: number | null }> | null }>,
