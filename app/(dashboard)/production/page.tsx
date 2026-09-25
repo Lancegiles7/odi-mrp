@@ -9,7 +9,7 @@ import {
 } from '@/lib/demand'
 import { loadStockLedger, closingStockAt } from '@/lib/stock-movements-data'
 import type { TransferDetail } from '@/lib/transfer-stock'
-import { getPlanningWindow } from '@/lib/settings'
+import { getPlanningWindow, fyLabel } from '@/lib/settings'
 import { PlanningHistoryToggle } from '@/components/shared/planning-history-toggle'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
@@ -219,7 +219,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         <p className="text-sm text-gray-500 mt-1">
           {planning.isHistory
             ? <>Completed months included ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · closed months are read-only, balances run from {monthLabel(planning.anchorMonth)}</>
-            : <>Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · Balance = prev + production ± transfers − forecast</>}
+            : <>Planning through {fyLabel(lastMonth)} ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · Balance = prev + production ± transfers − forecast</>}
         </p>
       </div>
       <div className="flex gap-2 items-center">
@@ -397,8 +397,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
 
       <div className="grid grid-cols-5 gap-3">
         <Tile label="Products" value={totals.products.toString()} sub={`${totals.active} active · ${totals.inactive} inactive`} />
-        <Tile label="Forecast 12mo" value={totals.forecast.toLocaleString()} sub="units" />
-        <Tile label="Production 12mo" value={totals.production.toLocaleString()} sub="scheduled" />
+        <Tile label={`Forecast ${activeMonths.length}mo`} value={totals.forecast.toLocaleString()} sub="units" />
+        <Tile label={`Production ${activeMonths.length}mo`} value={totals.production.toLocaleString()} sub="scheduled" />
         <Tile label="Shortfalls" value={totals.shortfalls.toString()} sub="months × SKU" accent={totals.shortfalls > 0 ? 'red' : undefined} />
         <Tile label="Opening stock" value={totals.opening.toLocaleString()} sub="units on hand" />
       </div>

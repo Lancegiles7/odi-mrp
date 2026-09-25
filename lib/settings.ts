@@ -86,6 +86,25 @@ export function fiscalYearStart(today: Date = new Date()): Date {
   return new Date(Date.UTC(inNewFy ? y : y - 1, FY_START_MONTH_INDEX, 1))
 }
 
+/** Financial-year label for a month key, named by the year it ends: '2027-06-01' → 'FY28'. */
+export function fyLabel(monthKeyStr: string): string {
+  const [y, m] = monthKeyStr.split('-').map(Number)
+  const endYear = m - 1 >= FY_START_MONTH_INDEX ? y + 1 : y
+  return `FY${String(endYear).slice(2)}`
+}
+
+/**
+ * Live planning months: at least 12 from the anchor, then run on to the end of
+ * that financial year so a whole FY is always in view (e.g. Sep 26 → Mar 28,
+ * all of FY28). Between 12 and 23 months.
+ */
+export function planningForwardMonths(anchor: Date): string[] {
+  const minEnd = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() + 11, 1))
+  const fyEnd  = new Date(Date.UTC(fiscalYearStart(minEnd).getUTCFullYear() + 1, FY_START_MONTH_INDEX - 1, 1))
+  const n = (fyEnd.getUTCFullYear() - anchor.getUTCFullYear()) * 12 + (fyEnd.getUTCMonth() - anchor.getUTCMonth()) + 1
+  return rollingMonths(n, anchor)
+}
+
 export interface PlanningWindow {
   /** Every month to render, oldest first. */
   months: string[]
@@ -104,7 +123,7 @@ export interface PlanningWindow {
 export async function getPlanningWindow(showHistory = false): Promise<PlanningWindow> {
   const anchor  = await getPlanningAnchor()
   const fyStart = fiscalYearStart()
-  const forward = rollingMonths(undefined, anchor)
+  const forward = planningForwardMonths(anchor)
 
   const base = {
     anchorMonth:  forward[0],

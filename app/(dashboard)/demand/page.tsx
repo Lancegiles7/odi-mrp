@@ -7,7 +7,7 @@ import {
   type ChannelCountry,
 } from '@/lib/constants'
 import { indexDemand, monthLabel } from '@/lib/demand'
-import { getPlanningAnchor, getPlanningWindow } from '@/lib/settings'
+import { getPlanningAnchor, getPlanningWindow, fyLabel } from '@/lib/settings'
 import { DemandProductTable, type DemandProductData, type CountryFilter } from '@/components/demand/demand-product-table'
 import { CompleteMonthButton } from '@/components/demand/complete-month-button'
 import { PlanningHistoryToggle } from '@/components/shared/planning-history-toggle'
@@ -155,7 +155,7 @@ export default async function DemandPage({ searchParams }: PageProps) {
           <p className="text-sm text-gray-500 mt-1">
             {planning.isHistory
               ? <>Completed months included ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · closed months are read-only</>
-              : <>Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)})</>}
+              : <>Planning through {fyLabel(lastMonth)} ({monthLabel(firstMonth)} → {monthLabel(lastMonth)})</>}
             {country !== 'all' && (
               <> · <span className="font-semibold text-gray-800">{country === 'NZ' ? 'NZ only' : 'AUS only'}</span></>
             )}
@@ -184,22 +184,22 @@ export default async function DemandPage({ searchParams }: PageProps) {
       {/* Page-level country split tiles */}
       <div className="grid grid-cols-4 gap-3">
         <div className="p-3 bg-white border border-gray-200 rounded-md">
-          <div className="text-[11px] uppercase font-semibold text-gray-500">Total 12mo</div>
+          <div className="text-[11px] uppercase font-semibold text-gray-500">Total {months.length}mo</div>
           <div className="text-lg font-semibold text-gray-900 tabular-nums">{totalAll.toLocaleString()}</div>
           <div className="text-[11px] text-gray-500">all channels · all countries</div>
         </div>
         <div className="p-3 bg-white border border-gray-200 rounded-md border-l-4 border-l-emerald-800">
-          <div className="text-[11px] uppercase font-semibold text-gray-500">NZ 12mo</div>
+          <div className="text-[11px] uppercase font-semibold text-gray-500">NZ {months.length}mo</div>
           <div className="text-lg font-semibold text-gray-900 tabular-nums">{totalNZ.toLocaleString()}</div>
           <div className="text-[11px] text-gray-500">{pctNZ}% of total · {pipefillNZ.toLocaleString()} pipefill</div>
         </div>
         <div className="p-3 bg-white border border-gray-200 rounded-md border-l-4 border-l-amber-700">
-          <div className="text-[11px] uppercase font-semibold text-gray-500">AUS 12mo</div>
+          <div className="text-[11px] uppercase font-semibold text-gray-500">AUS {months.length}mo</div>
           <div className="text-lg font-semibold text-gray-900 tabular-nums">{totalAUS.toLocaleString()}</div>
           <div className="text-[11px] text-gray-500">{pctAUS}% of total · {pipefillAUS.toLocaleString()} pipefill</div>
         </div>
         <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <div className="text-[11px] uppercase font-semibold text-blue-700">Pipefill 12mo</div>
+          <div className="text-[11px] uppercase font-semibold text-blue-700">Pipefill {months.length}mo</div>
           <div className="text-lg font-semibold text-blue-900 tabular-nums">{(pipefillNZ + pipefillAUS).toLocaleString()}</div>
           <div className="text-[11px] text-blue-700">NZ {pipefillNZ.toLocaleString()} · AUS {pipefillAUS.toLocaleString()}</div>
         </div>
