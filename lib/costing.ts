@@ -53,9 +53,13 @@ export function lineUnits(item: BomItemWithIngredient): number {
 // Cost of one BOM line at a given per-unit-of-measure price. Count items cost
 // unit_quantity × per-unit price; weight items cost grams ÷ 1000 × per-kg price.
 function costLine(item: BomItemWithIngredient, perUom: number): number {
+  // Per-ingredient production yield (e.g. 5% on noodles) lifts the line cost so
+  // it matches what the plan actually consumes. Product-level wastage is still
+  // applied on the subtotal separately.
+  const yieldMult = 1 + (Number(item.ingredients.yield_pct ?? 0) || 0)
   return isCountUom(item.ingredients.unit_of_measure)
-    ? round2(lineUnits(item) * perUom)
-    : round2((lineWetGrams(item) / 1000) * perUom)
+    ? round2(lineUnits(item) * perUom * yieldMult)
+    : round2((lineWetGrams(item) / 1000) * perUom * yieldMult)
 }
 
 // Per-line price for a BOM item — costed on the wet input (no wastage here;

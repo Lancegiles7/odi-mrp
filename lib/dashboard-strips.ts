@@ -227,7 +227,7 @@ export async function loadGpByGroup(sb: SB, settings: SettingsSnapshot): Promise
       apply_fx, wastage_pct, manufacturer_au, manufacture_market,
       boms ( is_active, market, bom_items (
         id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order,
-        ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price )
+        ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price, yield_pct )
       ))
     `).eq('is_active', true).is('deleted_at', null))
 

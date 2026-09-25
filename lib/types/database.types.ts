@@ -959,7 +959,7 @@ export type BomItemWithIngredient = BomItem & {
   ingredients: Pick<
     Ingredient,
     'id' | 'name' | 'sku_code' | 'unit_of_measure' | 'total_loaded_cost' | 'total_loaded_cost_au' | 'is_organic' | 'currency' | 'price'
-  >
+  > & { yield_pct?: number | null }
 }
 
 export type BomWithItems = Bom & {
