@@ -4,6 +4,7 @@ import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
 import { InboundCell } from '@/components/stock-movements/inbound-cell'
 import { OpenPoChips } from '@/components/stock-movements/open-po-chips'
 import { TransferChips } from '@/components/stock-movements/transfer-chips'
+import { WriteoffCell } from '@/components/stock-movements/writeoff-cell'
 
 const nf = (n: number) => Math.round(n).toLocaleString('en-NZ')
 const dash = <span className="text-gray-300">—</span>
@@ -166,7 +167,7 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
           <Fragment key={m}>
             <InboundCell value={c.inbound} receipts={c.receipts ?? []} stillToReceipt={c.stillToReceipt ?? []} partialReceipt={c.partialReceipt ?? []} transfers={c.transfers ?? []} />
             <td className="px-1.5 py-2 text-right text-blue-700">{cell(c.outbound)}</td>
-            <td className="px-1.5 py-2 text-right text-rose-700">{cell(c.writeoff)}</td>
+            <td className="px-1 py-1.5 text-right"><WriteoffCell product_id={r.product_id} market={r.market} month={m} units={c.writeoff} /></td>
             <td className={`px-1.5 py-2 text-right font-semibold bg-gray-50/60 border-r border-gray-100 ${eomClass(c.eom)}`}>{nf(c.eom)}</td>
           </Fragment>
         )

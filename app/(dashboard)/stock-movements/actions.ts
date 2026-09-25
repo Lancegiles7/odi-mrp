@@ -164,6 +164,39 @@ export async function setStockAdjustment(input: {
 }
 
 // ============================================================
+// setProductWriteoff — manual finished-goods write-off for a product/month/
+// country. Feeds the Finished goods Stock Movements "write-offs" column (and
+// the EOM). Zero/blank clears it. One row per product × month × market.
+// ============================================================
+export async function setProductWriteoff(input: {
+  product_id: string
+  year_month: string
+  market: 'NZ' | 'AU'
+  units: number | null
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  const month = input.year_month.slice(0, 7) + '-01'
+  const units = input.units != null && Number.isFinite(input.units) ? input.units : null
+
+  if (units == null || units === 0) {
+    const { error } = await supabase.from('product_writeoffs')
+      .delete().eq('product_id', input.product_id).eq('year_month', month).eq('market', input.market)
+    if (error) return { ok: false, error: error.message }
+  } else {
+    const { error } = await supabase.from('product_writeoffs')
+      .upsert({ product_id: input.product_id, year_month: month, market: input.market, units } as never,
+        { onConflict: 'product_id,year_month,market' })
+    if (error) return { ok: false, error: error.message }
+  }
+
+  revalidatePath('/stock-movements')
+  return { ok: true }
+}
+
+// ============================================================
 // setStockMovementNote — free-text monthly note for a Stock Movements tab.
 // One row per scope (products|ingredients|packaging) × month. Blank clears it.
 // ============================================================
