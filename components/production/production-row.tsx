@@ -8,7 +8,7 @@ import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { CellCommentPopover } from '@/components/inventory/cell-comment-popover'
 import { TransferChips } from '@/components/stock-movements/transfer-chips'
 import type { TransferDetail } from '@/lib/transfer-stock'
-import { poCoverState, type PoCover } from '@/lib/production-po-status'
+import { poCoverState, PO_MATCH_TOLERANCE, type PoCover } from '@/lib/production-po-status'
 
 interface Props {
   productId: string
@@ -239,25 +239,23 @@ function FragmentCells({
     : po === 'diff'  ? 'bg-amber-50 border-amber-500 text-amber-900'
     : po === 'draft' ? 'bg-gray-200 border-gray-400 text-gray-700'
     :                  'bg-white border-gray-300'
-  const poNote = (() => {
-    if (!poCover || po === 'none') return null
-    if (po === 'match') return <span className="text-emerald-700">✓ PO in</span>
+  // PO status lives in the hover tooltip only — an inline note overflowed
+  // into the balance column.
+  const poSummary = (() => {
+    if (!poCover || po === 'none') return 'No PO for this month yet'
+    if (po === 'match') return `✓ PO in for ${poCover.firm.toLocaleString()}`
     const qty = po === 'draft' ? poCover.draft : poCover.firm
     const d = qty - production
-    const diff = production === 0 ? 'not planned'
-      : po === 'draft' && Math.abs(d) <= production * 0.01 ? null
-      : d > 0 ? `${d.toLocaleString()} over` : `${Math.abs(d).toLocaleString()} short`
-    return (
-      <span className={po === 'draft' ? 'text-gray-500' : 'text-amber-700'}>
-        {po === 'draft' ? 'Draft' : 'PO'} {qty.toLocaleString()}{diff ? ` · ${diff}` : ''}
-      </span>
-    )
+    const diff = production === 0 ? 'nothing planned this month'
+      : po === 'draft' && Math.abs(d) <= production * PO_MATCH_TOLERANCE ? null
+      : d > 0 ? `${d.toLocaleString()} over plan` : `${Math.abs(d).toLocaleString()} short of plan`
+    return `${po === 'draft' ? 'Draft PO' : 'PO'} ${qty.toLocaleString()}${diff ? ` · ${diff}` : ''}`
   })()
-  const poTitle = poCover?.refs.length
-    ? poCover.refs.map((r) =>
-        `${r.po}${r.supplier ? ` (${r.supplier})` : ''} · ${r.status === 'draft' ? 'DRAFT · ' : ''}due ${r.expected} · ${r.units.toLocaleString()}`,
-      ).join('\n')
-    : 'No PO for this month yet'
+  const poTitle = [
+    poSummary,
+    ...(poCover?.refs ?? []).map((r) =>
+      `${r.po}${r.supplier ? ` (${r.supplier})` : ''} · ${r.status === 'draft' ? 'DRAFT · ' : ''}due ${r.expected} · ${r.units.toLocaleString()}`),
+  ].join('\n')
   return (
     <>
       <td className={`px-2 text-right text-xs text-gray-600 border-l border-gray-200 tabular-nums ${negCls}`} style={{ height: 36 }}>
@@ -287,10 +285,9 @@ function FragmentCells({
             }
           }}
           placeholder="0"
-          title={`Production for ${monthLabel(month)} — Enter to save and move down\n\n${poTitle}`}
+          title={`${poTitle}\n\nProduction for ${monthLabel(month)} — Enter to save and move down`}
           className={`w-16 text-right text-[11px] border rounded px-1 py-0.5 ${inputCls} focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none`}
         />
-        {poNote && <div className="text-[10px] leading-tight mt-0.5 whitespace-nowrap" title={poTitle}>{poNote}</div>}
         {transfers.length > 0 && <div className="leading-none"><TransferChips items={transfers} /></div>}
       </td>
       <td className={`relative px-2 text-right tabular-nums ${negCls} ${balTxt}`} style={{ height: 36 }}>
