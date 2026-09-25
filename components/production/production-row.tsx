@@ -8,6 +8,7 @@ import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { CellCommentPopover } from '@/components/inventory/cell-comment-popover'
 import { TransferChips } from '@/components/stock-movements/transfer-chips'
 import type { TransferDetail } from '@/lib/transfer-stock'
+import { poCoverState, type PoCover } from '@/lib/production-po-status'
 
 interface Props {
   productId: string
@@ -24,6 +25,8 @@ interface Props {
   /** NZ ↔ AU transfer orders per month (signed: + in / − out). Read-only —
    *  raised in Purchase Orders. Counted in the balance, not as production. */
   transfersByMonth?: Record<string, TransferDetail[]>
+  /** Finished-goods POs due per live month — colours the Prod input. */
+  poCoverByMonth?: Record<string, PoCover>
   commentedCells: Set<string>      // "productId|yyyy-mm-01" keys
   showManufacturerChip?: boolean   // true on the flat "view all" table
   /** Which build this row plans. Production cells write to this market. */
@@ -46,7 +49,7 @@ interface Props {
 export function ProductionRow({
   productId, skuCode, productName, manufacturer, isActive,
   openingStock, openingSource, months, forecastByMonth, productionByMonth, transfersByMonth,
-  commentedCells, showManufacturerChip,
+  poCoverByMonth, commentedCells, showManufacturerChip,
   market = 'NZ', marketTag, lockedMonths,
 }: Props) {
   const locked = useMemo(() => new Set(lockedMonths ?? []), [lockedMonths])
@@ -148,6 +151,7 @@ export function ProductionRow({
             forecast={r.forecast}
             production={prod[r.month] ?? 0}
             transfers={transfersByMonth?.[r.month] ?? []}
+            poCover={poCoverByMonth?.[r.month]}
             balance={r.balance}
             state={r.state}
             shortAmount={r.shortAmount}
@@ -212,7 +216,7 @@ function ClosedMonthCells({
 }
 
 function FragmentCells({
-  productId, productName, month, forecast, production, transfers, balance, state, shortAmount, negCls, balTxt, hasComment, onCommit,
+  productId, productName, month, forecast, production, transfers, poCover, balance, state, shortAmount, negCls, balTxt, hasComment, onCommit,
 }: {
   productId: string
   productName: string
@@ -220,6 +224,7 @@ function FragmentCells({
   forecast: number
   production: number
   transfers: TransferDetail[]
+  poCover?: PoCover
   balance: number
   state: ShortfallState
   shortAmount: number
@@ -228,6 +233,31 @@ function FragmentCells({
   hasComment: boolean
   onCommit: (raw: string) => void
 }) {
+  const po = poCoverState(production, poCover)
+  const inputCls =
+    po === 'match' ? 'bg-emerald-50 border-emerald-500 text-emerald-900'
+    : po === 'diff'  ? 'bg-amber-50 border-amber-500 text-amber-900'
+    : po === 'draft' ? 'bg-gray-200 border-gray-400 text-gray-700'
+    :                  'bg-white border-gray-300'
+  const poNote = (() => {
+    if (!poCover || po === 'none') return null
+    if (po === 'match') return <span className="text-emerald-700">✓ PO in</span>
+    const qty = po === 'draft' ? poCover.draft : poCover.firm
+    const d = qty - production
+    const diff = production === 0 ? 'not planned'
+      : po === 'draft' && Math.abs(d) <= production * 0.01 ? null
+      : d > 0 ? `${d.toLocaleString()} over` : `${Math.abs(d).toLocaleString()} short`
+    return (
+      <span className={po === 'draft' ? 'text-gray-500' : 'text-amber-700'}>
+        {po === 'draft' ? 'Draft' : 'PO'} {qty.toLocaleString()}{diff ? ` · ${diff}` : ''}
+      </span>
+    )
+  })()
+  const poTitle = poCover?.refs.length
+    ? poCover.refs.map((r) =>
+        `${r.po}${r.supplier ? ` (${r.supplier})` : ''} · ${r.status === 'draft' ? 'DRAFT · ' : ''}due ${r.expected} · ${r.units.toLocaleString()}`,
+      ).join('\n')
+    : 'No PO for this month yet'
   return (
     <>
       <td className={`px-2 text-right text-xs text-gray-600 border-l border-gray-200 tabular-nums ${negCls}`} style={{ height: 36 }}>
@@ -257,9 +287,10 @@ function FragmentCells({
             }
           }}
           placeholder="0"
-          title={`Production for ${monthLabel(month)} — Enter to save and move down`}
-          className="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none"
+          title={`Production for ${monthLabel(month)} — Enter to save and move down\n\n${poTitle}`}
+          className={`w-16 text-right text-[11px] border rounded px-1 py-0.5 ${inputCls} focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none`}
         />
+        {poNote && <div className="text-[10px] leading-tight mt-0.5 whitespace-nowrap" title={poTitle}>{poNote}</div>}
         {transfers.length > 0 && <div className="leading-none"><TransferChips items={transfers} /></div>}
       </td>
       <td className={`relative px-2 text-right tabular-nums ${negCls} ${balTxt}`} style={{ height: 36 }}>

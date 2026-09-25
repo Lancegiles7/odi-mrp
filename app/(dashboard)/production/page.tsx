@@ -16,6 +16,8 @@ import { ProductionRow } from '@/components/production/production-row'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
+import { coverFor, type PoCover } from '@/lib/production-po-status'
+import { loadPoCover } from '@/lib/production-po-status-data'
 import type { DemandForecast, ProductionPlan } from '@/lib/types/database.types'
 
 export const metadata: Metadata = { title: 'Production schedule' }
@@ -44,6 +46,8 @@ interface ProdLine {
   productionByMonth: Record<string, number>
   /** NZ ↔ AU transfer legs landing on / leaving this line, per month. */
   transfersByMonth: Record<string, TransferDetail[]>
+  /** Finished-goods POs due per live month (by expected delivery date). */
+  poCoverByMonth: Record<string, PoCover>
   /** True when the product is split into NZ + AU lines (show the market tag). */
   showTag: boolean
 }
@@ -62,7 +66,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
-  const [{ data: products }, demand, { data: production }, ledger] = await Promise.all([
+  const [{ data: products }, demand, { data: production }, ledger, poCover] = await Promise.all([
     supabase
       .from('products')
       .select('id, sku_code, name, manufacturer, manufacturer_au, opening_stock_override, is_active')
@@ -85,6 +89,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       .gte('year_month', firstMonth)
       .lte('year_month', lastMonth) as unknown as Promise<{ data: Array<ProductionPlan & { market: string | null }> | null }>,
     loadStockLedger(),
+    // PO colouring is for live months only — completed months stay plain.
+    loadPoCover(activeMonths[0] ?? firstMonth, lastMonth),
   ])
 
   const allProducts = products ?? []
@@ -141,6 +147,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       forecastByMonth:  byMonth((m) => hasAu ? getCountryTotal(demandIdx, p.id, m, 'NZ') : getGrandTotal(demandIdx, p.id, m)),
       productionByMonth: byMonth((m) => getProductionCell(prodIdxNz, p.id, m)),
       transfersByMonth: transfersFor(p.id, hasAu ? ['NZ'] : ['NZ', 'AU']),
+      poCoverByMonth: coverFor(poCover, p.id, hasAu ? ['NZ'] : ['NZ', 'AU'], activeMonths),
       showTag: hasAu,
     })
     if (hasAu) {
@@ -151,6 +158,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         // AU production is only what's been planned — no make-to-demand default.
         productionByMonth: byMonth((m) => getProductionCell(prodIdxAu, p.id, m)),
         transfersByMonth: transfersFor(p.id, ['AU']),
+        poCoverByMonth: coverFor(poCover, p.id, ['AU'], activeMonths),
         showTag: true,
       })
     }
@@ -260,7 +268,10 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         {header}
 
         <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-100 border border-gray-300"></span> Production (editable)</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-white border border-gray-300"></span> Production — no PO yet</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-500"></span> PO in, matches</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-50 border border-amber-500"></span> PO in, different qty</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-200 border border-gray-400"></span> Draft PO only</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-50 border border-amber-200"></span> Amber — saved by this month&rsquo;s production</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-50 border border-red-200"></span> Red — short even with production</span>
           <span className="flex items-center gap-1.5"><span className="text-[9px] font-bold px-1 rounded border bg-teal-50 text-teal-700 border-teal-200">⇄</span> NZ ↔ AU transfer order — moves stock, not production</span>
@@ -341,6 +352,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                           forecastByMonth={ln.forecastByMonth}
                           productionByMonth={ln.productionByMonth}
                           transfersByMonth={ln.transfersByMonth}
+                          poCoverByMonth={ln.poCoverByMonth}
                           commentedCells={commentedCells}
                         />
                       )
@@ -450,6 +462,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                     forecastByMonth={ln.forecastByMonth}
                     productionByMonth={ln.productionByMonth}
                     transfersByMonth={ln.transfersByMonth}
+                          poCoverByMonth={ln.poCoverByMonth}
                     commentedCells={commentedCells}
                     showManufacturerChip
                   />
