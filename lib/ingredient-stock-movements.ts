@@ -88,8 +88,8 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     { data: openPos }, { data: openPoLines }, { data: adjustments },
   ] = await Promise.all([
     supabase.from('products')
-      .select('id, sku_code, name, wastage_pct')
-      .is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; wastage_pct: number | null }> | null }>,
+      .select('id, sku_code, name, wastage_pct, manufacture_market')
+      .is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; wastage_pct: number | null; manufacture_market: string | null }> | null }>,
     supabase.from('ingredients')
       .select('id, sku_code, name, unit_of_measure, supplier_id, total_loaded_cost, total_loaded_cost_au')
       .eq('is_active', true)
@@ -136,12 +136,21 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
   for (const m of calcMonths) { unitsNz.set(m, new Map()); unitsAu.set(m, new Map()) }
   for (const p of products ?? []) {
     const isDual = activeBomByProductAu.has(p.id)
+    // Ingredient consumption follows where the product is MANUFACTURED, not where
+    // it's sold. A made-in-AU product's NZ-demand production is still made in AU,
+    // so all its usage runs through the AU build; made-in-NZ, the reverse. Only
+    // 'BOTH'/unset keep the per-market production split.
+    const mm = (p as { manufacture_market: string | null }).manufacture_market
     for (const m of calcMonths) {
-      const nz = getProductionCell(prodIdxNz, p.id, m)
-      if (nz) unitsNz.get(m)!.set(p.id, nz)
-      if (isDual) {
-        const au = getProductionCell(prodIdxAu, p.id, m)
-        if (au) unitsAu.get(m)!.set(p.id, au)
+      const nz = getProductionCell(prodIdxNz, p.id, m) || 0
+      const au = isDual ? (getProductionCell(prodIdxAu, p.id, m) || 0) : 0
+      if (mm === 'AU' && isDual) {
+        if (nz + au) unitsAu.get(m)!.set(p.id, nz + au)          // all consumed in AU
+      } else if (mm === 'NZ') {
+        if (nz + au) unitsNz.get(m)!.set(p.id, nz + au)          // all consumed in NZ
+      } else {
+        if (nz) unitsNz.get(m)!.set(p.id, nz)
+        if (isDual && au) unitsAu.get(m)!.set(p.id, au)
       }
     }
   }

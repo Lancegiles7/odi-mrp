@@ -53,8 +53,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     { data: openPos }, { data: openPoLines },
   ] = await Promise.all([
     supabase.from('products')
-      .select('id, sku_code, name, size_g, wet_weight_g, wastage_pct')
-      .is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; size_g: number | null; wet_weight_g: number | null; wastage_pct: number | null }> | null }>,
+      .select('id, sku_code, name, size_g, wet_weight_g, wastage_pct, manufacture_market')
+      .is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; size_g: number | null; wet_weight_g: number | null; wastage_pct: number | null; manufacture_market: string | null }> | null }>,
     supabase.from('ingredients')
       .select('id, sku_code, name, unit_of_measure, supplier_id, opening_stock_override, opening_stock_override_au, is_active')
       .eq('is_active', true)
@@ -118,25 +118,31 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
 
   for (const p of products ?? []) {
     const isDual = activeBomByProductAu.has(p.id)
+    const mm = (p as { manufacture_market: string | null }).manufacture_market
     for (const m of months) {
+      let nz = 0, au = 0
       if (source === 'forecast') {
         if (isDual) {
-          const nz = getCountryTotal(demandIdx, p.id, m, 'NZ')
-          const au = getCountryTotal(demandIdx, p.id, m, 'AUS')
-          if (nz) unitsByMonthByProduct.get(m)!.set(p.id, nz)
-          if (au) unitsAuByMonthByProduct.get(m)!.set(p.id, au)
+          nz = getCountryTotal(demandIdx, p.id, m, 'NZ') || 0
+          au = getCountryTotal(demandIdx, p.id, m, 'AUS') || 0
         } else {
-          const units = getGrandTotal(demandIdx, p.id, m)
-          if (units) unitsByMonthByProduct.get(m)!.set(p.id, units)
+          nz = getGrandTotal(demandIdx, p.id, m) || 0
         }
       } else {
         // Production source: each build's own plan (Brand Nation NZ, VMC AU).
-        const nz = getProductionCell(prodIdxNz, p.id, m)
+        nz = getProductionCell(prodIdxNz, p.id, m) || 0
+        au = isDual ? (getProductionCell(prodIdxAu, p.id, m) || 0) : 0
+      }
+      // Ingredient consumption follows where the product is MANUFACTURED, not
+      // where it's sold: a made-in-AU product consumes everything via the AU
+      // build (and vice versa); 'BOTH'/unset keep the per-market split.
+      if (mm === 'AU' && isDual) {
+        if (nz + au) unitsAuByMonthByProduct.get(m)!.set(p.id, nz + au)
+      } else if (mm === 'NZ') {
+        if (nz + au) unitsByMonthByProduct.get(m)!.set(p.id, nz + au)
+      } else {
         if (nz) unitsByMonthByProduct.get(m)!.set(p.id, nz)
-        if (isDual) {
-          const au = getProductionCell(prodIdxAu, p.id, m)
-          if (au) unitsAuByMonthByProduct.get(m)!.set(p.id, au)
-        }
+        if (isDual && au) unitsAuByMonthByProduct.get(m)!.set(p.id, au)
       }
     }
   }
