@@ -8,6 +8,7 @@ import {
   getGrandTotal, getCountryTotal, getProductionCell, monthLabel, calcRollingBalance,
 } from '@/lib/demand'
 import { loadStockLedger, closingStockAt } from '@/lib/stock-movements-data'
+import type { TransferDetail } from '@/lib/transfer-stock'
 import { getPlanningWindow } from '@/lib/settings'
 import { PlanningHistoryToggle } from '@/components/shared/planning-history-toggle'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
@@ -41,6 +42,8 @@ interface ProdLine {
   opening: number
   forecastByMonth: Record<string, number>
   productionByMonth: Record<string, number>
+  /** NZ ↔ AU transfer legs landing on / leaving this line, per month. */
+  transfersByMonth: Record<string, TransferDetail[]>
   /** True when the product is split into NZ + AU lines (show the market tag). */
   showTag: boolean
 }
@@ -107,6 +110,19 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     return out
   }
 
+  // NZ ↔ AU transfers (transfer orders marked as moving stock between builds) move stock between the
+  // two lines without producing anything — off the sender at pick-up, onto the
+  // receiver on arrival. A single-line product carries both legs (net zero).
+  const transfersFor = (pid: string, markets: Array<'NZ' | 'AU'>): Record<string, TransferDetail[]> => {
+    const out: Record<string, TransferDetail[]> = {}
+    for (const m of months) {
+      const list = markets.flatMap((mk) => ledger.transfers[mk].get(pid)?.get(m) ?? [])
+      if (list.length) out[m] = list
+    }
+    return out
+  }
+  const netOf = (list: TransferDetail[] | undefined) => (list ?? []).reduce((s, t) => s + t.units, 0)
+
   // Expand products into production lines. A dual product (manufacturer_au set)
   // splits into an NZ line under Brand Nation (NZ-channel demand, NZ plan) and
   // an AU line under VMC (AU-channel demand, AU plan). Non-dual products keep a
@@ -124,6 +140,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       opening: openingFor(p, 'NZ'),
       forecastByMonth:  byMonth((m) => hasAu ? getCountryTotal(demandIdx, p.id, m, 'NZ') : getGrandTotal(demandIdx, p.id, m)),
       productionByMonth: byMonth((m) => getProductionCell(prodIdxNz, p.id, m)),
+      transfersByMonth: transfersFor(p.id, hasAu ? ['NZ'] : ['NZ', 'AU']),
       showTag: hasAu,
     })
     if (hasAu) {
@@ -133,6 +150,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         forecastByMonth:  byMonth((m) => getCountryTotal(demandIdx, p.id, m, 'AUS')),
         // AU production is only what's been planned — no make-to-demand default.
         productionByMonth: byMonth((m) => getProductionCell(prodIdxAu, p.id, m)),
+        transfersByMonth: transfersFor(p.id, ['AU']),
         showTag: true,
       })
     }
@@ -147,7 +165,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     const totals = new Map<string, number>(activeMonths.map((m) => [m, 0]))
     const shorts = new Map<string, number>(activeMonths.map((m) => [m, 0]))
     for (const ln of items) {
-      const rolling = calcRollingBalance(activeMonths, ln.opening, (m) => ln.forecastByMonth[m] ?? 0, (m) => ln.productionByMonth[m] ?? 0)
+      const rolling = calcRollingBalance(activeMonths, ln.opening, (m) => ln.forecastByMonth[m] ?? 0, (m) => ln.productionByMonth[m] ?? 0, (m) => netOf(ln.transfersByMonth[m]))
       for (const r of rolling) {
         if (r.forecast > 0)    totals.set(r.month, (totals.get(r.month) ?? 0) + 1)
         if (r.state === 'red') shorts.set(r.month, (shorts.get(r.month) ?? 0) + 1)
@@ -175,7 +193,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     for (const ln of items) {
       let bal = ln.opening
       for (const m of activeMonths) {
-        bal = bal + (ln.productionByMonth[m] ?? 0) - (ln.forecastByMonth[m] ?? 0)
+        bal = bal + (ln.productionByMonth[m] ?? 0) + netOf(ln.transfersByMonth[m]) - (ln.forecastByMonth[m] ?? 0)
         if (bal < 0) n++
       }
     }
@@ -193,7 +211,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
         <p className="text-sm text-gray-500 mt-1">
           {planning.isHistory
             ? <>Completed months included ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · closed months are read-only, balances run from {monthLabel(planning.anchorMonth)}</>
-            : <>Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · Balance = prev + production − forecast</>}
+            : <>Rolling 12 months ({monthLabel(firstMonth)} → {monthLabel(lastMonth)}) · Balance = prev + production ± transfers − forecast</>}
         </p>
       </div>
       <div className="flex gap-2 items-center">
@@ -245,6 +263,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-100 border border-gray-300"></span> Production (editable)</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-50 border border-amber-200"></span> Amber — saved by this month&rsquo;s production</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-50 border border-red-200"></span> Red — short even with production</span>
+          <span className="flex items-center gap-1.5"><span className="text-[9px] font-bold px-1 rounded border bg-teal-50 text-teal-700 border-teal-200">⇄</span> NZ ↔ AU transfer order — moves stock, not production</span>
           <span className="text-gray-300">·</span>
           <span>Opening stock = closing (EOM) of the last closed month from Stock Movements{closedMonthLabel ? ` (${closedMonthLabel})` : ''}.</span>
         </div>
@@ -321,6 +340,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                           lockedMonths={planning.lockedMonths}
                           forecastByMonth={ln.forecastByMonth}
                           productionByMonth={ln.productionByMonth}
+                          transfersByMonth={ln.transfersByMonth}
                           commentedCells={commentedCells}
                         />
                       )
@@ -429,6 +449,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                     lockedMonths={planning.lockedMonths}
                     forecastByMonth={ln.forecastByMonth}
                     productionByMonth={ln.productionByMonth}
+                    transfersByMonth={ln.transfersByMonth}
                     commentedCells={commentedCells}
                     showManufacturerChip
                   />

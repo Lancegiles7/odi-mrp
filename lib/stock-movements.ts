@@ -2,14 +2,17 @@
  * Stock Movements ledger — a running finished-goods stocktake per product.
  *
  * For each month, in order:
- *   EOM = opening + inbound − outbound − write-off        (actual months)
- *   EOM = opening + produced − demand                     (forecast months)
+ *   EOM = opening + inbound − outbound − write-off ± transfer   (actual months)
+ *   EOM = opening + produced − demand ± transfer                (forecast months)
  * where opening is the previous month's EOM. March (launch) starts at 0.
  *
  * Pure function: the page assembles the per-product/per-month maps from the
  * DB (receipts, BvA actuals, write-offs, production plan, demand forecast)
- * and this rolls them into the ledger.
+ * and this rolls them into the ledger. Transfers are NZ ↔ AU transfer
+ * orders moving stock between the NZ and AUS rows (see lib/transfer-stock.ts).
  */
+import type { TransferDetail } from '@/lib/transfer-stock'
+export type { TransferDetail }
 
 /** One finished-goods receipt behind a month's inbound total. */
 export interface ReceiptDetail {
@@ -34,6 +37,8 @@ export interface ActualCell {
   outbound: number     // sold + samples (BvA actuals)
   writeoff: number
   eom: number          // predicted closing stock — INCLUDES fully-open POs (stillToReceipt)
+  transfer: number     // net NZ ↔ AU transfer (+ in / − out)
+  transfers: TransferDetail[]
   receipts: ReceiptDetail[]     // breakdown behind `inbound` (for the hover)
   stillToReceipt: OpenPoDetail[] // fully-open POs (nothing received) — counted in eom
   partialReceipt: OpenPoDetail[] // part-received PO lines — flagged only, not counted
@@ -43,6 +48,8 @@ export interface ForecastCell {
   produced: number     // production plan
   demand: number       // demand forecast
   eom: number          // INCLUDES fully-open POs (stillToReceipt)
+  transfer: number     // net NZ ↔ AU transfer (+ in / − out)
+  transfers: TransferDetail[]
   shortfall: boolean   // eom < 0
   stillToReceipt: OpenPoDetail[] // fully-open POs — counted in eom
   partialReceipt: OpenPoDetail[] // part-received PO lines — flagged only
@@ -77,6 +84,7 @@ export interface MarketMaps {
   opening?: Map<string, number>
   inboundReceipts?: Map<string, Map<string, ReceiptDetail[]>>
   openPo?: Map<string, Map<string, OpenPoDetail[]>>
+  transfers?: Map<string, Map<string, TransferDetail[]>>
 }
 
 function buildRow(
@@ -88,6 +96,7 @@ function buildRow(
   startMonth: string | null,
 ): StockRow {
   const openByMonth = maps.openPo?.get(p.id)
+  const trByMonth = maps.transfers?.get(p.id)
   const baseOpening = maps.opening?.get(p.id) ?? 0
   let eom = baseOpening
   let carriedOpening = baseOpening   // balance carried into the first visible month
@@ -103,13 +112,15 @@ function buildRow(
     const stillToReceipt = open.filter((o) => !o.partial)
     const partialReceipt = open.filter((o) => o.partial)
     const expected = stillToReceipt.reduce((s, o) => s + o.remaining, 0)
-    eom = eom + inbound + expected - outbound - writeoff
-    if (inbound || outbound || writeoff || open.length) activity = true
+    const transfers = trByMonth?.get(m) ?? []
+    const transfer = transfers.reduce((s, t) => s + t.units, 0)
+    eom = eom + inbound + expected - outbound - writeoff + transfer
+    if (inbound || outbound || writeoff || open.length || transfers.length) activity = true
     // Months before an AU row's start are rolled into its opening (stock built
     // ahead of launch), not shown as their own cells.
     if (!visible(m)) { carriedOpening = eom; continue }
     const receipts = maps.inboundReceipts?.get(p.id)?.get(m) ?? []
-    actual[m] = { inbound, outbound, writeoff, eom, receipts, stillToReceipt, partialReceipt }
+    actual[m] = { inbound, outbound, writeoff, eom, transfer, transfers, receipts, stillToReceipt, partialReceipt }
   }
 
   const forecast: Record<string, ForecastCell> = {}
@@ -120,11 +131,13 @@ function buildRow(
     const stillToReceipt = open.filter((o) => !o.partial)
     const partialReceipt = open.filter((o) => o.partial)
     const expected = stillToReceipt.reduce((s, o) => s + o.remaining, 0)
-    eom = eom + produced + expected - demand
+    const transfers = trByMonth?.get(m) ?? []
+    const transfer = transfers.reduce((s, t) => s + t.units, 0)
+    eom = eom + produced + expected - demand + transfer
     const noPo = produced > 0 && open.length === 0
-    if (produced || demand || open.length) activity = true
+    if (produced || demand || open.length || transfers.length) activity = true
     if (!visible(m)) { carriedOpening = eom; continue }   // pre-launch build → opening
-    forecast[m] = { produced, demand, eom, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo }
+    forecast[m] = { produced, demand, eom, transfer, transfers, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo }
   }
 
   return {
@@ -141,7 +154,8 @@ function firstActivityMonth(pid: string, maps: MarketMaps, months: string[]): st
     if (
       at(maps.inbound, pid, m) || at(maps.outbound, pid, m) || at(maps.writeoff, pid, m) ||
       at(maps.produced, pid, m) || at(maps.demand, pid, m) ||
-      (maps.openPo?.get(pid)?.get(m)?.length ?? 0) > 0
+      (maps.openPo?.get(pid)?.get(m)?.length ?? 0) > 0 ||
+      (maps.transfers?.get(pid)?.get(m)?.length ?? 0) > 0
     ) return m
   }
   return null

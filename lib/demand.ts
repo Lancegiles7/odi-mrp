@@ -153,12 +153,14 @@ export function calcRollingBalance(
   opening: number,
   forecastByMonth: (m: string) => number,
   productionByMonth: (m: string) => number,
+  /** Net NZ ↔ AU transfer (+ in / − out). Moves stock, isn't production. */
+  transferByMonth: (m: string) => number = () => 0,
 ): MonthRow[] {
   const out: MonthRow[] = []
   let bal = opening
   for (const m of months) {
     const f = forecastByMonth(m)
-    const p = productionByMonth(m)
+    const p = productionByMonth(m) + transferByMonth(m)
     const carried   = bal                  // balance before this month's production / forecast applied
     const available = Math.max(0, carried) + p
     const shortAmount = Math.max(0, f - available)

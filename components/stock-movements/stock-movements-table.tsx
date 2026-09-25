@@ -3,6 +3,7 @@ import type { StockRow } from '@/lib/stock-movements'
 import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
 import { InboundCell } from '@/components/stock-movements/inbound-cell'
 import { OpenPoChips } from '@/components/stock-movements/open-po-chips'
+import { TransferChips } from '@/components/stock-movements/transfer-chips'
 
 const nf = (n: number) => Math.round(n).toLocaleString('en-NZ')
 const dash = <span className="text-gray-300">—</span>
@@ -121,7 +122,9 @@ export function StockMovementsTable({
         </table>
       </div>
       <div className="p-3 text-[11px] text-gray-500 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-x-4 gap-y-1 items-center">
-        <span><b>EOM</b> = opening + inbound − sold/samples − write-offs (carries to next month)</span>
+        <span><b>EOM</b> = opening + inbound − sold/samples − write-offs ± transfers (carries to next month)</span>
+        <span className="text-gray-300">·</span>
+        <span><span className="text-teal-700 font-semibold">⇄</span> = NZ ↔ AU transfer order (off the sending market at pick-up, onto the receiving one on arrival)</span>
         <span className="text-gray-300">·</span>
         <span className="text-emerald-700">In / Prod</span>
         <span className="text-blue-700">Out / Demand</span>
@@ -158,10 +161,10 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
       <td className={`px-2 py-2 text-right sticky left-[240px] z-10 border-r-2 border-gray-300 text-gray-500 ${isAu ? 'bg-sky-50/40' : 'bg-white'} group-hover:bg-gray-50`}>{nf(r.opening)}</td>
       {actualMonths.map((m) => {
         if (before(m)) return <BlankActual key={m} />
-        const c = r.actual[m] ?? { inbound: 0, outbound: 0, writeoff: 0, eom: 0, receipts: [], stillToReceipt: [], partialReceipt: [] }
+        const c = r.actual[m] ?? { inbound: 0, outbound: 0, writeoff: 0, eom: 0, transfer: 0, transfers: [], receipts: [], stillToReceipt: [], partialReceipt: [] }
         return (
           <Fragment key={m}>
-            <InboundCell value={c.inbound} receipts={c.receipts ?? []} stillToReceipt={c.stillToReceipt ?? []} partialReceipt={c.partialReceipt ?? []} />
+            <InboundCell value={c.inbound} receipts={c.receipts ?? []} stillToReceipt={c.stillToReceipt ?? []} partialReceipt={c.partialReceipt ?? []} transfers={c.transfers ?? []} />
             <td className="px-1.5 py-2 text-right text-blue-700">{cell(c.outbound)}</td>
             <td className="px-1.5 py-2 text-right text-rose-700">{cell(c.writeoff)}</td>
             <td className={`px-1.5 py-2 text-right font-semibold bg-gray-50/60 border-r border-gray-100 ${eomClass(c.eom)}`}>{nf(c.eom)}</td>
@@ -170,13 +173,14 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
       })}
       {forecastMonths.map((m, i) => {
         if (before(m)) return <BlankForecast key={m} first={i === 0} />
-        const c = r.forecast[m] ?? { produced: 0, demand: 0, eom: 0, shortfall: false, stillToReceipt: [], partialReceipt: [], noPo: false }
+        const c = r.forecast[m] ?? { produced: 0, demand: 0, eom: 0, transfer: 0, transfers: [], shortfall: false, stillToReceipt: [], partialReceipt: [], noPo: false }
         return (
           <Fragment key={m}>
             <td className={`px-1.5 py-2 text-right text-emerald-700 bg-amber-50/20 ${i === 0 ? 'border-l-2 border-amber-200' : 'border-l border-gray-100'}`}>
               {cell(c.produced)}
               {(c.stillToReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.stillToReceipt} kind="still" /></div>}
               {(c.partialReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.partialReceipt} kind="partial" /></div>}
+              {(c.transfers?.length ?? 0) > 0 && <div><TransferChips items={c.transfers} /></div>}
               {c.noPo && <div className="mt-0.5 text-[9px] font-bold px-1.5 rounded border bg-amber-50 text-amber-700 border-amber-200 inline-block">⚑ no PO</div>}
             </td>
             <td className="px-1.5 py-2 text-right text-blue-700 bg-amber-50/20">{cell(c.demand)}</td>

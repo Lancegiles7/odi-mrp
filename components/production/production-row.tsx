@@ -6,6 +6,8 @@ import { updateProductionCell } from '@/app/(dashboard)/production/actions'
 import { calcRollingBalance, monthLabel, type ShortfallState } from '@/lib/demand'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { CellCommentPopover } from '@/components/inventory/cell-comment-popover'
+import { TransferChips } from '@/components/stock-movements/transfer-chips'
+import type { TransferDetail } from '@/lib/transfer-stock'
 
 interface Props {
   productId: string
@@ -19,6 +21,9 @@ interface Props {
   months: string[]
   forecastByMonth: Record<string, number>
   productionByMonth: Record<string, number>
+  /** NZ ↔ AU transfer orders per month (signed: + in / − out). Read-only —
+   *  raised in Purchase Orders. Counted in the balance, not as production. */
+  transfersByMonth?: Record<string, TransferDetail[]>
   commentedCells: Set<string>      // "productId|yyyy-mm-01" keys
   showManufacturerChip?: boolean   // true on the flat "view all" table
   /** Which build this row plans. Production cells write to this market. */
@@ -40,7 +45,7 @@ interface Props {
  */
 export function ProductionRow({
   productId, skuCode, productName, manufacturer, isActive,
-  openingStock, openingSource, months, forecastByMonth, productionByMonth,
+  openingStock, openingSource, months, forecastByMonth, productionByMonth, transfersByMonth,
   commentedCells, showManufacturerChip,
   market = 'NZ', marketTag, lockedMonths,
 }: Props) {
@@ -59,8 +64,9 @@ export function ProductionRow({
       opening,
       (m) => forecastByMonth[m] ?? 0,
       (m) => prod[m] ?? 0,
+      (m) => (transfersByMonth?.[m] ?? []).reduce((s, t) => s + t.units, 0),
     ),
-    [activeMonths, opening, forecastByMonth, prod],
+    [activeMonths, opening, forecastByMonth, prod, transfersByMonth],
   )
 
   function commit(month: string, raw: string) {
@@ -141,6 +147,7 @@ export function ProductionRow({
             month={r.month}
             forecast={r.forecast}
             production={prod[r.month] ?? 0}
+            transfers={transfersByMonth?.[r.month] ?? []}
             balance={r.balance}
             state={r.state}
             shortAmount={r.shortAmount}
@@ -205,13 +212,14 @@ function ClosedMonthCells({
 }
 
 function FragmentCells({
-  productId, productName, month, forecast, production, balance, state, shortAmount, negCls, balTxt, hasComment, onCommit,
+  productId, productName, month, forecast, production, transfers, balance, state, shortAmount, negCls, balTxt, hasComment, onCommit,
 }: {
   productId: string
   productName: string
   month: string
   forecast: number
   production: number
+  transfers: TransferDetail[]
   balance: number
   state: ShortfallState
   shortAmount: number
@@ -252,6 +260,7 @@ function FragmentCells({
           title={`Production for ${monthLabel(month)} — Enter to save and move down`}
           className="w-16 text-right text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-gray-50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none"
         />
+        {transfers.length > 0 && <div className="leading-none"><TransferChips items={transfers} /></div>}
       </td>
       <td className={`relative px-2 text-right tabular-nums ${negCls} ${balTxt}`} style={{ height: 36 }}>
         <div className="text-xs leading-tight">{balance.toLocaleString()}</div>
@@ -281,9 +290,13 @@ function FragmentCells({
             entityName={productName}
             state={state}
             hasComment={hasComment}
-            status={state === 'red'
-              ? `Balance ${balance.toLocaleString()} — short even with ${production.toLocaleString()} planned production.`
-              : `Balance ${balance.toLocaleString()} — covered by ${production.toLocaleString()} planned production this month.`}
+            status={(() => {
+              const net = transfers.reduce((s, t) => s + t.units, 0)
+              const tr = net ? ` and ${net > 0 ? '+' : '−'}${Math.abs(net).toLocaleString()} transferred` : ''
+              return state === 'red'
+                ? `Balance ${balance.toLocaleString()} — short even with ${production.toLocaleString()} planned production${tr}.`
+                : `Balance ${balance.toLocaleString()} — covered by ${production.toLocaleString()} planned production${tr} this month.`
+            })()}
           />
         )}
       </td>

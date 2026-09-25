@@ -10,6 +10,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { buildStockLedger, type StockRow, type ReceiptDetail, type OpenPoDetail } from '@/lib/stock-movements'
+import { loadBuildTransfers, type BuildTransfers } from '@/lib/transfer-stock'
 
 const AU_START = '2026-09-01'   // AU demand begins Sept 2026 (fallback row start)
 
@@ -35,6 +36,8 @@ export interface StockLedger {
   forecastMonths: string[]
   /** Latest month with actuals loaded — the last "closed" month. */
   actualThrough: string | null
+  /** NZ ↔ AU transfer legs per market: product_id → month → transfers. */
+  transfers: BuildTransfers
 }
 
 export async function loadStockLedger(): Promise<StockLedger> {
@@ -42,7 +45,7 @@ export async function loadStockLedger(): Promise<StockLedger> {
 
   const [
     { data: products }, { data: receipts }, { data: actuals },
-    { data: writeoffs }, { data: production }, demand,
+    { data: writeoffs }, { data: production }, demand, transfers,
   ] = await Promise.all([
     supabase.from('products')
       .select('id, sku_code, name, product_type')
@@ -60,6 +63,7 @@ export async function loadStockLedger(): Promise<StockLedger> {
         .select('product_id, year_month, units, channel')
         .order('product_id').order('year_month')
         .range(from, to) as unknown as PromiseLike<{ data: Array<{ product_id: string; year_month: string; units: number; channel: string | null }> | null; error: { message: string } | null }>),
+    loadBuildTransfers(),
   ])
 
   // AU channels differ by table: product_actuals uses the `au_*` prefix
@@ -112,11 +116,16 @@ export async function loadStockLedger(): Promise<StockLedger> {
   const producedAu = mergeProduced(plannedAu, inboundAu)
 
   // ── Open POs still to receipt (chips), split NZ / AU by PO market ──
+  // Transfers are excluded: the goods already exist, so an open transfer is
+  // not new stock arriving. NZ ↔ AU ones move stock via `transfers`.
   const openPoNz = new Map<string, Map<string, OpenPoDetail[]>>()
   const openPoAu = new Map<string, Map<string, OpenPoDetail[]>>()
   const { data: openPos } = await supabase.from('purchase_orders')
-    .select('id, po_number, expected_delivery_date, market, suppliers(name)')
-    .in('status', ['submitted', 'partially_received']) as {
+    // Name the FK: transfers added a second link to suppliers (the "To" site),
+    // and an unqualified suppliers(name) embed fails outright (PGRST201).
+    .select('id, po_number, expected_delivery_date, market, suppliers!purchase_orders_supplier_id_fkey(name)')
+    .in('status', ['submitted', 'partially_received'])
+    .neq('po_type', 'transfer') as {
       data: Array<{ id: string; po_number: string; expected_delivery_date: string | null; market: string | null; suppliers: { name: string } | null }> | null }
   if ((openPos ?? []).length) {
     const poById = new Map((openPos ?? []).map((p) => [p.id, p]))
@@ -146,6 +155,8 @@ export async function loadStockLedger(): Promise<StockLedger> {
   }
   for (const src of [openPoNz, openPoAu])
     for (const bm of Array.from(src.values())) for (const k of Array.from(bm.keys())) monthSet.add(k)
+  for (const src of [transfers.NZ, transfers.AU])
+    for (const bm of Array.from(src.values())) for (const k of Array.from(bm.keys())) monthSet.add(k)
   const sorted = Array.from(monthSet).sort()
   const months: string[] = []
   if (sorted.length) {
@@ -165,11 +176,11 @@ export async function loadStockLedger(): Promise<StockLedger> {
 
   const rows = buildStockLedger({
     products: products ?? [], actualMonths, forecastMonths, auStartMonth: AU_START,
-    nz: { inbound: inboundNz, outbound: outboundNz, writeoff: writeoffNz, produced: producedNz, demand: demandNz, inboundReceipts: receiptsNz, openPo: openPoNz },
-    au: { inbound: inboundAu, outbound: outboundAu, writeoff: writeoffAu, produced: producedAu, demand: demandAu, inboundReceipts: receiptsAu, openPo: openPoAu },
+    nz: { inbound: inboundNz, outbound: outboundNz, writeoff: writeoffNz, produced: producedNz, demand: demandNz, inboundReceipts: receiptsNz, openPo: openPoNz, transfers: transfers.NZ },
+    au: { inbound: inboundAu, outbound: outboundAu, writeoff: writeoffAu, produced: producedAu, demand: demandAu, inboundReceipts: receiptsAu, openPo: openPoAu, transfers: transfers.AU },
   })
 
-  return { rows, months, actualMonths, forecastMonths, actualThrough }
+  return { rows, months, actualMonths, forecastMonths, actualThrough, transfers }
 }
 
 /**

@@ -95,6 +95,11 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       .select('pickup_date, transport_provider')
       .eq('id', po.id)
       .maybeSingle() as { data: { pickup_date: string | null; transport_provider: string | null } | null }
+    // Separate again: stock_move arrives with migration 072.
+    const { data: stockMove } = await supabase.from('purchase_orders')
+      .select('stock_move')
+      .eq('id', po.id)
+      .maybeSingle() as { data: { stock_move: 'NZ_TO_AU' | 'AU_TO_NZ' | null } | null }
     const transferLines: TransferLine[] = (lines ?? [])
       .filter((l) => l.product_id)
       .map((l) => {
@@ -121,6 +126,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         initialFromId={po.supplier_id}
         initialToId={po.destination_supplier_id ?? ''}
         initialMarket={po.market === 'AU' ? 'AU' : 'NZ'}
+        initialStockMove={stockMove?.stock_move ?? null}
         initialPickupDate={logistics?.pickup_date ?? null}
         initialExpectedDate={po.expected_delivery_date?.slice(0, 10) ?? null}
         initialTransportProvider={logistics?.transport_provider ?? null}

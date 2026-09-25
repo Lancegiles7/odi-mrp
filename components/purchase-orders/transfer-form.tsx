@@ -50,6 +50,8 @@ interface Props {
   initialFromId: string
   initialToId: string
   initialMarket: 'NZ' | 'AU'
+  /** Moves stock between the NZ and AUS builds (null = logistics only). */
+  initialStockMove: 'NZ_TO_AU' | 'AU_TO_NZ' | null
   initialPickupDate: string | null
   initialExpectedDate: string | null
   initialTransportProvider: string | null
@@ -78,6 +80,7 @@ export function TransferForm(props: Props) {
   const [fromId, setFromId]   = useState(props.initialFromId)
   const [toId, setToId]       = useState(props.initialToId)
   const [market, setMarket]   = useState<'NZ' | 'AU'>(props.initialMarket)
+  const [stockMove, setStockMove] = useState<'NZ_TO_AU' | 'AU_TO_NZ' | null>(props.initialStockMove)
   const [pickupDate, setPickupDate]     = useState(props.initialPickupDate ?? '')
   const [expectedDate, setExpectedDate] = useState(props.initialExpectedDate ?? '')
   const [transport, setTransport]       = useState(props.initialTransportProvider ?? '')
@@ -211,6 +214,7 @@ export function TransferForm(props: Props) {
       po_type: 'transfer' as const,
       supplier_id: fromId,
       destination_supplier_id: toId,
+      stock_move: stockMove,
       pickup_date: pickupDate || null,
       transport_provider: transport.trim() || null,
       currency: 'NZD',
@@ -339,6 +343,29 @@ export function TransferForm(props: Props) {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Stock move between builds */}
+        <div className="mt-4">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Moves stock between builds?</label>
+          <div className="inline-flex gap-1.5 flex-wrap">
+            {([
+              { v: null,        label: 'No' },
+              { v: 'NZ_TO_AU',  label: 'NZ → AU' },
+              { v: 'AU_TO_NZ',  label: 'AU → NZ' },
+            ] as const).map((o) => (
+              <button key={o.label} type="button" disabled={readOnly}
+                onClick={() => setStockMove(o.v)}
+                className={`text-sm font-semibold px-4 py-1.5 rounded-lg border ${stockMove === o.v ? (o.v ? 'bg-teal-50 text-teal-800 border-teal-300' : 'bg-gray-100 text-gray-800 border-gray-300') : 'bg-white text-gray-500 border-gray-200'} disabled:opacity-60`}>
+                {o.v && '⇄ '}{o.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-1.5">
+            {stockMove
+              ? <>Takes the product units off the {stockMove === 'NZ_TO_AU' ? 'NZ' : 'AUS'} build at pick-up and puts them on the {stockMove === 'NZ_TO_AU' ? 'AUS' : 'NZ'} build on delivery, in the Production schedule and Stock Movements. Not counted as production.</>
+              : <>Logistics only. Stock stays on the same build, e.g. factory → DC, or AU-made stock shipped to NZ for the NZ build.</>}
+          </p>
         </div>
 
         {/* Logistics */}

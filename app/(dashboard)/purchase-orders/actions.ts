@@ -718,8 +718,10 @@ export async function receivePoLines(input: {
 // destination market, per product line, in INDIVIDUAL units (packs × pack size).
 // Idempotent: it wipes this transfer's own 'transfer'-source receipts and
 // rebuilds them from the received quantities, so editing/re-receiving stays in
-// sync. Needs a market (NZ/AU) on both sites; if either is missing it clears the
-// receipts and returns a warning rather than guessing the direction.
+// sync. Direction comes from the transfer's "Moves stock between builds?"
+// choice (stock_move). Left on "No", it only clears the receipts — factory → DC
+// moves and AU-made stock shipped to NZ for the NZ build don't change builds.
+// Planned (not yet received) moves are shown by lib/transfer-stock.ts.
 // ============================================================
 async function syncTransferReceipts(
   supabase: ReturnType<typeof createClient>,
@@ -728,8 +730,8 @@ async function syncTransferReceipts(
 ): Promise<{ warning?: string }> {
   const { data: po } = await supabase
     .from('purchase_orders')
-    .select('po_number, po_type, supplier_id, destination_supplier_id, expected_delivery_date, order_date, pickup_date')
-    .eq('id', poId).maybeSingle() as { data: { po_number: string; po_type: string | null; supplier_id: string; destination_supplier_id: string | null; expected_delivery_date: string | null; order_date: string | null; pickup_date: string | null } | null }
+    .select('po_number, po_type, stock_move, supplier_id, destination_supplier_id, expected_delivery_date, order_date, pickup_date')
+    .eq('id', poId).maybeSingle() as { data: { po_number: string; po_type: string | null; stock_move: 'NZ_TO_AU' | 'AU_TO_NZ' | null; supplier_id: string; destination_supplier_id: string | null; expected_delivery_date: string | null; order_date: string | null; pickup_date: string | null } | null }
   if (!po || po.po_type !== 'transfer') return {}
 
   const { data: lines } = await supabase
@@ -745,17 +747,14 @@ async function syncTransferReceipts(
     await supabase.from('finished_goods_receipts').delete().in('source', ['transfer', 'manual']).in('purchase_order_line_id', lineIds)
   }
   if (!lines || lines.length === 0) return {}
+  if (po.stock_move !== 'NZ_TO_AU' && po.stock_move !== 'AU_TO_NZ') return {}   // logistics only
 
   const siteIds = [po.supplier_id, po.destination_supplier_id].filter(Boolean) as string[]
   const { data: sites } = await supabase
-    .from('suppliers').select('id, name, market').in('id', siteIds) as { data: Array<{ id: string; name: string; market: string | null }> | null }
-  const src = (sites ?? []).find((s) => s.id === po.supplier_id)
-  const dest = (sites ?? []).find((s) => s.id === po.destination_supplier_id)
-  const srcMarket = src?.market === 'AU' ? 'AU' : src?.market === 'NZ' ? 'NZ' : null
-  const destMarket = dest?.market === 'AU' ? 'AU' : dest?.market === 'NZ' ? 'NZ' : null
-  if (!src || !dest || !srcMarket || !destMarket) {
-    return { warning: `Transfer saved, but stock wasn't applied — set a market (NZ/AU) on both sites (${src?.name ?? 'from'} → ${dest?.name ?? 'to'}).` }
-  }
+    .from('suppliers').select('id, name').in('id', siteIds) as { data: Array<{ id: string; name: string }> | null }
+  const srcName  = (sites ?? []).find((s) => s.id === po.supplier_id)?.name ?? 'origin'
+  const destName = (sites ?? []).find((s) => s.id === po.destination_supplier_id)?.name ?? 'destination'
+  const [srcMarket, destMarket] = po.stock_move === 'NZ_TO_AU' ? ['NZ', 'AU'] : ['AU', 'NZ']
 
   const iso = (v?: string | null) => (/^\d{4}-\d{2}-\d{2}$/.test(v ?? '') ? (v as string) : null)
   const rows: Record<string, unknown>[] = []
@@ -768,12 +767,12 @@ async function syncTransferReceipts(
     rows.push({
       product_id: l.product_id, received_month: month, received_date: date, units: -units,
       source: 'transfer', po_number: po.po_number, market: srcMarket,
-      batch_ref: `Transfer to ${dest.name} · ${po.po_number}`, purchase_order_line_id: l.id, created_by: profileId,
+      batch_ref: `Transfer to ${destName} · ${po.po_number}`, purchase_order_line_id: l.id, created_by: profileId,
     })
     rows.push({
       product_id: l.product_id, received_month: month, received_date: date, units,
       source: 'transfer', po_number: po.po_number, market: destMarket,
-      batch_ref: `Transfer from ${src.name} · ${po.po_number}`, purchase_order_line_id: l.id, created_by: profileId,
+      batch_ref: `Transfer from ${srcName} · ${po.po_number}`, purchase_order_line_id: l.id, created_by: profileId,
     })
   }
   if (rows.length) {

@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import type { ReceiptDetail, OpenPoDetail } from '@/lib/stock-movements'
 import { OpenPoChips } from '@/components/stock-movements/open-po-chips'
+import { TransferChips } from '@/components/stock-movements/transfer-chips'
+import type { TransferDetail } from '@/lib/transfer-stock'
 
 const nf = (n: number) => Math.round(n).toLocaleString('en-NZ')
 const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -17,7 +19,7 @@ function fmtDate(iso: string | null): string {
  * and, when receipts are known, a hover tooltip listing each one with its PO ref.
  * Fixed-position tooltip so the scroll container can't clip it.
  */
-export function InboundCell({ value, receipts, stillToReceipt = [], partialReceipt = [] }: { value: number; receipts: ReceiptDetail[]; stillToReceipt?: OpenPoDetail[]; partialReceipt?: OpenPoDetail[] }) {
+export function InboundCell({ value, receipts, stillToReceipt = [], partialReceipt = [], transfers = [] }: { value: number; receipts: ReceiptDetail[]; stillToReceipt?: OpenPoDetail[]; partialReceipt?: OpenPoDetail[]; transfers?: TransferDetail[] }) {
   const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
   const has = receipts.length > 0
 
@@ -35,6 +37,7 @@ export function InboundCell({ value, receipts, stillToReceipt = [], partialRecei
       </span>
       {stillToReceipt.length > 0 && <div><OpenPoChips items={stillToReceipt} kind="still" /></div>}
       {partialReceipt.length > 0 && <div><OpenPoChips items={partialReceipt} kind="partial" /></div>}
+      {transfers.length > 0 && <div><TransferChips items={transfers} /></div>}
 
       {tip && has && (
         <div
