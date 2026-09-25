@@ -12,9 +12,9 @@ import {
   convertGramsToIngredientUom, monthShortfallStates,
 } from '@/lib/ingredient-demand'
 import { IngredientDemandRow } from '@/components/ingredients/ingredient-demand-row'
+import { loadIngredientStockLedger } from '@/lib/ingredient-stock-movements'
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
-import { getIngredientOpeningStockSummary } from '@/lib/opening-stock-summary'
 import { PROCURED_INGREDIENT_CATEGORY } from '@/lib/constants'
 
 export const metadata: Metadata = { title: 'Ingredient demand' }
@@ -41,12 +41,9 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
   const market: Market =
     searchParams.market === 'nz' ? 'nz' : searchParams.market === 'au' ? 'au' : 'combined'
 
-  // The stocktake to check demand against for the selected market: NZ uses the
-  // NZ opening stock, AU the Australian stocktake, Combined the two summed.
-  const openingForMarket = (ing: { opening_stock_override: number | null; opening_stock_override_au: number | null }) =>
-    market === 'au' ? (ing.opening_stock_override_au ?? 0)
-    : market === 'nz' ? (ing.opening_stock_override ?? 0)
-    : (ing.opening_stock_override ?? 0) + (ing.opening_stock_override_au ?? 0)
+  // Opening stock now comes from the Stock Movements ledger's end-of-August
+  // close (the window starts Sept, so Aug close = the opening). Built after the
+  // ledger loads; `openingForMarket` is defined below.
 
   // ── Fetch everything we need in parallel ───────────────────
   const [
@@ -218,6 +215,22 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     arrivalsByIngredient,
   })
 
+  // ── Opening = Stock Movements end-of-August close (per market) ──
+  const ingredientLedger = await loadIngredientStockLedger()
+  const AUG_CLOSE = '2026-08-01'
+  const smAugByIngredient = new Map<string, { nz: number; au: number }>()
+  for (const r of ingredientLedger.rows) {
+    smAugByIngredient.set(r.entity_id, {
+      nz: r.nz.cells[AUG_CLOSE]?.eom ?? 0,
+      au: r.au.cells[AUG_CLOSE]?.eom ?? 0,
+    })
+  }
+  const openingForMarket = (ing: { id: string }) => {
+    const s = smAugByIngredient.get(ing.id)
+    if (!s) return 0
+    return market === 'au' ? s.au : market === 'nz' ? s.nz : s.nz + s.au
+  }
+
   // ── Derived totals for tiles ───────────────────────────────
   let totalIngredients = 0
   let totalShortfalls = 0
@@ -260,10 +273,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     }
   }
 
-  const [commentedCells, openingHistorySummary] = await Promise.all([
-    getCellsWithComments('ingredient', allIngredientIds, firstMonth, lastMonth),
-    getIngredientOpeningStockSummary(allIngredientIds, market === 'au' ? 'AU' : 'NZ'),
-  ])
+  const commentedCells = await getCellsWithComments('ingredient', allIngredientIds, firstMonth, lastMonth)
 
   const demandSummaryParts: string[] = []
   for (const [u, v] of demandByUnit.entries()) {
@@ -326,7 +336,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       </div>
 
       <div className="flex items-center gap-4 text-xs text-gray-500">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-white border border-dashed border-gray-300"></span> Opening stock (editable)</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-white border border-dashed border-gray-300"></span> Opening stock (from Stock Movements · end Aug)</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-50 border border-red-200"></span> Shortfall (opening won&rsquo;t cover cumulative demand)</span>
         <span className="text-gray-300">·</span>
         <span>Click an ingredient row to see which products are driving the demand.</span>
@@ -349,7 +359,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
 
       {groups.map((g) => {
         const shortCount = g.ingredients.reduce((n, r) =>
-          n + (hasAnyShortfall(r, r.ingredient.opening_stock_override ?? 0, months) ? 1 : 0), 0)
+          n + (hasAnyShortfall(r, openingForMarket(r.ingredient), months) ? 1 : 0), 0)
         return (
           <details key={g.supplier.id ?? 'none'} className="bg-white rounded-lg border border-gray-200 overflow-hidden" open={shortCount > 0}>
             <summary className="list-none cursor-pointer px-5 py-3 flex items-center justify-between hover:bg-gray-50">
@@ -379,7 +389,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
                     <th className="text-left font-medium px-4 py-2">Ingredient</th>
                     <th className="text-right font-medium px-3 py-2">
                       Opening
-                      <span className="block text-[9px] normal-case tracking-normal text-amber-700 font-normal">editable</span>
+                      <span className="block text-[9px] normal-case tracking-normal text-gray-400 font-normal">end Aug · SM</span>
                     </th>
                     {months.map((m) => (
                       <th key={m} className="text-right font-medium px-2 py-2 border-l border-gray-200">{monthLabel(m)}</th>
@@ -396,7 +406,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
                       months={months}
                       market={market}
                       commentedCells={commentedCells}
-                      openingHistory={openingHistorySummary.get(row.ingredient.id)}
+                      opening={openingForMarket(row.ingredient)}
                     />
                   ))}
                 </tbody>

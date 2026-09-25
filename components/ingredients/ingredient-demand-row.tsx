@@ -1,15 +1,10 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import {
-  updateIngredientOpeningStock,
-  getIngredientOpeningStockHistory,
-} from '@/app/(dashboard)/ingredients/demand/actions'
 import { demandUnitLabel, monthShortfallStates, monthRunningBalances, monthShortAmounts } from '@/lib/ingredient-demand'
 import { isCountUom } from '@/lib/costing'
 import type { IngredientRow as IngredientRowData } from '@/lib/ingredient-demand'
-import { OpeningStockHistoryPopover } from '@/components/inventory/opening-stock-popover'
 import { CellCommentPopover } from '@/components/inventory/cell-comment-popover'
 
 interface Props {
@@ -17,9 +12,9 @@ interface Props {
   months: string[]
   /** Set of "ingredientId|yyyy-mm-01" keys that already have at least one comment. */
   commentedCells: Set<string>
-  /** Bulk-fetched opening-stock summary: drives the clock-button render. */
-  openingHistory?: { hasHistory: boolean; hasComment: boolean }
-  /** Which build's stocktake to check against. Combined = NZ + AU (read-only sum). */
+  /** End-of-August close from Stock Movements — the read-only opening for the selected market. */
+  opening: number
+  /** Which build's stocktake to check against. Combined = NZ + AU. */
   market?: 'combined' | 'nz' | 'au'
 }
 
@@ -31,38 +26,20 @@ function fmt(n: number): string {
   return n.toFixed(2)
 }
 
-export function IngredientDemandRow({ row, months, commentedCells, openingHistory, market = 'combined' }: Props) {
-  const isCombined = market === 'combined'
-  const marketUpper: 'NZ' | 'AU' = market === 'au' ? 'AU' : 'NZ'
-  const nzStock = row.ingredient.opening_stock_override ?? 0
-  const auStock = row.ingredient.opening_stock_override_au ?? 0
-
+export function IngredientDemandRow({ row, months, commentedCells, opening, market = 'combined' }: Props) {
   const [open, setOpen] = useState(false)
-  // The editable stocktake for the selected single market (NZ or AU).
-  const [override, setOverride] = useState<number | null>(
-    market === 'au' ? row.ingredient.opening_stock_override_au : row.ingredient.opening_stock_override,
-  )
-  const [error, setError] = useState<string | null>(null)
 
-  // Combined view checks against both stocktakes summed (read-only); a single
-  // market view checks against (and edits) that market's stocktake.
-  const opening = isCombined ? nzStock + auStock : (override ?? 0)
+  // Opening = the end-of-August close from Stock Movements (read-only here).
+  // To change it, edit the Aug "Actual" count on the Stock Movements ledger.
   const stateByMonth   = useMemo(() => monthShortfallStates(row, opening, months), [row, opening, months])
   const balanceByMonth = useMemo(() => monthRunningBalances(row, opening, months), [row, opening, months])
   const shortByMonth   = useMemo(() => monthShortAmounts(row, opening, months),    [row, opening, months])
   const totalShortfall = useMemo(() => months.reduce((s, m) => s + (shortByMonth.get(m) ?? 0), 0), [shortByMonth, months])
 
-  const ingredientId = row.ingredient.id
-  const ingredientName = row.ingredient.name
-  const onSave        = useCallback((v: number | null, note: string) => updateIngredientOpeningStock(ingredientId, v, note, marketUpper), [ingredientId, marketUpper])
-  const onLoadHistory = useCallback(() => getIngredientOpeningStockHistory(ingredientId, marketUpper), [ingredientId, marketUpper])
-  function handleSaved(next: number | null) {
-    setOverride(next)
-    setError(null)
-  }
-
   const unit = demandUnitLabel(row.ingredient.unit_of_measure)
   const lastMonthState = stateByMonth.get(months[months.length - 1]) ?? 'ok'
+  const ingredientId = row.ingredient.id
+  const ingredientName = row.ingredient.name
 
   return (
     <>
@@ -85,29 +62,12 @@ export function IngredientDemandRow({ row, months, commentedCells, openingHistor
                 </Link>
                 <span className="ml-2 text-[10px] text-gray-400">({unit})</span>
               </div>
-              {error && <div className="text-[11px] text-red-600 mt-0.5">{error}</div>}
             </div>
           </div>
         </td>
 
-        <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-          {isCombined ? (
-            <span className="text-sm tabular-nums text-gray-700" title="NZ + AU stocktake — edit each in its NZ / AU view">
-              {fmt(opening)}
-            </span>
-          ) : (
-          <OpeningStockHistoryPopover
-            entityLabel={`${marketUpper} stocktake · ${ingredientName}`}
-            description={`${marketUpper} opening stock in ${unit} — leave blank to fall back to on-hand inventory.`}
-            currentValue={override}
-            unitLabel={unit}
-            onSave={onSave}
-            onLoadHistory={onLoadHistory}
-            onSaved={handleSaved}
-            hasHistory={openingHistory?.hasHistory}
-            hasComment={openingHistory?.hasComment}
-          />
-          )}
+        <td className="px-3 py-2 text-right" title="From Stock Movements — end-of-August close (edit via the Aug Actual count on Stock Movements)">
+          <span className="text-sm tabular-nums text-gray-700">{fmt(opening)}</span>
         </td>
 
         {months.map((m) => {
