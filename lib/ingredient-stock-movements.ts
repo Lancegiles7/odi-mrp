@@ -86,6 +86,7 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     { data: products }, { data: ingredients }, { data: suppliers },
     { data: boms }, { data: bomItems }, { data: production },
     { data: openPos }, { data: openPoLines }, { data: adjustments },
+    { data: fgReceipts },
   ] = await Promise.all([
     supabase.from('products')
       .select('id, sku_code, name, wastage_pct, manufacture_market')
@@ -113,6 +114,12 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     supabase.from('stock_period_adjustments')
       .select('entity_id, year_month, market, wastage_units, wastage_comment, counted_units, count_comment, inbound_units, inbound_comment')
       .eq('entity_type', 'ingredient') as unknown as Promise<{ data: Array<{ entity_id: string; year_month: string; market: string; wastage_units: number; wastage_comment: string | null; counted_units: number | null; count_comment: string | null; inbound_units: number; inbound_comment: string | null }> | null }>,
+    // Actual finished-goods produced (received) — used instead of the plan for
+    // closed months so ingredient consumption matches what was really made.
+    // Transfers just move stock between markets, so they're not production.
+    supabase.from('finished_goods_receipts')
+      .select('product_id, received_month, units, market, source')
+      .neq('source', 'transfer') as unknown as Promise<{ data: Array<{ product_id: string; received_month: string; units: number; market: string | null; source: string }> | null }>,
   ])
 
   // ── BOM lookups per market ──
@@ -128,6 +135,23 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     bomItemsByBom.get(it.bom_id)!.push(it)
   }
 
+  // ── Actual finished-goods produced (received) per product/month/market ──
+  // For closed months this replaces the plan, so ingredient consumption matches
+  // what was really made (e.g. a tub received 1,928 not the 2,000 ordered).
+  const normMonth = (m: string) => m.slice(0, 7) + '-01'
+  const actualNz = new Map<string, Map<string, number>>()
+  const actualAu = new Map<string, Map<string, number>>()
+  let actualThrough: string | null = null
+  for (const r of fgReceipts ?? []) {
+    const m = normMonth(r.received_month)
+    if (!actualThrough || m > actualThrough) actualThrough = m
+    const map = r.market === 'AU' ? actualAu : actualNz
+    if (!map.has(r.product_id)) map.set(r.product_id, new Map())
+    const pm = map.get(r.product_id)!
+    pm.set(m, (pm.get(m) ?? 0) + Number(r.units || 0))
+  }
+  const actual = (map: Map<string, Map<string, number>>, pid: string, m: string) => map.get(pid)?.get(m) ?? 0
+
   // ── Produced units per product per month, split by build market ──
   const prodIdxNz = indexProduction(((production ?? []) as Array<{ market: string | null }>).filter((r) => (r.market ?? 'NZ') !== 'AU') as never[])
   const prodIdxAu = indexProduction(((production ?? []) as Array<{ market: string | null }>).filter((r) => r.market === 'AU') as never[])
@@ -142,8 +166,11 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     // 'BOTH'/unset keep the per-market production split.
     const mm = (p as { manufacture_market: string | null }).manufacture_market
     for (const m of calcMonths) {
-      const nz = getProductionCell(prodIdxNz, p.id, m) || 0
-      const au = isDual ? (getProductionCell(prodIdxAu, p.id, m) || 0) : 0
+      // Closed months (≤ the last actual receipt) use what was really produced;
+      // future months fall back to the production plan.
+      const isActual = actualThrough != null && m <= actualThrough
+      const nz = isActual ? actual(actualNz, p.id, m) : (getProductionCell(prodIdxNz, p.id, m) || 0)
+      const au = isActual ? actual(actualAu, p.id, m) : (isDual ? (getProductionCell(prodIdxAu, p.id, m) || 0) : 0)
       if (mm === 'AU' && isDual) {
         if (nz + au) unitsAu.get(m)!.set(p.id, nz + au)          // all consumed in AU
       } else if (mm === 'NZ') {
