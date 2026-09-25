@@ -172,9 +172,15 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
       const nz = isActual ? actual(actualNz, p.id, m) : (getProductionCell(prodIdxNz, p.id, m) || 0)
       const au = isActual ? actual(actualAu, p.id, m) : (isDual ? (getProductionCell(prodIdxAu, p.id, m) || 0) : 0)
       if (mm === 'AU' && isDual) {
-        if (nz + au) unitsAu.get(m)!.set(p.id, nz + au)          // all consumed in AU
+        // Made in AU. The plan combines NZ+AU demand (all built in AU). Actuals
+        // count AU production ONLY — a NZ receipt for this product is a transfer-in
+        // of stock already made (and counted) in AU, not new production.
+        const made = isActual ? au : nz + au
+        if (made) unitsAu.get(m)!.set(p.id, made)
       } else if (mm === 'NZ') {
-        if (nz + au) unitsNz.get(m)!.set(p.id, nz + au)          // all consumed in NZ
+        // Made in NZ — the mirror: actuals count NZ production only.
+        const made = isActual ? nz : nz + au
+        if (made) unitsNz.get(m)!.set(p.id, made)
       } else {
         if (nz) unitsNz.get(m)!.set(p.id, nz)
         if (isDual && au) unitsAu.get(m)!.set(p.id, au)
