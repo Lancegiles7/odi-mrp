@@ -258,3 +258,15 @@ function generateSku(name: string): string {
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase()
   return `PH-${base.slice(0, 36)}-${suffix}`
 }
+
+/** Latest month with any imported/entered demand — the importer pre-ticks only
+ *  financial years after it, so a new year can be added without reloading
+ *  (and overwriting) the years already in the app. */
+export async function latestDemandMonth(): Promise<string | null> {
+  const supabase = createClient()
+  const { data } = await supabase.from('demand_forecasts')
+    .select('year_month')
+    .order('year_month', { ascending: false })
+    .limit(1) as { data: Array<{ year_month: string }> | null }
+  return data?.[0]?.year_month?.slice(0, 10) ?? null
+}

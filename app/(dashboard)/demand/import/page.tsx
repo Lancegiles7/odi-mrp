@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { commitDemandImport, type DemandImportPayload, type DemandImportResult } from './actions'
+import { commitDemandImport, latestDemandMonth, type DemandImportPayload, type DemandImportResult } from './actions'
 import type { DemandChannel } from '@/lib/types/database.types'
 
 type Stage = 'upload' | 'preview' | 'result'
@@ -17,14 +17,16 @@ interface ParsedRow {
 
 /**
  * The Units sheet layout we parse (based on the actual FY26 Budget workbook):
- *   - Month labels on row 3, columns E..P (Apr-26 .. Mar-27)
+ *   - Month labels on row 3 from column E onwards (Apr-26 → Mar-29 in the
+ *     current workbook: FY27, FY28, FY29). Every dated column is read; the
+ *     preview lets you pick which financial years to import.
  *   - 4 channel sections at fixed starting rows:
  *       Ecomm NZ   rows 76–145
  *       Retail NZ  rows 148–217
  *       Ecomm AU   rows 220–289
  *       Retail AU  rows 292–361
  *   - Inside each section, subgroup headers live in column B, individual
- *     product rows in column C, and monthly units in columns E..P.
+ *     product rows in column C, and monthly units from column E.
  */
 const SECTIONS: Array<{ channel: DemandChannel; startRow: number; endRow: number }> = [
   { channel: 'ecomm_nz',  startRow: 76,  endRow: 145 },
@@ -35,6 +37,13 @@ const SECTIONS: Array<{ channel: DemandChannel; startRow: number; endRow: number
 
 const MONTH_COL_START = 5   // E
 const MONTH_ROW       = 3
+const MAX_MONTHS      = 60  // safety cap on header columns scanned
+
+/** Odi FY runs Apr–Mar and is named by the year it ends: 2027-06-01 → 'FY28'. */
+function fyOf(yearMonth: string): string {
+  const [y, m] = yearMonth.split('-').map(Number)
+  return `FY${String(m >= 4 ? y + 1 : y).slice(2)}`
+}
 
 function colIndexToKey(colIdx: number): string {
   // 1 → A, 2 → B, …, 27 → AA
@@ -86,6 +95,7 @@ export default function DemandImportPage() {
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<DemandImportResult | null>(null)
   const [fileName, setFileName] = useState<string>('')
+  const [selectedFys, setSelectedFys] = useState<Set<string>>(new Set())
 
   async function handleFile(file: File) {
     setParseError(null)
@@ -114,8 +124,12 @@ export default function DemandImportPage() {
         return
       }
       const [anchorY, anchorM] = anchorKey.split('-').map(Number)
+      // Count dated header columns from E onwards — the budget carries
+      // several years, not just the first 12 months.
+      let monthCount = 0
+      while (monthCount < MAX_MONTHS && yearMonthFromDate(ws[colIndexToKey(MONTH_COL_START + monthCount) + MONTH_ROW]?.v)) monthCount++
       const months: string[] = []
-      for (let c = 0; c < 12; c++) {
+      for (let c = 0; c < monthCount; c++) {
         const d = new Date(anchorY, anchorM - 1 + c, 1)
         const y = d.getFullYear()
         const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -143,7 +157,7 @@ export default function DemandImportPage() {
           if (typeof cVal !== 'string' || !cVal.trim()) continue
 
           const productName = cVal.trim()
-          for (let mIdx = 0; mIdx < 12; mIdx++) {
+          for (let mIdx = 0; mIdx < months.length; mIdx++) {
             const ref = colIndexToKey(MONTH_COL_START + mIdx) + r
             const val = ws[ref]?.v
             const num = typeof val === 'number' ? val : Number(val ?? 0)
@@ -164,6 +178,13 @@ export default function DemandImportPage() {
         return
       }
 
+      // Pre-tick only the years after the demand already loaded, so adding
+      // FY28 doesn't reload (and overwrite) FY27. Any year can be ticked.
+      const latest = await latestDemandMonth()
+      const fys = Array.from(new Set(parsed.map((r) => fyOf(r.year_month))))
+      const fresh = fys.filter((fy) => !latest || parsed.some((r) => fyOf(r.year_month) === fy && r.year_month > latest)
+        && !parsed.some((r) => fyOf(r.year_month) === fy && r.year_month <= latest))
+      setSelectedFys(new Set(fresh.length ? fresh : fys))
       setRows(parsed)
       setStage('preview')
     } catch (e) {
@@ -181,7 +202,7 @@ export default function DemandImportPage() {
       const d = String(today.getDate()).padStart(2, '0')
       const source = `import:${y}-${m}-${d}`
 
-      const payload: DemandImportPayload = { source, rows }
+      const payload: DemandImportPayload = { source, rows: selectedRows }
       const res = await commitDemandImport(payload)
       setResult(res)
       setStage('result')
@@ -196,12 +217,32 @@ export default function DemandImportPage() {
     setParseError(null)
     setResult(null)
     setFileName('')
+    setSelectedFys(new Set())
     if (fileRef.current) fileRef.current.value = ''
+  }
+
+  // Per-FY summary for the year picker, then only the ticked years flow on.
+  const fySummary = new Map<string, { cells: number; units: number; first: string; last: string }>()
+  for (const r of rows) {
+    const fy = fyOf(r.year_month)
+    const e = fySummary.get(fy) ?? { cells: 0, units: 0, first: r.year_month, last: r.year_month }
+    e.cells++; e.units += r.units
+    if (r.year_month < e.first) e.first = r.year_month
+    if (r.year_month > e.last) e.last = r.year_month
+    fySummary.set(fy, e)
+  }
+  const selectedRows = rows.filter((r) => selectedFys.has(fyOf(r.year_month)))
+  function toggleFy(fy: string) {
+    setSelectedFys((prev) => {
+      const next = new Set(prev)
+      if (next.has(fy)) next.delete(fy); else next.add(fy)
+      return next
+    })
   }
 
   // Aggregate preview by product
   const byProduct = new Map<string, { group: string; channels: Set<string>; total: number }>()
-  for (const r of rows) {
+  for (const r of selectedRows) {
     const key = r.product_name
     if (!byProduct.has(key)) byProduct.set(key, { group: r.sheet_group, channels: new Set(), total: 0 })
     const p = byProduct.get(key)!
@@ -221,7 +262,7 @@ export default function DemandImportPage() {
         <div>
           <h1 className="text-2xl font-semibold">Import demand from XLSX</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Reads the &ldquo;Units&rdquo; tab · parses 4 channels × 12 months · previews before committing · preserves manually-edited cells.
+            Reads the &ldquo;Units&rdquo; tab · parses 4 channels × every month in the sheet · pick which financial years · previews before committing · preserves manually-edited cells.
           </p>
         </div>
       </div>
@@ -229,7 +270,7 @@ export default function DemandImportPage() {
       {stage === 'upload' && (
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center bg-white">
           <p className="text-sm text-gray-600 mb-3">
-            Select your FY26 Budget workbook (must contain a &ldquo;Units&rdquo; tab)
+            Select your Budget workbook (must contain a &ldquo;Units&rdquo; tab)
           </p>
           <label className="cursor-pointer inline-block px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800">
             Choose XLSX
@@ -258,10 +299,31 @@ export default function DemandImportPage() {
             <div className="flex-1">
               <div className="font-medium">{fileName}</div>
               <div className="text-xs text-gray-500 mt-0.5">
-                {rows.length.toLocaleString()} non-zero cells across {byProduct.size} products
+                {selectedRows.length.toLocaleString()} non-zero cells across {byProduct.size} products
               </div>
             </div>
             <button onClick={reset} className="text-xs text-gray-600 underline">Choose different file</button>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="text-xs font-medium text-gray-700 mb-2">Financial years to import</div>
+            <div className="flex flex-wrap gap-2">
+              {Array.from(fySummary.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([fy, info]) => {
+                const on = selectedFys.has(fy)
+                return (
+                  <label key={fy} className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer text-sm ${on ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
+                    <input type="checkbox" className="sr-only" checked={on} onChange={() => toggleFy(fy)} />
+                    <span className="font-semibold">{on ? '✓ ' : ''}{fy}</span>
+                    <span className={`text-xs ${on ? 'text-gray-300' : 'text-gray-500'}`}>
+                      {monthShort(info.first)}–{monthShort(info.last)} · {info.units.toLocaleString()} units
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+            <p className="text-[11px] text-gray-500 mt-2">
+              Years you leave unticked aren&apos;t touched. Ticking a year that&apos;s already loaded replaces its imported figures (edited cells are still kept).
+            </p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -274,7 +336,7 @@ export default function DemandImportPage() {
                   <th className="text-left font-medium px-4 py-2">Product</th>
                   <th className="text-left font-medium px-4 py-2">Sheet group</th>
                   <th className="text-left font-medium px-4 py-2">Channels</th>
-                  <th className="text-right font-medium px-4 py-2">Total units (12 mo)</th>
+                  <th className="text-right font-medium px-4 py-2">Total units (ticked years)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -304,10 +366,10 @@ export default function DemandImportPage() {
             </button>
             <button
               onClick={handleImport}
-              disabled={importing}
+              disabled={importing || selectedRows.length === 0}
               className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800 disabled:opacity-50"
             >
-              {importing ? 'Importing…' : `Import ${rows.length.toLocaleString()} cells`}
+              {importing ? 'Importing…' : `Import ${selectedRows.length.toLocaleString()} cells`}
             </button>
           </div>
         </div>
@@ -362,6 +424,11 @@ export default function DemandImportPage() {
       )}
     </div>
   )
+}
+
+function monthShort(yearMonth: string): string {
+  const [y, m] = yearMonth.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-GB', { month: 'short', year: '2-digit', timeZone: 'UTC' })
 }
 
 function Stat({ label, value, accent }: { label: string; value: number; accent?: 'green' | 'amber' }) {
