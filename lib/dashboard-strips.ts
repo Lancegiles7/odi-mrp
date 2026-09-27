@@ -8,11 +8,8 @@
  * Strips are built on the PRODUCTION PLAN (the demand pages' default basis).
  */
 import type { createClient } from '@/lib/supabase/server'
-import { fetchAllRows } from '@/lib/supabase/fetch-all'
-import {
-  indexDemand, indexProduction, getGrandTotal, getProductionCell,
-  resolveOpeningStock, calcRollingBalance,
-} from '@/lib/demand'
+import { loadProductionLines, productionShortfallCounts } from '@/lib/production-lines'
+import { indexProduction, getProductionCell } from '@/lib/demand'
 import {
   aggregateIngredientDemand, monthShortfallStates as ingStates, convertGramsToIngredientUom,
 } from '@/lib/ingredient-demand'
@@ -39,36 +36,11 @@ function emptyCounts(months: string[]) {
 }
 
 // ── Production: finished-product demand vs production plan ─────
-export async function loadProductionStrip(sb: SB, months: string[], first: string, last: string): Promise<StripData> {
-  const [{ data: products }, demand, { data: production }] = await Promise.all([
-    all<Array<{ id: string; opening_stock_override: number | null }>>(
-      sb.from('products').select('id, opening_stock_override').is('deleted_at', null).eq('is_active', true)),
-    fetchAllRows<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }>((f, t) =>
-      sb.from('demand_forecasts').select('product_id, year_month, channel, units, is_edited')
-        .gte('year_month', first).lte('year_month', last)
-        .order('product_id').order('year_month').order('channel').range(f, t) as unknown as PromiseLike<{ data: Array<{ product_id: string; year_month: string; channel: string; units: number; is_edited: boolean }> | null; error: { message: string } | null }>),
-    all<Array<{ product_id: string; year_month: string; units_planned: number }>>(
-      sb.from('production_plans').select('product_id, year_month, units_planned').gte('year_month', first).lte('year_month', last)),
-  ])
-  const demandIdx = indexDemand((demand ?? []) as never[])
-  // Total finished output = every maker's plan summed (a dual product's NZ + AU
-  // plans both produce the same SKU), so sum across markets rather than index.
-  const prodSummed = new Map<string, number>()
-  for (const r of production ?? []) {
-    const ym = typeof r.year_month === 'string' ? r.year_month.slice(0, 10) : r.year_month
-    const key = `${r.product_id}|${ym}`
-    prodSummed.set(key, (prodSummed.get(key) ?? 0) + Number(r.units_planned || 0))
-  }
-  const { totals, shorts } = emptyCounts(months)
-  for (const p of products ?? []) {
-    const opening = resolveOpeningStock(p.opening_stock_override, undefined)
-    const rolling = calcRollingBalance(months, opening, (m) => getGrandTotal(demandIdx, p.id, m), (m) => prodSummed.get(`${p.id}|${m}`) ?? 0)
-    for (const r of rolling) {
-      if (r.forecast > 0)    totals.set(r.month, (totals.get(r.month) ?? 0) + 1)
-      if (r.state === 'red') shorts.set(r.month, (shorts.get(r.month) ?? 0) + 1)
-    }
-  }
-  return { totals, shorts }
+export async function loadProductionStrip(sb: SB, months: string[]): Promise<StripData> {
+  // Same NZ/AU lines, Stock Movements opening and transfers as the Production
+  // page, so the dashboard count always matches it.
+  const { lines } = await loadProductionLines(sb, months)
+  return productionShortfallCounts(lines, months)
 }
 
 // Shared: month → product → production-plan units. Dashboard rollups use the

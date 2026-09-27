@@ -37,12 +37,14 @@ export function rollingMonths(n: number = PLANNING_MONTHS, startFrom?: Date): st
   return out
 }
 
+/** Three-letter month names. Fixed list, because en-GB formatting gives
+ *  "Sept", which wraps the month column headers. */
+export const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 /** Short label for a month key, e.g. '2026-04-01' → 'Apr 26'. */
 export function monthLabel(key: string): string {
   const [y, m] = key.split('-').map(Number)
-  const d = new Date(Date.UTC(y, m - 1, 1))
-  const mon = d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })
-  return `${mon} ${String(y).slice(2)}`
+  return `${MONTH_SHORT[m - 1]} ${String(y).slice(2)}`
 }
 
 // ============================================================

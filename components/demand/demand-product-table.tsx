@@ -113,7 +113,7 @@ export function DemandProductTable({
         key={ch.value}
         className={`border-t border-gray-50 ${ch.isPipefill ? 'bg-blue-50/40' : ''}`}
       >
-        <td className={`px-4 py-1.5 ${ch.isPipefill ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
+        <td className={`px-4 py-1.5 whitespace-nowrap ${ch.isPipefill ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
           {ch.label}
         </td>
         {months.map((m) => {
@@ -176,7 +176,7 @@ export function DemandProductTable({
           </Link>
         </div>
         <div className="text-xs text-gray-500">
-          Yr total <span className="font-semibold text-gray-900 tabular-nums">{yearTotal.toLocaleString()}</span>
+          Total {months.length} mo <span className="font-semibold text-gray-900 tabular-nums">{yearTotal.toLocaleString()}</span>
           {saving && <span className="ml-2 text-gray-400">saving…</span>}
         </div>
       </button>
@@ -187,12 +187,14 @@ export function DemandProductTable({
             <div className="px-4 py-2 text-xs text-red-700 bg-red-50 border-b border-red-200">{error}</div>
           )}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            {/* Fixed per-month minimum so a long window (to end of next FY)
+                scrolls sideways instead of squeezing and clipping the numbers. */}
+            <table className="w-full text-sm" style={{ minWidth: 140 + months.length * 84 }}>
               <thead>
                 <tr className="text-[11px] uppercase tracking-wider text-gray-500 bg-gray-50">
-                  <th className="text-left font-medium px-4 py-1.5 w-[140px]">Channel</th>
+                  <th className="text-left font-medium px-4 py-1.5 w-[140px] min-w-[140px] whitespace-nowrap">Channel</th>
                   {months.map((m) => (
-                    <th key={m} className={`text-right font-medium px-2 py-1.5 min-w-[64px] ${locked.has(m) ? 'bg-gray-100 text-gray-400' : ''}`}>
+                    <th key={m} className={`text-right font-medium px-2 py-1.5 min-w-[84px] whitespace-nowrap ${locked.has(m) ? 'bg-gray-100 text-gray-400' : ''}`}>
                       {monthLabel(m)}
                     </th>
                   ))}

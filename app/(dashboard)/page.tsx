@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { rollingMonths } from '@/lib/demand'
+import { rollingMonths, MONTH_SHORT } from '@/lib/demand'
 import { getPlanningAnchor, getAppSettings } from '@/lib/settings'
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { loadProductionStrip, loadIngredientStrip, loadPackagingStrip, loadGpByGroup } from '@/lib/dashboard-strips'
@@ -54,7 +54,7 @@ function fmtCount(n: number | null | undefined): string {
 
 function fmtMonth(key: string): string {
   const [y, m] = key.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-GB', { month: 'short', year: '2-digit', timeZone: 'UTC' }).replace(' ', '-')
+  return `${MONTH_SHORT[m - 1]}-${String(y).slice(2)}`
 }
 
 // ============================================================
@@ -126,7 +126,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   const lastMonth  = months[months.length - 1]
   const settings   = await getAppSettings()
   const [productionStrip, ingredientStrip, packagingStrip, gpGroups] = await Promise.all([
-    loadProductionStrip(supabase, months, firstMonth, lastMonth),
+    loadProductionStrip(supabase, months),
     loadIngredientStrip(supabase, months, firstMonth, lastMonth),
     loadPackagingStrip(supabase, months, firstMonth, lastMonth),
     loadGpByGroup(supabase, settings),

@@ -2,13 +2,8 @@ import type { Metadata } from 'next'
 import { Fragment } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { fetchAllRows } from '@/lib/supabase/fetch-all'
-import {
-  indexDemand, indexProduction,
-  getGrandTotal, getCountryTotal, getProductionCell, monthLabel, calcRollingBalance,
-} from '@/lib/demand'
-import { loadStockLedger, closingStockAt } from '@/lib/stock-movements-data'
-import type { TransferDetail } from '@/lib/transfer-stock'
+import { monthLabel } from '@/lib/demand'
+import { loadProductionLines, productionShortfallCounts, netTransfers, type ProductionLine } from '@/lib/production-lines'
 import { getPlanningWindow, fyLabel } from '@/lib/settings'
 import { PlanningHistoryToggle } from '@/components/shared/planning-history-toggle'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
@@ -18,38 +13,13 @@ import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
 import { coverFor, type PoCover } from '@/lib/production-po-status'
 import { loadPoCover } from '@/lib/production-po-status-data'
-import type { DemandForecast, ProductionPlan } from '@/lib/types/database.types'
 
 export const metadata: Metadata = { title: 'Production schedule' }
 
-interface ProductRow {
-  id: string
-  sku_code: string
-  name: string
-  manufacturer: string | null
-  manufacturer_au: string | null
-  opening_stock_override: number | null
-  is_active: boolean
-}
-
-// One production line = a product made by one maker for one market. Non-dual
-// products have a single NZ line; dual products have an NZ line (Brand Nation)
-// and an AU line (VMC), each planned and tracked separately.
-interface ProdLine {
-  key: string
-  product: ProductRow
-  market: 'NZ' | 'AU'
-  maker: string | null
-  canEditOpening: boolean
-  opening: number
-  forecastByMonth: Record<string, number>
-  productionByMonth: Record<string, number>
-  /** NZ ↔ AU transfer legs landing on / leaving this line, per month. */
-  transfersByMonth: Record<string, TransferDetail[]>
+// One production line per product per build market — see lib/production-lines.
+interface ProdLine extends ProductionLine {
   /** Finished-goods POs due per live month (by expected delivery date). */
   poCoverByMonth: Record<string, PoCover>
-  /** True when the product is split into NZ + AU lines (show the market tag). */
-  showTag: boolean
 }
 
 interface PageProps {
@@ -66,121 +36,25 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   const firstMonth = months[0]
   const lastMonth  = months[months.length - 1]
 
-  const [{ data: products }, demand, { data: production }, ledger, poCover] = await Promise.all([
-    supabase
-      .from('products')
-      .select('id, sku_code, name, manufacturer, manufacturer_au, opening_stock_override, is_active')
-      .is('deleted_at', null)
-      .eq('is_active', true)
-      .order('manufacturer', { ascending: true, nullsFirst: false })
-      .order('name', { ascending: true }) as unknown as Promise<{ data: ProductRow[] | null }>,
-    fetchAllRows<DemandForecast>((from, to) =>
-      supabase
-        .from('demand_forecasts')
-        .select('product_id, year_month, channel, units, is_edited')
-        .gte('year_month', firstMonth)
-        .lte('year_month', lastMonth)
-        .order('product_id').order('year_month').order('channel')
-        .range(from, to) as unknown as PromiseLike<{ data: DemandForecast[] | null; error: { message: string } | null }>,
-    ),
-    supabase
-      .from('production_plans')
-      .select('product_id, year_month, units_planned, market')
-      .gte('year_month', firstMonth)
-      .lte('year_month', lastMonth) as unknown as Promise<{ data: Array<ProductionPlan & { market: string | null }> | null }>,
-    loadStockLedger(),
+  // Lines come from the shared calculation the dashboard strip also uses.
+  const [{ products: allProducts, lines: baseLines, ledger }, poCover] = await Promise.all([
+    loadProductionLines(supabase, months),
     // PO colouring is for live months only — completed months stay plain.
     loadPoCover(activeMonths[0] ?? firstMonth, lastMonth),
   ])
 
-  const allProducts = products ?? []
-  const demandIdx = indexDemand(demand)
-  // Production is now planned per market. Index NZ and AU plans separately;
-  // legacy rows default to NZ so single-build behaviour is unchanged.
-  const prodRows  = (production ?? []) as Array<ProductionPlan & { market: string | null }>
-  const prodIdxNz = indexProduction(prodRows.filter((r) => (r.market ?? 'NZ') !== 'AU'))
-  const prodIdxAu = indexProduction(prodRows.filter((r) => r.market === 'AU'))
-
-  // Opening stock is the closing (EOM) of the last closed month from Stock
-  // Movements — the single source of truth. No manual entry: as each month
-  // closes (actuals loaded), its EOM becomes the next opening automatically.
   const closedMonth = ledger.actualThrough
   const closedMonthLabel = closedMonth ? monthLabel(closedMonth) : null
-  const closing = closingStockAt(ledger.rows, closedMonth)
-  const openingFor = (p: ProductRow, market: 'NZ' | 'AU'): number =>
-    (market === 'AU' ? closing.get(p.id)?.AU : closing.get(p.id)?.NZ) ?? 0
+  const netOf = netTransfers
 
-  const byMonth = (fn: (m: string) => number): Record<string, number> => {
-    const out: Record<string, number> = {}
-    for (const m of months) out[m] = fn(m)
-    return out
-  }
+  const lines: ProdLine[] = baseLines.map((ln) => ({
+    ...ln,
+    poCoverByMonth: coverFor(poCover, ln.product.id, ln.markets, activeMonths),
+  }))
 
-  // NZ ↔ AU transfers (transfer orders marked as moving stock between builds) move stock between the
-  // two lines without producing anything — off the sender at pick-up, onto the
-  // receiver on arrival. A single-line product carries both legs (net zero).
-  const transfersFor = (pid: string, markets: Array<'NZ' | 'AU'>): Record<string, TransferDetail[]> => {
-    const out: Record<string, TransferDetail[]> = {}
-    for (const m of months) {
-      const list = markets.flatMap((mk) => ledger.transfers[mk].get(pid)?.get(m) ?? [])
-      if (list.length) out[m] = list
-    }
-    return out
-  }
-  const netOf = (list: TransferDetail[] | undefined) => (list ?? []).reduce((s, t) => s + t.units, 0)
-
-  // Expand products into production lines. A dual product (manufacturer_au set)
-  // splits into an NZ line under Brand Nation (NZ-channel demand, NZ plan) and
-  // an AU line under VMC (AU-channel demand, AU plan). Non-dual products keep a
-  // single NZ line driven by all-channel demand — exactly as before.
-  const lines: ProdLine[] = []
-  for (const p of allProducts) {
-    const dual = !!(p.manufacturer_au && p.manufacturer_au.trim())
-    // Split into NZ + AU lines whenever the product sells to Australia, so AU
-    // production can be planned per market. Dual products always split (their AU
-    // build is real); products with no AU demand stay a single NZ line driven
-    // by all-channel demand — exactly as before.
-    const hasAu = dual || months.some((m) => getCountryTotal(demandIdx, p.id, m, 'AUS') > 0)
-    lines.push({
-      key: `${p.id}:NZ`, product: p, market: 'NZ', maker: p.manufacturer, canEditOpening: false,
-      opening: openingFor(p, 'NZ'),
-      forecastByMonth:  byMonth((m) => hasAu ? getCountryTotal(demandIdx, p.id, m, 'NZ') : getGrandTotal(demandIdx, p.id, m)),
-      productionByMonth: byMonth((m) => getProductionCell(prodIdxNz, p.id, m)),
-      transfersByMonth: transfersFor(p.id, hasAu ? ['NZ'] : ['NZ', 'AU']),
-      poCoverByMonth: coverFor(poCover, p.id, hasAu ? ['NZ'] : ['NZ', 'AU'], activeMonths),
-      showTag: hasAu,
-    })
-    if (hasAu) {
-      lines.push({
-        key: `${p.id}:AU`, product: p, market: 'AU', maker: p.manufacturer_au?.trim() || p.manufacturer, canEditOpening: false,
-        opening: openingFor(p, 'AU'),
-        forecastByMonth:  byMonth((m) => getCountryTotal(demandIdx, p.id, m, 'AUS')),
-        // AU production is only what's been planned — no make-to-demand default.
-        productionByMonth: byMonth((m) => getProductionCell(prodIdxAu, p.id, m)),
-        transfersByMonth: transfersFor(p.id, ['AU']),
-        poCoverByMonth: coverFor(poCover, p.id, ['AU'], activeMonths),
-        showTag: true,
-      })
-    }
-  }
-
-  // Total-across-visible-products monthly shortfall counts. Drives the
-  // single top-of-page summary strip — grouped view uses the all-active set
-  // (consistent regardless of which manufacturer accordion is open);
-  // view-all uses the filtered set so the strip respects the manufacturer
-  // filter.
-  function shortfallCountsFor(items: ProdLine[]) {
-    const totals = new Map<string, number>(activeMonths.map((m) => [m, 0]))
-    const shorts = new Map<string, number>(activeMonths.map((m) => [m, 0]))
-    for (const ln of items) {
-      const rolling = calcRollingBalance(activeMonths, ln.opening, (m) => ln.forecastByMonth[m] ?? 0, (m) => ln.productionByMonth[m] ?? 0, (m) => netOf(ln.transfersByMonth[m]))
-      for (const r of rolling) {
-        if (r.forecast > 0)    totals.set(r.month, (totals.get(r.month) ?? 0) + 1)
-        if (r.state === 'red') shorts.set(r.month, (shorts.get(r.month) ?? 0) + 1)
-      }
-    }
-    return { totals, shorts }
-  }
+  // Grouped view uses the all-active set; view-all uses the filtered set so
+  // the strip respects the manufacturer filter.
+  const shortfallCountsFor = (items: ProdLine[]) => productionShortfallCounts(items, activeMonths)
   const pageCounts = shortfallCountsFor(lines)
 
   // Bulk-fetch which (product, month) cells already have a comment.

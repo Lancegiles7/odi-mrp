@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { commitDemandImport, latestDemandMonth, type DemandImportPayload, type DemandImportResult } from './actions'
 import type { DemandChannel } from '@/lib/types/database.types'
+import { MONTH_SHORT } from '@/lib/demand'
 
 type Stage = 'upload' | 'preview' | 'result'
 
@@ -428,7 +429,7 @@ export default function DemandImportPage() {
 
 function monthShort(yearMonth: string): string {
   const [y, m] = yearMonth.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-GB', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+  return `${MONTH_SHORT[m - 1]} ${String(y).slice(2)}`
 }
 
 function Stat({ label, value, accent }: { label: string; value: number; accent?: 'green' | 'amber' }) {
