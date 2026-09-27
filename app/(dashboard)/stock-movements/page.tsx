@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { loadStockLedger } from '@/lib/stock-movements-data'
 import { loadIngredientStockLedger } from '@/lib/ingredient-stock-movements'
+import { loadPackagingStockLedger } from '@/lib/packaging-stock-movements'
 import { StockMovementsTable } from '@/components/stock-movements/stock-movements-table'
 import { IngredientStockTable } from '@/components/stock-movements/ingredient-stock-table'
 import { InwardsUpload } from '@/components/stock-movements/inwards-upload'
@@ -50,11 +51,7 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
 
       {view === 'products' && <ProductsView label={monthLabel} />}
       {view === 'ingredients' && <IngredientsView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
-      {view === 'packaging' && (
-        <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
-          Packaging Stock Movements is next — it will mirror the Ingredients view exactly.
-        </div>
-      )}
+      {view === 'packaging' && <PackagingView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
     </div>
   )
 }
@@ -93,6 +90,19 @@ async function IngredientsView({ group }: { group: 'flat' | 'supplier' }) {
     <div className="space-y-3">
       <IngredientStockTable ledger={ledger} group={group} />
       {ledger.months.length > 0 && <MonthlyNotes scope="ingredients" months={ledger.months} initial={notes} />}
+    </div>
+  )
+}
+
+async function PackagingView({ group }: { group: 'flat' | 'supplier' }) {
+  const [ledger, notes] = await Promise.all([
+    loadPackagingStockLedger(),
+    loadStockMovementNotes('packaging'),
+  ])
+  return (
+    <div className="space-y-3">
+      <IngredientStockTable ledger={ledger} group={group} entityType="packaging" />
+      {ledger.months.length > 0 && <MonthlyNotes scope="packaging" months={ledger.months} initial={notes} />}
     </div>
   )
 }

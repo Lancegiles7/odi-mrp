@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useMemo, useRef, useState, useTransition } from 'react'
+import { Fragment, createContext, useContext, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { setStockAdjustment } from '@/app/(dashboard)/stock-movements/actions'
@@ -11,13 +11,22 @@ const money = (n: number, cur: 'NZ$' | 'A$') => (n ? `${cur}${Math.round(n).toLo
 const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const label = (m: string) => `${MON3[Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`
 
+type EntityType = 'ingredient' | 'packaging'
+// Which adjustments the manual cells save against — set once by the table.
+const EntityCtx = createContext<EntityType>('ingredient')
+
 interface Props {
   ledger: IngStockLedger
   group: 'flat' | 'supplier'
+  /** Same ledger layout serves the Ingredients and Packaging tabs. */
+  entityType?: EntityType
 }
 
-export function IngredientStockTable({ ledger, group }: Props) {
+export function IngredientStockTable({ ledger, group, entityType = 'ingredient' }: Props) {
   const { rows, months } = ledger
+  const isPkg = entityType === 'packaging'
+  const viewHref = `/stock-movements?view=${isPkg ? 'packaging' : 'ingredients'}`
+  const noun = isPkg ? 'packaging item' : 'ingredient'
   const seedLabel = 'End Jul'
   const [query, setQuery] = useState('')
 
@@ -53,7 +62,7 @@ export function IngredientStockTable({ ledger, group }: Props) {
           <div className="shrink-0">
             <div className="text-[11px] uppercase tracking-wide text-gray-500">Total stock holding</div>
             <div className="text-2xl font-semibold text-emerald-800 leading-tight">{money(monthTotal(currentMonth), 'NZ$')}</div>
-            <div className="text-[10px] text-gray-400">as at {label(currentMonth)} EOM · all ingredients (NZ + AUS in NZ$)</div>
+            <div className="text-[10px] text-gray-400">as at {label(currentMonth)} EOM · all {isPkg ? 'packaging' : 'ingredients'} (NZ + AUS in NZ$)</div>
           </div>
           <div className="flex-1 min-w-0 overflow-x-auto border-l border-gray-100 pl-4">
             <div className="flex gap-2">
@@ -69,13 +78,13 @@ export function IngredientStockTable({ ledger, group }: Props) {
       )}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
-          <Link href="/stock-movements?view=ingredients"
-            className={`px-3 py-1.5 font-medium ${group === 'flat' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>By ingredient</Link>
-          <Link href="/stock-movements?view=ingredients&group=supplier"
+          <Link href={viewHref}
+            className={`px-3 py-1.5 font-medium ${group === 'flat' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>By {isPkg ? 'item' : 'ingredient'}</Link>
+          <Link href={`${viewHref}&group=supplier`}
             className={`px-3 py-1.5 font-medium border-l border-gray-300 ${group === 'supplier' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>By supplier</Link>
         </div>
         <div className="relative">
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search ingredient, SKU or supplier…"
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${isPkg ? 'packaging' : 'ingredient'}, SKU or supplier…`}
             className="text-xs border border-gray-300 rounded-md pl-7 pr-6 py-1.5 w-64 focus:outline-none focus:ring-2 focus:ring-gray-300" />
           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">⌕</span>
           {query && <button onClick={() => setQuery('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs">✕</button>}
@@ -88,13 +97,14 @@ export function IngredientStockTable({ ledger, group }: Props) {
 
       {rows.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
-          Nothing to show yet — set an end-of-July count on an ingredient, or once production plans and POs exist the ledger fills in.
+          Nothing to show yet — set an end-of-July count on {isPkg ? 'a packaging item' : 'an ingredient'}, or once production plans and POs exist the ledger fills in.
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
-          No ingredient matches “{query}”.
+          No {noun} matches “{query}”.
         </div>
       ) : (
+        <EntityCtx.Provider value={entityType}>
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <div className="overflow-auto max-h-[calc(100vh-230px)]">
             <table className="text-xs tabular-nums border-separate border-spacing-0" style={{ minWidth }}>
@@ -107,7 +117,7 @@ export function IngredientStockTable({ ledger, group }: Props) {
                   ))}
                 </tr>
                 <tr>
-                  <th className="sticky left-0 top-7 z-40 bg-gray-50 px-3 py-1.5 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200 w-[240px] min-w-[240px]">Ingredient</th>
+                  <th className="sticky left-0 top-7 z-40 bg-gray-50 px-3 py-1.5 text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200 w-[240px] min-w-[240px]">{isPkg ? 'Packaging' : 'Ingredient'}</th>
                   <th className="sticky left-[240px] top-7 z-40 bg-gray-50 border-b border-r-2 border-gray-300" />
                   {months.map((m, i) => (
                     <Fragment key={m}>
@@ -138,6 +148,7 @@ export function IngredientStockTable({ ledger, group }: Props) {
             </table>
           </div>
         </div>
+        </EntityCtx.Provider>
       )}
     </div>
   )
@@ -166,7 +177,10 @@ function IngredientRows({ row, months, uomLabel }: { row: IngStockRow; months: s
   // Only show a market's row when that market actually has activity (used in a
   // recipe, received, counted or wasted). Total only when it's in BOTH.
   const cellActive = (c: IngCell) => !!(c.used || c.inbound || c.wastage || c.counted != null)
-  const nzActive = row.nz.opening !== 0 || months.some((m) => cellActive(row.nz.cells[m]))
+  const auActiveRaw = row.au.opening !== 0 || months.some((m) => cellActive(row.au.cells[m]))
+  // An item with no activity anywhere still gets its NZ row, so a first
+  // count can be entered (the packaging ledger starts blank).
+  const nzActive = row.nz.opening !== 0 || months.some((m) => cellActive(row.nz.cells[m])) || !auActiveRaw
   const auActive = row.au.opening !== 0 || months.some((m) => cellActive(row.au.cells[m]))
   const showTotal = nzActive && auActive
   const expandBtn = <button onClick={() => setOpen((v) => !v)} className="text-gray-400 hover:text-gray-700 mr-1">{open ? '▾' : '▸'}</button>
@@ -267,6 +281,7 @@ function ManualCell({ entity, market, month, field, units, comment, tone, uom, p
   units: number | null; comment: string | null; tone: 'waste' | 'count' | 'inbound'; uom: string; placeholderVal?: number
 }) {
   const router = useRouter()
+  const entityType = useContext(EntityCtx)
   const [pending, start] = useTransition()
   const [val, setVal] = useState<string>(units == null ? '' : String(units))
   const [cmt, setCmt] = useState<string>(comment ?? '')
@@ -278,7 +293,7 @@ function ManualCell({ entity, market, month, field, units, comment, tone, uom, p
     const u = nextVal.trim() === '' ? null : Number(nextVal)
     if (u != null && !Number.isFinite(u)) return
     start(async () => {
-      await setStockAdjustment({ entity_type: 'ingredient', entity_id: entity, year_month: month, market, field, units: u, comment: nextCmt.trim() || null })
+      await setStockAdjustment({ entity_type: entityType, entity_id: entity, year_month: month, market, field, units: u, comment: nextCmt.trim() || null })
       router.refresh()
     })
   }
@@ -290,7 +305,7 @@ function ManualCell({ entity, market, month, field, units, comment, tone, uom, p
     : tone === 'inbound' ? (units != null ? 'text-emerald-700 font-semibold' : 'text-gray-500')
     : (units != null ? 'text-violet-700 font-semibold' : 'text-gray-500')
   const cmtLabel = tone === 'waste' ? 'Why wasted' : tone === 'inbound' ? 'Received without a PO — note' : 'Why the count differs'
-  const cmtPlaceholder = tone === 'waste' ? 'e.g. spoiled at Brand Nation' : tone === 'inbound' ? 'e.g. sample stock in, no PO' : 'e.g. recount — 5kg short'
+  const cmtPlaceholder = tone === 'waste' ? (entityType === 'packaging' ? 'e.g. damaged cartons' : 'e.g. spoiled at Brand Nation') : tone === 'inbound' ? 'e.g. sample stock in, no PO' : (entityType === 'packaging' ? 'e.g. recount — 200 short' : 'e.g. recount — 5kg short')
 
   return (
     <span className="inline-flex items-center gap-0.5 justify-end">

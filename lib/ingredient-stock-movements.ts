@@ -20,6 +20,9 @@ import { getAppSettings } from '@/lib/settings'
 
 const SEED_MONTH = '2026-07-01'   // end-of-July raw count seeds the ledger
 const HORIZON = 13                // months of forecast columns (Aug 2026 → …)
+// Shared with the packaging ledger so both tabs roll on the same months.
+export const INGREDIENT_SEED_MONTH = SEED_MONTH
+export const INGREDIENT_HORIZON = HORIZON
 
 export type Market = 'NZ' | 'AU'
 
@@ -83,14 +86,11 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
   const calcMonths = [SEED_MONTH, ...months]   // used/inbound also computed for July (unused) → keep simple
 
   const [
-    { data: products }, { data: ingredients }, { data: suppliers },
-    { data: boms }, { data: bomItems }, { data: production },
+    produced, { data: ingredients }, { data: suppliers },
+    { data: bomItems },
     { data: openPos }, { data: openPoLines }, { data: adjustments },
-    { data: fgReceipts },
   ] = await Promise.all([
-    supabase.from('products')
-      .select('id, sku_code, name, wastage_pct, manufacture_market')
-      .is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; wastage_pct: number | null; manufacture_market: string | null }> | null }>,
+    loadProducedUnits(supabase, calcMonths),
     supabase.from('ingredients')
       .select('id, sku_code, name, unit_of_measure, supplier_id, total_loaded_cost, total_loaded_cost_au, yield_pct')
       .eq('is_active', true)
@@ -99,11 +99,7 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
       // would show a stocktake nobody counts.
       .eq('category', 'purchased') as unknown as Promise<{ data: Array<{ id: string; sku_code: string; name: string; unit_of_measure: string | null; supplier_id: string | null; total_loaded_cost: number | null; total_loaded_cost_au: number | null; yield_pct: number | null }> | null }>,
     supabase.from('suppliers').select('id, name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
-    supabase.from('boms').select('id, product_id, is_active, market').eq('is_active', true) as unknown as Promise<{ data: Array<{ id: string; product_id: string; is_active: boolean; market: string | null }> | null }>,
     supabase.from('bom_items').select('bom_id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity') as unknown as Promise<{ data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null; unit_quantity: number | null }> | null }>,
-    supabase.from('production_plans')
-      .select('product_id, year_month, units_planned, market')
-      .gte('year_month', SEED_MONTH) as unknown as Promise<{ data: Array<{ product_id: string; year_month: string; units_planned: number; market: string | null }> | null }>,
     supabase.from('purchase_orders')
       .select('id, po_number, status, expected_delivery_date, market')
       .in('status', ['submitted', 'partially_received'])
@@ -114,79 +110,15 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     supabase.from('stock_period_adjustments')
       .select('entity_id, year_month, market, wastage_units, wastage_comment, counted_units, count_comment, inbound_units, inbound_comment')
       .eq('entity_type', 'ingredient') as unknown as Promise<{ data: Array<{ entity_id: string; year_month: string; market: string; wastage_units: number; wastage_comment: string | null; counted_units: number | null; count_comment: string | null; inbound_units: number; inbound_comment: string | null }> | null }>,
-    // Actual finished-goods produced (received) — used instead of the plan for
-    // closed months so ingredient consumption matches what was really made.
-    // Transfers just move stock between markets, so they're not production.
-    supabase.from('finished_goods_receipts')
-      .select('product_id, received_month, units, market, source')
-      .neq('source', 'transfer') as unknown as Promise<{ data: Array<{ product_id: string; received_month: string; units: number; market: string | null; source: string }> | null }>,
   ])
+  const { products, activeBomByProduct, activeBomByProductAu, unitsNz, unitsAu } = produced
 
-  // ── BOM lookups per market ──
-  const activeBomByProduct = new Map<string, string>()
-  const activeBomByProductAu = new Map<string, string>()
-  for (const b of boms ?? []) {
-    if ((b.market ?? 'NZ') === 'AU') activeBomByProductAu.set(b.product_id, b.id)
-    else activeBomByProduct.set(b.product_id, b.id)
-  }
   const bomItemsByBom = new Map<string, Array<{ ingredient_id: string; quantity_g: number; wet_quantity_g: number | null; unit_quantity: number | null }>>()
   for (const it of bomItems ?? []) {
     if (!bomItemsByBom.has(it.bom_id)) bomItemsByBom.set(it.bom_id, [])
     bomItemsByBom.get(it.bom_id)!.push(it)
   }
 
-  // ── Actual finished-goods produced (received) per product/month/market ──
-  // For closed months this replaces the plan, so ingredient consumption matches
-  // what was really made (e.g. a tub received 1,928 not the 2,000 ordered).
-  const normMonth = (m: string) => m.slice(0, 7) + '-01'
-  const actualNz = new Map<string, Map<string, number>>()
-  const actualAu = new Map<string, Map<string, number>>()
-  let actualThrough: string | null = null
-  for (const r of fgReceipts ?? []) {
-    const m = normMonth(r.received_month)
-    if (!actualThrough || m > actualThrough) actualThrough = m
-    const map = r.market === 'AU' ? actualAu : actualNz
-    if (!map.has(r.product_id)) map.set(r.product_id, new Map())
-    const pm = map.get(r.product_id)!
-    pm.set(m, (pm.get(m) ?? 0) + Number(r.units || 0))
-  }
-  const actual = (map: Map<string, Map<string, number>>, pid: string, m: string) => map.get(pid)?.get(m) ?? 0
-
-  // ── Produced units per product per month, split by build market ──
-  const prodIdxNz = indexProduction(((production ?? []) as Array<{ market: string | null }>).filter((r) => (r.market ?? 'NZ') !== 'AU') as never[])
-  const prodIdxAu = indexProduction(((production ?? []) as Array<{ market: string | null }>).filter((r) => r.market === 'AU') as never[])
-  const unitsNz = new Map<string, Map<string, number>>()
-  const unitsAu = new Map<string, Map<string, number>>()
-  for (const m of calcMonths) { unitsNz.set(m, new Map()); unitsAu.set(m, new Map()) }
-  for (const p of products ?? []) {
-    const isDual = activeBomByProductAu.has(p.id)
-    // Ingredient consumption follows where the product is MANUFACTURED, not where
-    // it's sold. A made-in-AU product's NZ-demand production is still made in AU,
-    // so all its usage runs through the AU build; made-in-NZ, the reverse. Only
-    // 'BOTH'/unset keep the per-market production split.
-    const mm = (p as { manufacture_market: string | null }).manufacture_market
-    for (const m of calcMonths) {
-      // Closed months (≤ the last actual receipt) use what was really produced;
-      // future months fall back to the production plan.
-      const isActual = actualThrough != null && m <= actualThrough
-      const nz = isActual ? actual(actualNz, p.id, m) : (getProductionCell(prodIdxNz, p.id, m) || 0)
-      const au = isActual ? actual(actualAu, p.id, m) : (isDual ? (getProductionCell(prodIdxAu, p.id, m) || 0) : 0)
-      if (mm === 'AU' && isDual) {
-        // Made in AU. The plan combines NZ+AU demand (all built in AU). Actuals
-        // count AU production ONLY — a NZ receipt for this product is a transfer-in
-        // of stock already made (and counted) in AU, not new production.
-        const made = isActual ? au : nz + au
-        if (made) unitsAu.get(m)!.set(p.id, made)
-      } else if (mm === 'NZ') {
-        // Made in NZ — the mirror: actuals count NZ production only.
-        const made = isActual ? nz : nz + au
-        if (made) unitsNz.get(m)!.set(p.id, made)
-      } else {
-        if (nz) unitsNz.get(m)!.set(p.id, nz)
-        if (isDual && au) unitsAu.get(m)!.set(p.id, au)
-      }
-    }
-  }
   const empty = new Map<string, Map<string, number>>(calcMonths.map((m) => [m, new Map()]))
 
   // ── Used + per-SKU drivers, one aggregate pass per market ──
@@ -320,4 +252,98 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
 
   rows.sort((a, b) => a.name.localeCompare(b.name))
   return { rows: rows.filter((r) => r.hasActivity), months, seedMonth: SEED_MONTH, fx }
+}
+
+export interface ProducedUnits {
+  products: Array<{ id: string; sku_code: string; name: string; wastage_pct: number | null; manufacture_market: string | null }>
+  activeBomByProduct: Map<string, string>
+  activeBomByProductAu: Map<string, string>
+  /** month → product_id → units made in NZ / in AU. */
+  unitsNz: Map<string, Map<string, number>>
+  unitsAu: Map<string, Map<string, number>>
+}
+
+/**
+ * Units produced per product per month, split by where they're MADE. Closed
+ * months (≤ latest finished-goods receipt) use actual receipts; later months
+ * use the production plan. Shared by the ingredient and packaging ledgers so
+ * both consume on exactly the same production.
+ */
+export async function loadProducedUnits(supabase: ReturnType<typeof createClient>, calcMonths: string[]): Promise<ProducedUnits> {
+  const [{ data: products }, { data: boms }, { data: production }, { data: fgReceipts }] = await Promise.all([
+    supabase.from('products')
+      .select('id, sku_code, name, wastage_pct, manufacture_market')
+      .is('deleted_at', null) as unknown as Promise<{ data: ProducedUnits['products'] | null }>,
+    supabase.from('boms').select('id, product_id, is_active, market').eq('is_active', true) as unknown as Promise<{ data: Array<{ id: string; product_id: string; is_active: boolean; market: string | null }> | null }>,
+    supabase.from('production_plans')
+      .select('product_id, year_month, units_planned, market')
+      .gte('year_month', calcMonths[0]) as unknown as Promise<{ data: Array<{ product_id: string; year_month: string; units_planned: number; market: string | null }> | null }>,
+    // Actual finished-goods produced (received) — used instead of the plan for
+    // closed months so consumption matches what was really made. Transfers
+    // just move stock between markets, so they're not production.
+    supabase.from('finished_goods_receipts')
+      .select('product_id, received_month, units, market, source')
+      .neq('source', 'transfer') as unknown as Promise<{ data: Array<{ product_id: string; received_month: string; units: number; market: string | null; source: string }> | null }>,
+  ])
+
+  // ── BOM lookups per market ──
+  const activeBomByProduct = new Map<string, string>()
+  const activeBomByProductAu = new Map<string, string>()
+  for (const b of boms ?? []) {
+    if ((b.market ?? 'NZ') === 'AU') activeBomByProductAu.set(b.product_id, b.id)
+    else activeBomByProduct.set(b.product_id, b.id)
+  }
+  // ── Actual finished-goods produced (received) per product/month/market ──
+  // For closed months this replaces the plan, so ingredient consumption matches
+  // what was really made (e.g. a tub received 1,928 not the 2,000 ordered).
+  const normMonth = (m: string) => m.slice(0, 7) + '-01'
+  const actualNz = new Map<string, Map<string, number>>()
+  const actualAu = new Map<string, Map<string, number>>()
+  let actualThrough: string | null = null
+  for (const r of fgReceipts ?? []) {
+    const m = normMonth(r.received_month)
+    if (!actualThrough || m > actualThrough) actualThrough = m
+    const map = r.market === 'AU' ? actualAu : actualNz
+    if (!map.has(r.product_id)) map.set(r.product_id, new Map())
+    const pm = map.get(r.product_id)!
+    pm.set(m, (pm.get(m) ?? 0) + Number(r.units || 0))
+  }
+  const actual = (map: Map<string, Map<string, number>>, pid: string, m: string) => map.get(pid)?.get(m) ?? 0
+
+  // ── Produced units per product per month, split by build market ──
+  const prodIdxNz = indexProduction(((production ?? []) as Array<{ market: string | null }>).filter((r) => (r.market ?? 'NZ') !== 'AU') as never[])
+  const prodIdxAu = indexProduction(((production ?? []) as Array<{ market: string | null }>).filter((r) => r.market === 'AU') as never[])
+  const unitsNz = new Map<string, Map<string, number>>()
+  const unitsAu = new Map<string, Map<string, number>>()
+  for (const m of calcMonths) { unitsNz.set(m, new Map()); unitsAu.set(m, new Map()) }
+  for (const p of products ?? []) {
+    const isDual = activeBomByProductAu.has(p.id)
+    // Ingredient consumption follows where the product is MANUFACTURED, not where
+    // it's sold. A made-in-AU product's NZ-demand production is still made in AU,
+    // so all its usage runs through the AU build; made-in-NZ, the reverse. Only
+    // 'BOTH'/unset keep the per-market production split.
+    const mm = (p as { manufacture_market: string | null }).manufacture_market
+    for (const m of calcMonths) {
+      // Closed months (≤ the last actual receipt) use what was really produced;
+      // future months fall back to the production plan.
+      const isActual = actualThrough != null && m <= actualThrough
+      const nz = isActual ? actual(actualNz, p.id, m) : (getProductionCell(prodIdxNz, p.id, m) || 0)
+      const au = isActual ? actual(actualAu, p.id, m) : (isDual ? (getProductionCell(prodIdxAu, p.id, m) || 0) : 0)
+      if (mm === 'AU' && isDual) {
+        // Made in AU. The plan combines NZ+AU demand (all built in AU). Actuals
+        // count AU production ONLY — a NZ receipt for this product is a transfer-in
+        // of stock already made (and counted) in AU, not new production.
+        const made = isActual ? au : nz + au
+        if (made) unitsAu.get(m)!.set(p.id, made)
+      } else if (mm === 'NZ') {
+        // Made in NZ — the mirror: actuals count NZ production only.
+        const made = isActual ? nz : nz + au
+        if (made) unitsNz.get(m)!.set(p.id, made)
+      } else {
+        if (nz) unitsNz.get(m)!.set(p.id, nz)
+        if (isDual && au) unitsAu.get(m)!.set(p.id, au)
+      }
+    }
+  }
+  return { products: products ?? [], activeBomByProduct, activeBomByProductAu, unitsNz, unitsAu }
 }
