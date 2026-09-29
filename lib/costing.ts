@@ -149,7 +149,7 @@ export function calcProductCostSummary(
     | 'manufacturer_au'
     | 'manufacture_market'
     | 'toll_au'
-  >,
+  > & { gst_free_au?: boolean | null },
   bomItems: BomItemWithIngredient[],
   settings: Pick<SettingsSnapshot, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct' | 'fx_rates'>,
   // The AU build's own recipe (market = 'AU' BOM). When omitted, a dual product
@@ -283,7 +283,9 @@ export function calcProductCostSummary(
   const rrpNz   = product.rrp ?? 0
   const rrpAu   = product.rrp_au ?? product.rrp ?? 0
   const gstNz   = Number(settings.gst_nz_pct) || 0
-  const gstAu   = Number(settings.gst_au_pct) || 0
+  // GST-free-in-AU products (basic foods: pouches, sachets, some tubs) carry no
+  // GST in their AU RRP, so nothing is stripped for the AU margin. NZ unchanged.
+  const gstAu   = product.gst_free_au ? 0 : (Number(settings.gst_au_pct) || 0)
 
   const rrpExNz = rrpNz > 0 ? round2(rrpNz / (1 + gstNz)) : 0
   const rrpExAu = rrpAu > 0 ? round2(rrpAu / (1 + gstAu)) : 0

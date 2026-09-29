@@ -51,6 +51,7 @@ export interface ProductFormData {
   freight_nz_currency?: string
   freight_au_currency?: string
   apply_fx?: string
+  gst_free_au?: string
   wastage_pct_input?: string
   manufacturer?: string
   manufacturer_au?: string
@@ -168,6 +169,7 @@ function buildProductPayload(data: ProductFormData) {
     freight_nz_currency: parseCurrency(data.freight_nz_currency, 'NZD'),
     freight_au_currency: parseCurrency(data.freight_au_currency, 'NZD'),
     apply_fx:        data.apply_fx === 'true',
+    gst_free_au:     data.gst_free_au === 'true',
     wastage_pct:     wastagePct,
     manufacturer:    data.manufacturer?.trim() || null,
     manufacturer_au: data.manufacturer_au?.trim() || null,
@@ -211,6 +213,7 @@ function formDataToProductForm(formData: FormData): ProductFormData {
     freight_nz_currency: formData.get('freight_nz_currency') as string,
     freight_au_currency: formData.get('freight_au_currency') as string,
     apply_fx:          formData.get('apply_fx') as string,
+    gst_free_au:       formData.get('gst_free_au') as string,
     wastage_pct_input: formData.get('wastage_pct_input') as string,
     manufacturer:      formData.get('manufacturer') as string,
     manufacturer_au:   formData.get('manufacturer_au') as string,

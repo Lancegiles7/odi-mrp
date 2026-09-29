@@ -243,6 +243,21 @@ export function ProductForm({ product, action, errorMessage, fxRate }: ProductFo
               </p>
             </Field>
 
+            <Field id="gst_free_au" label="GST-free (Australia)">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="gst_free_au"
+                  value="true"
+                  defaultChecked={!!(product as { gst_free_au?: boolean } | null)?.gst_free_au}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300"
+                />
+                <span className="text-gray-700">
+                  Basic food — no GST in the AU price. Skips stripping GST from the AU RRP for the margin calc. NZ GST (15%) still applies.
+                </span>
+              </label>
+            </Field>
+
             <Field id="manufacturer" label="Manufacturer — NZ">
               <input
                 id="manufacturer"
