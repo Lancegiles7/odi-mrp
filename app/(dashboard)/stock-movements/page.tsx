@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { loadStockLedger } from '@/lib/stock-movements-data'
+import { loadStockLedger, loadFgValueSummary } from '@/lib/stock-movements-data'
+import { FgValueSummaryCard } from '@/components/stock-movements/fg-value-summary'
 import { loadIngredientStockLedger } from '@/lib/ingredient-stock-movements'
 import { loadPackagingStockLedger } from '@/lib/packaging-stock-movements'
 import { StockMovementsTable } from '@/components/stock-movements/stock-movements-table'
@@ -57,10 +58,12 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
 }
 
 async function ProductsView({ label }: { label: (m: string) => string }) {
-  const [{ rows, actualMonths, forecastMonths, actualThrough }, notes] = await Promise.all([
+  const [ledger, notes] = await Promise.all([
     loadStockLedger(),
     loadStockMovementNotes('products'),
   ])
+  const { rows, actualMonths, forecastMonths, actualThrough } = ledger
+  const valueSummary = rows.length > 0 ? await loadFgValueSummary(ledger) : {}
   const lastActualLabel = actualThrough ? label(actualThrough) : null
   const months = [...actualMonths, ...forecastMonths]
   return (
@@ -69,6 +72,7 @@ async function ProductsView({ label }: { label: (m: string) => string }) {
         Inbound − sold/samples − write-offs = predicted EOM
         {lastActualLabel && <> · actuals through <span className="font-semibold text-gray-800">{lastActualLabel}</span>, forecast thereafter</>}
       </p>
+      {rows.length > 0 && <FgValueSummaryCard summary={valueSummary} months={months} />}
       {rows.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
           No stock movements yet. Use <strong>Upload inwards</strong> to load the Inwards Finished Goods sheet.

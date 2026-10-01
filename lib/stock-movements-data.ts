@@ -11,6 +11,8 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import { buildStockLedger, type StockRow, type ReceiptDetail, type OpenPoDetail } from '@/lib/stock-movements'
 import { loadBuildTransfers, type BuildTransfers } from '@/lib/transfer-stock'
+import { calcProductCostSummary } from '@/lib/costing'
+import { getAppSettings } from '@/lib/settings'
 
 const AU_START = '2026-09-01'   // AU demand begins Sept 2026 (fallback row start)
 
@@ -181,6 +183,80 @@ export async function loadStockLedger(): Promise<StockLedger> {
   })
 
   return { rows, months, actualMonths, forecastMonths, actualThrough, transfers }
+}
+
+// ============================================================
+// Finished-goods monthly VALUE summary (NZ$) for the top of the FG tab.
+// Per month: In / Out / Write-off / EOM units, each valued at full MRP landed
+// cost AND RRP ex-GST. NZ units use NZ figures; AU units use AU figures
+// converted A$→NZ$ at FX. Actual months use received/sold/write-off; forecast
+// months use planned production / demand.
+// ============================================================
+export interface FgValueCell { cost: number; rrp: number }
+export interface FgMonthValue { inbound: FgValueCell; out: FgValueCell; writeoff: FgValueCell; eom: FgValueCell }
+export type FgValueSummary = Record<string, FgMonthValue>
+
+export async function loadFgValueSummary(ledger: StockLedger): Promise<FgValueSummary> {
+  const supabase = createClient()
+  const [{ data: products }, settings] = await Promise.all([
+    supabase.from('products').select(`
+      id, sku_code, name, product_type, size_g, serving_size, wet_weight_g, rrp, rrp_au,
+      packaging, packaging_au, toll, toll_au, margin, other, freight, freight_nz, freight_au,
+      toll_currency, margin_currency, other_currency, freight_nz_currency, freight_au_currency,
+      apply_fx, wastage_pct, manufacturer_au, manufacture_market, gst_free_au, is_active,
+      boms ( id, is_active, market, bom_items (
+        id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity, uom, price_override, notes, sort_order,
+        ingredients ( id, name, sku_code, unit_of_measure, total_loaded_cost, total_loaded_cost_au, is_organic, currency, price, yield_pct )
+      ) )
+    `).is('deleted_at', null).eq('is_active', true) as unknown as { data: Array<Record<string, unknown>> | null },
+    getAppSettings(),
+  ])
+
+  // NZ$ per A$ (NZD = AUD × fx). Single source: fx_rates.AUD, fallback legacy.
+  const s = settings as unknown as { fx_rates?: { AUD?: number }; fx_rate?: number }
+  const fx = Number(s.fx_rates?.AUD) || Number(s.fx_rate) || 1
+
+  // Per-unit cost + RRP ex-GST per product, per market.
+  const costByProduct = new Map<string, { nzCost: number; auCost: number; nzRrp: number; auRrp: number }>()
+  for (const p of products ?? []) {
+    const boms = (p.boms as Array<{ is_active: boolean; market: string | null; bom_items: unknown[] }> | undefined) ?? []
+    const nzBom = boms.find((b) => b.is_active && (b.market ?? 'NZ') === 'NZ')
+    const auBom = boms.find((b) => b.is_active && b.market === 'AU')
+    const c = calcProductCostSummary(p as never, (nzBom?.bom_items ?? []) as never, settings as never, (auBom?.bom_items ?? []) as never)
+    costByProduct.set(p.id as string, {
+      nzCost: Number(c.nz_grand_total) || 0, auCost: Number(c.au_grand_total) || 0,
+      nzRrp: Number(c.rrp_ex_gst_nz) || 0, auRrp: Number(c.rrp_ex_gst_au) || 0,
+    })
+  }
+
+  const blank = (): FgMonthValue => ({ inbound: { cost: 0, rrp: 0 }, out: { cost: 0, rrp: 0 }, writeoff: { cost: 0, rrp: 0 }, eom: { cost: 0, rrp: 0 } })
+  const summary: FgValueSummary = {}
+  for (const m of ledger.months) summary[m] = blank()
+  const actualSet = new Set(ledger.actualMonths)
+
+  for (const row of ledger.rows) {
+    const cost = costByProduct.get(row.product_id)
+    if (!cost) continue
+    const isAu = row.market === 'AU'
+    const costU = (isAu ? cost.auCost : cost.nzCost) * (isAu ? fx : 1)   // → NZ$
+    const rrpU  = (isAu ? cost.auRrp  : cost.nzRrp)  * (isAu ? fx : 1)
+    for (const m of ledger.months) {
+      const t = summary[m]
+      if (actualSet.has(m)) {
+        const c = row.actual[m]; if (!c) continue
+        t.inbound.cost  += c.inbound  * costU; t.inbound.rrp  += c.inbound  * rrpU
+        t.out.cost      += c.outbound * costU; t.out.rrp      += c.outbound * rrpU
+        t.writeoff.cost += c.writeoff * costU; t.writeoff.rrp += c.writeoff * rrpU
+        t.eom.cost      += c.eom      * costU; t.eom.rrp      += c.eom      * rrpU
+      } else {
+        const c = row.forecast[m]; if (!c) continue
+        t.inbound.cost += c.produced * costU; t.inbound.rrp += c.produced * rrpU
+        t.out.cost     += c.demand   * costU; t.out.rrp     += c.demand   * rrpU
+        t.eom.cost     += c.eom      * costU; t.eom.rrp     += c.eom      * rrpU
+      }
+    }
+  }
+  return summary
 }
 
 /**
