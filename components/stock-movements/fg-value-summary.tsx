@@ -3,7 +3,7 @@ import type { FgValueSummary } from '@/lib/stock-movements-data'
 
 const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const label = (m: string) => `${MON3[Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`
-const money = (n: number) => (n ? `NZ$${Math.round(n).toLocaleString()}` : '—')
+const money = (n: number) => (n ? Math.round(n).toLocaleString() : '—')
 
 const METRICS = [
   { key: 'inbound',  label: 'In',           tone: 'text-emerald-700' },
