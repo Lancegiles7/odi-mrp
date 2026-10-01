@@ -150,6 +150,8 @@ interface IngredientPayload {
   is_active: boolean
   // Supplier's own SKU/code for this ingredient (migration 016)
   supplier_sku_code: string | null
+  // Minimum order quantity from the supplier (migration 074), in the purchase UoM
+  moq: number | null
   // Currency + FX (migration 023)
   currency: string
   fx_rate_override: number | null
@@ -238,6 +240,7 @@ async function buildPayloadFromForm(
                           ? (formData.get('category') as string) : 'purchased',
     is_active:          true,
     supplier_sku_code:  str(formData.get('supplier_sku_code')),
+    moq:                parseNumeric(formData.get('moq')),
     currency,
     fx_rate_override:   fxOverride,
     original_order_qty:   parseNumeric(formData.get('original_order_qty')),

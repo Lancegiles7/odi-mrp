@@ -345,6 +345,24 @@ export function IngredientForm({
           />
           <p className="text-xs text-gray-400 mt-1">Pre-fills on new PO lines for this ingredient.</p>
         </div>
+        <div>
+          <label htmlFor="moq" className="block text-sm font-medium text-gray-700 mb-1.5">
+            Minimum order quantity (MOQ)
+          </label>
+          <input
+            id="moq"
+            name="moq"
+            type="number"
+            min="0"
+            step="any"
+            defaultValue={(ingredient as unknown as { moq?: number | null })?.moq?.toString() ?? ''}
+            placeholder="e.g. 100"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Smallest quantity the supplier will accept, in {ingredient?.unit_of_measure || 'the purchase unit'}.
+          </p>
+        </div>
       </div>
 
       {/* Pricing */}

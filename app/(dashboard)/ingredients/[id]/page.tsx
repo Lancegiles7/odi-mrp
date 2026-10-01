@@ -205,6 +205,7 @@ export default async function IngredientDetailPage({ params, searchParams }: Pag
             <Row label="Certification" value={certInfo?.label ?? null} />
             <Row label="Used in" value={usedInCount != null ? `${usedInCount} BOM line${usedInCount === 1 ? '' : 's'}` : '—'} />
             <Row label="Reorder point" value={ingredient.reorder_point != null ? `${ingredient.reorder_point}` : null} />
+            <Row label="MOQ" value={(ingredient as { moq?: number | null }).moq != null ? `${(ingredient as { moq?: number | null }).moq} ${ingredient.unit_of_measure ?? ''}`.trim() : null} />
           </dl>
         </div>
 
