@@ -129,9 +129,10 @@ export async function loadStockLedger(): Promise<StockLedger> {
     .in('status', ['submitted', 'partially_received'])
     .neq('po_type', 'transfer') as {
       data: Array<{ id: string; po_number: string; expected_delivery_date: string | null; market: string | null; suppliers: { name: string } | null }> | null }
-  // Overdue POs can't have landed in a month that's already closed, so an open
-  // PO due in a past month is rolled forward to the CURRENT month — it shows as
-  // "still to receipt" now (counted there) instead of inflating a past balance.
+  // Open POs are shown as "still to receipt" chips but NOT counted in the balance
+  // (the balance mirrors the Production page — planned production + receipts). An
+  // overdue PO (due in a closed month) has its chip rolled forward to the current
+  // month, so it shows as still-expected now rather than on a month already shut.
   const nowMonth = norm(new Date().toISOString())
   if ((openPos ?? []).length) {
     const poById = new Map((openPos ?? []).map((p) => [p.id, p]))
