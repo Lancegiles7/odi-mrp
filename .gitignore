@@ -36,3 +36,11 @@ Thumbs.db
 *.tsbuildinfo
 next-env.d.ts
 .env.local
+
+# Claude Code — local & session files (never commit)
+.claude/settings.local.json
+.claude/launch.json
+.claude/worktrees/
+
+# One-off deliverables / working spreadsheets (not app code)
+Odi_Design_Planner.xlsx
