@@ -47,11 +47,11 @@ export interface ActualCell {
 export interface ForecastCell {
   produced: number     // production plan
   demand: number       // demand forecast
-  eom: number          // mirrors Production (open POs flagged, NOT counted)
+  eom: number          // supply = max(planned production, still-to-receipt PO)
   transfer: number     // net NZ ↔ AU transfer (+ in / − out)
   transfers: TransferDetail[]
   shortfall: boolean   // eom < 0
-  stillToReceipt: OpenPoDetail[] // fully-open POs — flagged only, NOT counted
+  stillToReceipt: OpenPoDetail[] // fully-open POs — counted as supply when ≥ the plan
   partialReceipt: OpenPoDetail[] // part-received PO lines — flagged only
   noPo: boolean             // planned production this month with no covering open PO
 }
@@ -132,10 +132,16 @@ function buildRow(
     const open = openByMonth?.get(m) ?? []
     const stillToReceipt = open.filter((o) => !o.partial)
     const partialReceipt = open.filter((o) => o.partial)
+    const expected = stillToReceipt.reduce((s, o) => s + o.remaining, 0)
     const transfers = trByMonth?.get(m) ?? []
     const transfer = transfers.reduce((s, t) => s + t.units, 0)
-    // Mirror Production: supply = planned production only (open POs are flags).
-    eom = eom + produced - demand + transfer
+    // Supply = planned production OR the still-to-receipt PO total, whichever is
+    // larger. Taking the greater (not the sum) means a PO that backs a production
+    // plan (e.g. AU snacks: plan 2,500 + its PO 2,500) is NOT double-counted,
+    // while a PO with no plan behind it (e.g. a NZ snack PO) still gets counted
+    // into the balance. Overdue POs are rolled into the current month upstream.
+    const supply = Math.max(produced, expected)
+    eom = eom + supply - demand + transfer
     const noPo = produced > 0 && open.length === 0
     if (produced || demand || open.length || transfers.length) activity = true
     if (!visible(m)) { carriedOpening = eom; continue }   // pre-launch build → opening
