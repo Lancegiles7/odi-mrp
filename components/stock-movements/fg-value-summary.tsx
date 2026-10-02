@@ -1,8 +1,6 @@
 import { Fragment } from 'react'
 import type { FgValueSummary } from '@/lib/stock-movements-data'
 
-const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const label = (m: string) => `${MON3[Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`
 const money = (n: number) => (n ? Math.round(n).toLocaleString() : '—')
 
 const METRICS = [
@@ -12,49 +10,58 @@ const METRICS = [
   { key: 'eom',      label: 'End of month', tone: 'text-gray-900 font-semibold' },
 ] as const
 
-export function FgValueSummaryCard({ summary, months }: { summary: FgValueSummary; months: string[] }) {
+/**
+ * Value summary rows, rendered INSIDE the stock movements table so each
+ * month's value sits directly above that month's movement columns (and
+ * scrolls with them). Each month spans its 4 actual / 3 forecast columns.
+ */
+export function FgValueSummaryRows({
+  summary, actualMonths, forecastMonths, totalCols,
+}: {
+  summary: FgValueSummary
+  actualMonths: string[]
+  forecastMonths: string[]
+  totalCols: number
+}) {
+  const months = [
+    ...actualMonths.map((m) => ({ m, span: 4, fc: false, first: false })),
+    ...forecastMonths.map((m, i) => ({ m, span: 3, fc: true, first: i === 0 })),
+  ]
   if (months.length === 0) return null
+  const monthBorder = (first: boolean) =>
+    first ? 'border-l-2 border-amber-300' : 'border-l border-gray-200'
+
   return (
-    <details open className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <summary className="list-none cursor-pointer px-4 py-2.5 flex items-center justify-between hover:bg-gray-50">
-        <span className="text-sm font-semibold text-gray-800">
-          Value summary <span className="text-gray-400">— NZ$</span>
-          <span className="ml-2 text-[11px] font-normal text-gray-400">per month · cost = full MRP landed (incl. packaging) · AUS converted A$→NZ$</span>
-        </span>
-        <span className="text-gray-400 text-xs">▾</span>
-      </summary>
-      <div className="border-t border-gray-100 overflow-x-auto">
-        <table className="text-xs tabular-nums border-separate border-spacing-0" style={{ minWidth: 240 + months.length * 96 }}>
-          <thead>
-            <tr>
-              <th className="sticky left-0 z-10 bg-gray-50 text-left px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 border-b border-r border-gray-200 w-[200px] min-w-[200px]">Metric</th>
-              {months.map((m, i) => (
-                <th key={m} className={`px-3 py-1.5 text-right text-[10px] font-bold uppercase tracking-wide text-emerald-800 bg-emerald-50 border-b border-gray-200 ${i > 0 ? 'border-l border-emerald-100' : ''}`}>{label(m)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {METRICS.map((metric) => (
-              <Fragment key={metric.key}>
-                <tr>
-                  <td className={`sticky left-0 z-10 bg-white px-3 pt-2 pb-0.5 border-r border-gray-100 font-medium ${metric.tone}`}>
-                    {metric.label} <span className="text-[10px] font-normal text-gray-400">cost</span>
-                  </td>
-                  {months.map((m) => (
-                    <td key={m} className="px-3 pt-2 pb-0.5 text-right text-gray-900">{money(summary[m]?.[metric.key].cost ?? 0)}</td>
-                  ))}
-                </tr>
-                <tr>
-                  <td className="sticky left-0 z-10 bg-white px-3 pt-0 pb-2 border-r border-b border-gray-100 text-[10px] text-gray-400">RRP ex‑GST</td>
-                  {months.map((m) => (
-                    <td key={m} className="px-3 pt-0 pb-2 text-right text-gray-500 border-b border-gray-100">{money(summary[m]?.[metric.key].rrp ?? 0)}</td>
-                  ))}
-                </tr>
-              </Fragment>
+    <>
+      <tr className="bg-emerald-50/70 [&>td]:border-y [&>td]:border-emerald-100">
+        <td colSpan={totalCols} className="px-3 py-1.5 sticky left-0 bg-emerald-50 z-10 text-[11px] font-semibold uppercase tracking-wider text-emerald-800">
+          Value summary <span className="normal-case font-normal text-emerald-700/70">— NZ$ · cost = full MRP landed (incl. packaging) · AUS converted A$→NZ$</span>
+        </td>
+      </tr>
+      {METRICS.map((metric) => (
+        <Fragment key={metric.key}>
+          <tr>
+            <td className={`sticky left-0 z-10 bg-white px-3 pt-2 pb-0.5 font-medium ${metric.tone}`}>
+              {metric.label} <span className="text-[10px] font-normal text-gray-400">cost</span>
+            </td>
+            <td className="sticky left-[240px] z-10 bg-white border-r-2 border-gray-300" />
+            {months.map(({ m, span, fc, first }) => (
+              <td key={m} colSpan={span} className={`px-1.5 pt-2 pb-0.5 text-right text-gray-900 ${fc ? 'bg-amber-50/20' : ''} ${monthBorder(first)}`}>
+                {money(summary[m]?.[metric.key].cost ?? 0)}
+              </td>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </details>
+          </tr>
+          <tr className="[&>td]:border-b [&>td]:border-gray-100">
+            <td className="sticky left-0 z-10 bg-white px-3 pt-0 pb-2 text-[10px] text-gray-400">RRP ex‑GST</td>
+            <td className="sticky left-[240px] z-10 bg-white border-r-2 border-gray-300" />
+            {months.map(({ m, span, fc, first }) => (
+              <td key={m} colSpan={span} className={`px-1.5 pt-0 pb-2 text-right text-gray-500 ${fc ? 'bg-amber-50/20' : ''} ${monthBorder(first)}`}>
+                {money(summary[m]?.[metric.key].rrp ?? 0)}
+              </td>
+            ))}
+          </tr>
+        </Fragment>
+      ))}
+    </>
   )
 }

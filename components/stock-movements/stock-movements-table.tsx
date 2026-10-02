@@ -5,6 +5,8 @@ import { InboundCell } from '@/components/stock-movements/inbound-cell'
 import { OpenPoChips } from '@/components/stock-movements/open-po-chips'
 import { TransferChips } from '@/components/stock-movements/transfer-chips'
 import { WriteoffCell } from '@/components/stock-movements/writeoff-cell'
+import { FgValueSummaryRows } from '@/components/stock-movements/fg-value-summary'
+import type { FgValueSummary } from '@/lib/stock-movements-data'
 
 const nf = (n: number) => Math.round(n).toLocaleString('en-NZ')
 const dash = <span className="text-gray-300">—</span>
@@ -17,9 +19,10 @@ function eomClass(v: number): string {
 }
 
 export function StockMovementsTable({
-  rows, actualMonths, forecastMonths, label,
+  rows, actualMonths, forecastMonths, label, valueSummary,
 }: {
   rows: StockRow[]
+  valueSummary?: FgValueSummary
   actualMonths: string[]
   forecastMonths: string[]
   label: (m: string) => string
@@ -98,6 +101,9 @@ export function StockMovementsTable({
               <tr><td colSpan={totalCols} className="px-4 py-10 text-center text-sm text-gray-500">
                 No stock movements yet. Upload the Inwards Finished Goods sheet to populate arrivals.
               </td></tr>
+            )}
+            {valueSummary && rows.length > 0 && (
+              <FgValueSummaryRows summary={valueSummary} actualMonths={actualMonths} forecastMonths={forecastMonths} totalCols={totalCols} />
             )}
             {groupKeys.map((key) => {
               const groupRows = grouped.get(key)!
