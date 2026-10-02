@@ -239,8 +239,7 @@ export const PRODUCT_GROUPS = [
   { value: 'tubs',        label: 'Tubs' },
   { value: 'sachets',     label: 'Sachets' },
   { value: 'noodles',     label: 'Noodles' },
-  { value: 'vitamin_d',   label: 'Vitamin D' },
-  { value: 'her_daily_dose', label: 'Her Daily Dose' },
+  { value: 'supplements', label: 'Odi Supplements' },
 ] as const
 
 export const PRODUCT_GROUP_LABELS: Record<string, string> = Object.fromEntries(

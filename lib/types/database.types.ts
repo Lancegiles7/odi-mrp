@@ -919,8 +919,7 @@ export type ProductGroup =
   | 'tubs'
   | 'sachets'
   | 'noodles'
-  | 'vitamin_d'
-  | 'her_daily_dose'
+  | 'supplements'
 
 export type PriceChangeReason =
   | 'initial'

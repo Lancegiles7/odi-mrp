@@ -12,11 +12,14 @@ const PRODUCT_GROUP_MAP: Record<string, ProductGroup | null> = {
   pouches:       'pouches',
   'puffs & melts':'puffs_melts',
   'puffs and melts':'puffs_melts',
-  'vitamin d':   'vitamin_d',
+  'vitamin d':   'supplements',
+  'her daily dose': 'supplements',
+  'odi supplements': 'supplements',
+  'supplements': 'supplements',
   'odi noodles': 'noodles',
   'odi protein': null,
   'odi go':      null,
-  'post partum': null,
+  'post partum': 'supplements',
   'other':       null,
 }
 
