@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { loadStockLedger, loadFgValueSummary } from '@/lib/stock-movements-data'
-import { FgValueSummaryCard } from '@/components/stock-movements/fg-value-summary'
 import { loadIngredientStockLedger } from '@/lib/ingredient-stock-movements'
 import { loadPackagingStockLedger } from '@/lib/packaging-stock-movements'
 import { StockMovementsTable } from '@/components/stock-movements/stock-movements-table'
@@ -72,13 +71,12 @@ async function ProductsView({ label }: { label: (m: string) => string }) {
         Inbound − sold/samples − write-offs = predicted EOM
         {lastActualLabel && <> · actuals through <span className="font-semibold text-gray-800">{lastActualLabel}</span>, forecast thereafter</>}
       </p>
-      {rows.length > 0 && <FgValueSummaryCard summary={valueSummary} months={months} />}
       {rows.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-sm text-gray-500">
           No stock movements yet. Use <strong>Upload inwards</strong> to load the Inwards Finished Goods sheet.
         </div>
       ) : (
-        <StockMovementsTable rows={rows} actualMonths={actualMonths} forecastMonths={forecastMonths} label={label} />
+        <StockMovementsTable rows={rows} actualMonths={actualMonths} forecastMonths={forecastMonths} label={label} valueSummary={valueSummary} />
       )}
       {months.length > 0 && <MonthlyNotes scope="products" months={months} initial={notes} />}
     </div>
