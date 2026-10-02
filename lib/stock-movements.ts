@@ -36,22 +36,22 @@ export interface ActualCell {
   inbound: number
   outbound: number     // sold + samples (BvA actuals)
   writeoff: number
-  eom: number          // predicted closing stock — open POs are flagged, NOT counted
+  eom: number          // predicted closing stock — includes still-to-receipt POs (counted)
   transfer: number     // net NZ ↔ AU transfer (+ in / − out)
   transfers: TransferDetail[]
   receipts: ReceiptDetail[]     // breakdown behind `inbound` (for the hover)
-  stillToReceipt: OpenPoDetail[] // fully-open POs (nothing received) — flagged only, NOT counted
+  stillToReceipt: OpenPoDetail[] // fully-open POs (nothing received) — counted; overdue roll to current month
   partialReceipt: OpenPoDetail[] // part-received PO lines — flagged only, not counted
 }
 
 export interface ForecastCell {
   produced: number     // production plan
   demand: number       // demand forecast
-  eom: number          // open POs are flagged, NOT counted
+  eom: number          // includes still-to-receipt POs (counted)
   transfer: number     // net NZ ↔ AU transfer (+ in / − out)
   transfers: TransferDetail[]
   shortfall: boolean   // eom < 0
-  stillToReceipt: OpenPoDetail[] // fully-open POs — flagged only, NOT counted
+  stillToReceipt: OpenPoDetail[] // fully-open POs — counted; overdue roll to current month
   partialReceipt: OpenPoDetail[] // part-received PO lines — flagged only
   noPo: boolean             // planned production this month with no covering open PO
 }
@@ -111,12 +111,13 @@ function buildRow(
     const open = openByMonth?.get(m) ?? []
     const stillToReceipt = open.filter((o) => !o.partial)
     const partialReceipt = open.filter((o) => o.partial)
+    const expected = stillToReceipt.reduce((s, o) => s + o.remaining, 0)
     const transfers = trByMonth?.get(m) ?? []
     const transfer = transfers.reduce((s, t) => s + t.units, 0)
-    // Open POs are shown as "still to receipt" chips but NOT counted into the
-    // balance — stock only lands when it's actually received. An unreceived or
-    // overdue PO therefore leaves the balance showing the true (short) position.
-    eom = eom + inbound - outbound - writeoff + transfer
+    // Still-to-receipt POs count as expected stock. Overdue ones are rolled
+    // forward to the current month (in loadStockLedger), so a closed past month
+    // never absorbs a PO that didn't actually arrive in it.
+    eom = eom + inbound + expected - outbound - writeoff + transfer
     if (inbound || outbound || writeoff || open.length || transfers.length) activity = true
     // Months before an AU row's start are rolled into its opening (stock built
     // ahead of launch), not shown as their own cells.
@@ -132,10 +133,10 @@ function buildRow(
     const open = openByMonth?.get(m) ?? []
     const stillToReceipt = open.filter((o) => !o.partial)
     const partialReceipt = open.filter((o) => o.partial)
+    const expected = stillToReceipt.reduce((s, o) => s + o.remaining, 0)
     const transfers = trByMonth?.get(m) ?? []
     const transfer = transfers.reduce((s, t) => s + t.units, 0)
-    // Open POs are flagged (still to receipt) but not allocated into the balance.
-    eom = eom + produced - demand + transfer
+    eom = eom + produced + expected - demand + transfer
     const noPo = produced > 0 && open.length === 0
     if (produced || demand || open.length || transfers.length) activity = true
     if (!visible(m)) { carriedOpening = eom; continue }   // pre-launch build → opening

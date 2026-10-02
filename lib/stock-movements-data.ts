@@ -129,6 +129,10 @@ export async function loadStockLedger(): Promise<StockLedger> {
     .in('status', ['submitted', 'partially_received'])
     .neq('po_type', 'transfer') as {
       data: Array<{ id: string; po_number: string; expected_delivery_date: string | null; market: string | null; suppliers: { name: string } | null }> | null }
+  // Overdue POs can't have landed in a month that's already closed, so an open
+  // PO due in a past month is rolled forward to the CURRENT month — it shows as
+  // "still to receipt" now (counted there) instead of inflating a past balance.
+  const nowMonth = norm(new Date().toISOString())
   if ((openPos ?? []).length) {
     const poById = new Map((openPos ?? []).map((p) => [p.id, p]))
     const { data: openLines } = await supabase.from('purchase_order_lines')
@@ -141,7 +145,8 @@ export async function loadStockLedger(): Promise<StockLedger> {
       if (remaining <= 0) continue
       const po = poById.get(l.purchase_order_id)
       if (!po?.expected_delivery_date) continue
-      const month = norm(po.expected_delivery_date)
+      const dueMonth = norm(po.expected_delivery_date)
+      const month = dueMonth < nowMonth ? nowMonth : dueMonth   // overdue → roll to now
       const target = mktIsAu(po.market) ? openPoAu : openPoNz
       if (!target.has(l.product_id)) target.set(l.product_id, new Map())
       const bm = target.get(l.product_id)!
