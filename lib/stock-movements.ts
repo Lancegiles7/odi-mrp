@@ -46,6 +46,7 @@ export interface ActualCell {
 
 export interface ForecastCell {
   produced: number     // production plan
+  supply: number       // counted supply = max(production plan, still-to-receipt PO)
   demand: number       // demand forecast
   eom: number          // supply = max(planned production, still-to-receipt PO)
   transfer: number     // net NZ ↔ AU transfer (+ in / − out)
@@ -145,7 +146,7 @@ function buildRow(
     const noPo = produced > 0 && open.length === 0
     if (produced || demand || open.length || transfers.length) activity = true
     if (!visible(m)) { carriedOpening = eom; continue }   // pre-launch build → opening
-    forecast[m] = { produced, demand, eom, transfer, transfers, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo }
+    forecast[m] = { produced, supply, demand, eom, transfer, transfers, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo }
   }
 
   return {

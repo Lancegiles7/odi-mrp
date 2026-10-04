@@ -180,14 +180,14 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
       })}
       {forecastMonths.map((m, i) => {
         if (before(m)) return <BlankForecast key={m} first={i === 0} />
-        const c = r.forecast[m] ?? { produced: 0, demand: 0, eom: 0, transfer: 0, transfers: [], shortfall: false, stillToReceipt: [], partialReceipt: [], noPo: false }
+        const c = r.forecast[m] ?? { produced: 0, supply: 0, demand: 0, eom: 0, transfer: 0, transfers: [], shortfall: false, stillToReceipt: [], partialReceipt: [], noPo: false }
         return (
           <Fragment key={m}>
             <td className={`px-1.5 py-2 text-right text-emerald-700 bg-amber-50/20 ${i === 0 ? 'border-l-2 border-amber-200' : 'border-l border-gray-100'}`}>
               {/* Planned production, then open POs as "still to receipt" chips so
                   incoming orders are visible. The chips are informational (not added
                   to the EOM, which stays in step with the Production page's balance). */}
-              {cell(c.produced)}
+              {cell(c.supply)}
               {(c.stillToReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.stillToReceipt} kind="still" /></div>}
               {(c.partialReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.partialReceipt} kind="partial" /></div>}
               {(c.transfers?.length ?? 0) > 0 && <div><TransferChips items={c.transfers} /></div>}
@@ -232,7 +232,7 @@ function SubtotalRow({
 }) {
   const sumA = (m: string, k: 'inbound' | 'outbound' | 'writeoff' | 'eom') =>
     rows.reduce((s, r) => s + (r.actual[m]?.[k] ?? 0), 0)
-  const sumF = (m: string, k: 'produced' | 'demand' | 'eom') =>
+  const sumF = (m: string, k: 'produced' | 'supply' | 'demand' | 'eom') =>
     rows.reduce((s, r) => s + (r.forecast[m]?.[k] ?? 0), 0)
   const bg = grand ? 'bg-gray-100 [&>td]:border-t-2 [&>td]:border-gray-300 text-[12px]' : 'bg-gray-50 [&>td]:border-t [&>td]:border-gray-200 text-[11px]'
 
@@ -250,7 +250,7 @@ function SubtotalRow({
       ))}
       {forecastMonths.map((m, i) => (
         <Fragment key={m}>
-          <td className={`px-1.5 py-2 text-right text-emerald-700 ${i === 0 ? 'border-l-2 border-amber-300' : 'border-l border-gray-200'}`}>{cell(sumF(m, 'produced'))}</td>
+          <td className={`px-1.5 py-2 text-right text-emerald-700 ${i === 0 ? 'border-l-2 border-amber-300' : 'border-l border-gray-200'}`}>{cell(sumF(m, 'supply'))}</td>
           <td className="px-1.5 py-2 text-right text-blue-700">{cell(sumF(m, 'demand'))}</td>
           <td className={`px-1.5 py-2 text-right border-r border-gray-200 ${eomClass(sumF(m, 'eom'))}`}>{nf(sumF(m, 'eom'))}</td>
         </Fragment>
