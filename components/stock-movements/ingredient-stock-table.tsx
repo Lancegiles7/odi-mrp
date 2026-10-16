@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, createContext, useContext, useMemo, useRef, useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { setStockAdjustment } from '@/app/(dashboard)/stock-movements/actions'
@@ -318,10 +319,11 @@ function ManualCell({ entity, market, month, field, units, comment, tone, uom, p
       <button ref={btnRef} type="button" title={hasComment ? comment! : 'Add a note'}
         onClick={() => { const r = btnRef.current?.getBoundingClientRect(); if (r) setPos({ top: r.bottom + 4, left: Math.max(8, r.right - 240) }); setOpenC(true) }}
         className={`text-[9px] w-4 h-4 rounded border inline-flex items-center justify-center ${hasComment ? 'bg-violet-50 border-violet-300 text-violet-600' : 'border-gray-200 text-gray-300 hover:text-gray-500'}`}>✎</button>
-      {openC && (
+      {openC && createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={() => { setOpenC(false); if (cmt !== (comment ?? '')) save(val, cmt) }} />
-          <div style={{ position: 'fixed', top: pos.top, left: pos.left }} className="z-50 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-2.5">
+          {/* Rendered on document.body so the scrollable table can't clip it. */}
+          <div className="fixed inset-0 z-[90]" onClick={() => { setOpenC(false); if (cmt !== (comment ?? '')) save(val, cmt) }} />
+          <div style={{ position: 'fixed', top: pos.top, left: pos.left }} className="z-[100] w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-2.5">
             <div className="text-[10px] font-semibold text-gray-600 mb-1">{cmtLabel}</div>
             <textarea value={cmt} onChange={(e) => setCmt(e.target.value)} autoFocus
               placeholder={cmtPlaceholder}
@@ -330,7 +332,8 @@ function ManualCell({ entity, market, month, field, units, comment, tone, uom, p
               <button type="button" onClick={() => { setOpenC(false); save(val, cmt) }} className="text-[11px] font-medium px-2.5 py-1 rounded bg-gray-900 text-white">Save</button>
             </div>
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </span>
   )
