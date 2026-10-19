@@ -47,18 +47,31 @@ export function InboundCell({ value, receipts, stillToReceipt = [], partialRecei
           <div className="flex justify-between text-[11px] font-bold text-white border-b border-slate-700 pb-1.5 mb-1.5">
             <span>Receipts this month</span><span className="tabular-nums">{nf(value)}</span>
           </div>
-          {receipts.map((r, i) => (
-            <div key={i} className="flex justify-between items-center gap-2 text-[11px] py-0.5">
-              <span className="text-slate-300 flex items-center gap-1.5 min-w-0">
-                {r.po
-                  ? <span className="font-mono text-[10px] bg-[#1e3a5f] text-blue-200 px-1.5 py-0.5 rounded whitespace-nowrap">{r.po}</span>
-                  : <span className="text-[9px] uppercase tracking-wide bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded">sheet</span>}
-                {r.date && <span className="text-slate-400">{fmtDate(r.date)}</span>}
-                {r.batch && <span className="text-slate-500 truncate">· {r.batch}</span>}
-              </span>
-              <span className="text-white tabular-nums flex-shrink-0">{nf(r.units)}</span>
-            </div>
-          ))}
+          {receipts.map((r, i) => {
+            // A PO line received short of order: show the ordered qty and the
+            // shortfall, flagged as closed off ("nothing more to come") or still open.
+            const ordered = r.ordered ?? null
+            const shortfall = ordered != null && ordered > r.units ? ordered - r.units : 0
+            return (
+              <div key={i} className="text-[11px] py-0.5">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-slate-300 flex items-center gap-1.5 min-w-0">
+                    {r.po
+                      ? <span className="font-mono text-[10px] bg-[#1e3a5f] text-blue-200 px-1.5 py-0.5 rounded whitespace-nowrap">{r.po}</span>
+                      : <span className="text-[9px] uppercase tracking-wide bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded">sheet</span>}
+                    {r.date && <span className="text-slate-400">{fmtDate(r.date)}</span>}
+                    {r.batch && <span className="text-slate-500 truncate">· {r.batch}</span>}
+                  </span>
+                  <span className="text-white tabular-nums flex-shrink-0">{nf(r.units)}</span>
+                </div>
+                {shortfall > 0 && (
+                  <div className="text-[10px] text-slate-400 pl-1 mt-0.5">
+                    ordered {nf(ordered!)} · received {nf(r.units)} · {nf(shortfall)} short{r.shortClosed ? ' closed off' : ' still to come'}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </td>

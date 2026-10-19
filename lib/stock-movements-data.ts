@@ -53,7 +53,7 @@ export async function loadStockLedger(): Promise<StockLedger> {
       .select('id, sku_code, name, product_type')
       .is('deleted_at', null).eq('is_active', true).order('sku_code') as { data: Array<{ id: string; sku_code: string; name: string; product_type: string | null }> | null },
     supabase.from('finished_goods_receipts')
-      .select('product_id, received_month, received_date, units, po_number, source, batch_ref, market') as { data: Array<{ product_id: string; received_month: string; received_date: string | null; units: number; po_number: string | null; source: string; batch_ref: string | null; market: string | null }> | null },
+      .select('product_id, received_month, received_date, units, po_number, source, batch_ref, market, purchase_order_line_id') as { data: Array<{ product_id: string; received_month: string; received_date: string | null; units: number; po_number: string | null; source: string; batch_ref: string | null; market: string | null; purchase_order_line_id: string | null }> | null },
     supabase.from('product_actuals')
       .select('product_id, year_month, units, channel') as { data: Array<{ product_id: string; year_month: string; units: number; channel: string | null }> | null },
     supabase.from('product_writeoffs')
@@ -83,6 +83,19 @@ export async function loadStockLedger(): Promise<StockLedger> {
   const receiptsNz = new Map<string, Map<string, ReceiptDetail[]>>()
   const receiptsAu = new Map<string, Map<string, ReceiptDetail[]>>()
 
+  // Join PO-line ordered qty + short-closed flag onto PO receipts, so the hover
+  // can show "ordered 4,000 · 999 received · 3,001 shortfall closed" for a line
+  // received short and closed off (otherwise a closed partial just reads "999").
+  const poLineIds = Array.from(new Set((receipts ?? [])
+    .map((r) => r.purchase_order_line_id).filter((id): id is string => !!id)))
+  const poLineById = new Map<string, { ordered: number; shortClosed: boolean }>()
+  if (poLineIds.length) {
+    const { data: poLines } = await supabase.from('purchase_order_lines')
+      .select('id, quantity_ordered, short_closed')
+      .in('id', poLineIds) as { data: Array<{ id: string; quantity_ordered: number; short_closed: boolean | null }> | null }
+    for (const l of poLines ?? []) poLineById.set(l.id, { ordered: Number(l.quantity_ordered), shortClosed: l.short_closed === true })
+  }
+
   for (const r of receipts ?? []) {
     const au = mktIsAu(r.market)
     const month = norm(r.received_month)
@@ -91,7 +104,12 @@ export async function loadStockLedger(): Promise<StockLedger> {
     if (!detail.has(r.product_id)) detail.set(r.product_id, new Map())
     const byMonth = detail.get(r.product_id)!
     if (!byMonth.has(month)) byMonth.set(month, [])
-    byMonth.get(month)!.push({ date: r.received_date ?? null, units: Number(r.units), po: r.po_number ?? null, source: r.source, batch: r.batch_ref ?? null })
+    const poLine = r.purchase_order_line_id ? poLineById.get(r.purchase_order_line_id) : undefined
+    byMonth.get(month)!.push({
+      date: r.received_date ?? null, units: Number(r.units), po: r.po_number ?? null,
+      source: r.source, batch: r.batch_ref ?? null,
+      ordered: poLine?.ordered ?? null, shortClosed: poLine?.shortClosed ?? false,
+    })
   }
   for (const detail of [receiptsNz, receiptsAu])
     for (const byMonth of Array.from(detail.values()))

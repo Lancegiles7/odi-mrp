@@ -21,6 +21,8 @@ export interface ReceiptDetail {
   po: string | null     // PO number, when the receipt came from a PO receipt
   source: string        // 'po_receipt' | 'inwards_upload' | 'manual'
   batch: string | null
+  ordered?: number | null  // PO line qty ordered (po_receipt only) — for the shortfall hover
+  shortClosed?: boolean    // true when the shortfall was written off ("nothing more to come")
 }
 
 /** An open (not-fully-received) finished-goods PO line, placed on its expected month. */
