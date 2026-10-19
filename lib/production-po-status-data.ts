@@ -24,14 +24,16 @@ export async function loadPoCover(firstMonth: string, lastMonth: string): Promis
 
   const poById = new Map((pos ?? []).map((p) => [p.id, p]))
   const { data: lines } = await supabase.from('purchase_order_lines')
-    .select('purchase_order_id, product_id, quantity_ordered')
+    .select('purchase_order_id, product_id, quantity_ordered, quantity_received, short_closed')
     .in('purchase_order_id', Array.from(poById.keys()))
     .not('product_id', 'is', null) as {
-      data: Array<{ purchase_order_id: string; product_id: string; quantity_ordered: number }> | null }
+      data: Array<{ purchase_order_id: string; product_id: string; quantity_ordered: number; quantity_received: number; short_closed: boolean | null }> | null }
 
   for (const l of lines ?? []) {
     const po = poById.get(l.purchase_order_id)
-    const units = Number(l.quantity_ordered)
+    // A short-closed line's shortfall is written off — only what actually
+    // arrived counts as cover, not the full ordered quantity.
+    const units = l.short_closed === true ? Number(l.quantity_received) : Number(l.quantity_ordered)
     if (!po || !(units > 0)) continue
     const target = out[(po.market ?? 'NZ').toUpperCase() === 'AU' ? 'AU' : 'NZ']
     const month = norm(po.expected_delivery_date)

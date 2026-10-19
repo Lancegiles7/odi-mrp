@@ -505,6 +505,7 @@ export async function receivePoLines(input: {
     expiry_date?: string | null      // ISO yyyy-mm-dd
     coa_file_path?: string | null
     coa_file_name?: string | null
+    short_closed?: boolean           // true = write off the shortfall (nothing more to come)
   }>
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
@@ -590,7 +591,8 @@ export async function receivePoLines(input: {
     const receiptIso = isoDate(r.received_date) ?? poReceiptIso
 
     // Update the PO line total (+ optional note). unit_cost stays the agreed price.
-    const updates: Record<string, unknown> = { quantity_received: received }
+    // short_closed: write off (or re-open) the shortfall — "nothing more to come".
+    const updates: Record<string, unknown> = { quantity_received: received, short_closed: r.short_closed === true }
     if (r.note?.trim()) updates.notes = r.note.trim()
     const { error: lineErr } = await supabase
       .from('purchase_order_lines').update(updates).eq('id', r.line_id)
@@ -664,14 +666,16 @@ export async function receivePoLines(input: {
     }
   }
 
-  // Recompute PO status: sum of received vs ordered across all lines
+  // Recompute PO status: sum of received vs ordered across all lines. A
+  // short-closed line counts as "done" even if under-received — its shortfall
+  // is written off, so the PO can complete.
   const { data: refreshed } = await supabase
     .from('purchase_order_lines')
-    .select('quantity_ordered, quantity_received')
-    .eq('purchase_order_id', input.po_id) as { data: Array<{ quantity_ordered: number; quantity_received: number }> | null }
+    .select('quantity_ordered, quantity_received, short_closed')
+    .eq('purchase_order_id', input.po_id) as { data: Array<{ quantity_ordered: number; quantity_received: number; short_closed: boolean | null }> | null }
 
   if (refreshed) {
-    const allFull = refreshed.every((l) => Number(l.quantity_received) >= Number(l.quantity_ordered))
+    const allFull = refreshed.every((l) => l.short_closed === true || Number(l.quantity_received) >= Number(l.quantity_ordered))
     const anyPartial = refreshed.some((l) => Number(l.quantity_received) > 0)
     const nextStatus: POStatus = allFull ? 'received' : anyPartial ? 'partially_received' : 'submitted'
     await supabase.from('purchase_orders').update({ status: nextStatus }).eq('id', input.po_id)
@@ -930,13 +934,14 @@ export async function correctReceivedQuantities(input: {
     }
   }
 
-  // Recompute status from the corrected quantities.
+  // Recompute status from the corrected quantities. A short-closed line counts
+  // as done so corrections don't re-open a PO that was closed off.
   const { data: refreshed } = await supabase
     .from('purchase_order_lines')
-    .select('quantity_ordered, quantity_received')
-    .eq('purchase_order_id', input.po_id) as { data: Array<{ quantity_ordered: number; quantity_received: number }> | null }
+    .select('quantity_ordered, quantity_received, short_closed')
+    .eq('purchase_order_id', input.po_id) as { data: Array<{ quantity_ordered: number; quantity_received: number; short_closed: boolean | null }> | null }
   if (refreshed && refreshed.length) {
-    const allFull    = refreshed.every((l) => Number(l.quantity_received) >= Number(l.quantity_ordered))
+    const allFull    = refreshed.every((l) => l.short_closed === true || Number(l.quantity_received) >= Number(l.quantity_ordered))
     const anyPartial = refreshed.some((l) => Number(l.quantity_received) > 0)
     const nextStatus: POStatus = allFull ? 'received' : anyPartial ? 'partially_received' : 'submitted'
     await supabase.from('purchase_orders').update({ status: nextStatus }).eq('id', input.po_id)

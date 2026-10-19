@@ -28,6 +28,7 @@ interface POLineRow {
   description: string | null
   quantity_ordered: number
   quantity_received: number
+  short_closed: boolean | null
   unit_cost: number | null
   unit_of_measure: string
   notes: string | null
@@ -51,7 +52,7 @@ export default async function ReceivePoPage({ params }: PageProps) {
 
   const { data: lines } = await supabase
     .from('purchase_order_lines')
-    .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, quantity_received, unit_cost, unit_of_measure, notes')
+    .select('id, ingredient_id, product_id, packaging_id, description, quantity_ordered, quantity_received, short_closed, unit_cost, unit_of_measure, notes')
     .eq('purchase_order_id', params.id)
     .order('created_at') as { data: POLineRow[] | null }
 
@@ -119,6 +120,7 @@ export default async function ReceivePoPage({ params }: PageProps) {
                          null,
     quantity_ordered:  Number(l.quantity_ordered),
     quantity_received: Number(l.quantity_received),
+    saved_short_closed: l.short_closed === true,
     is_product:        !!l.product_id,
     saved_received_date: isTransfer
       ? (transferDateByLine.get(l.id) ?? null)

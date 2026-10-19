@@ -12,6 +12,7 @@ interface LineRow {
   quantity_ordered: number
   quantity_received: number
   is_product: boolean
+  saved_short_closed: boolean           // shortfall already written off on record
   saved_received_date: string | null   // values already on record for this line
   saved_lot: string | null
   saved_expiry: string | null
@@ -34,6 +35,7 @@ interface Props {
 
 interface RowState {
   received: number                   // TOTAL received for this line (edit-in-place)
+  short_closed: boolean              // true = shortfall written off (nothing more to come)
   received_date: string              // ISO yyyy-mm-dd the stock physically arrived (per line)
   invoice_unit_cost: number | null   // user-entered invoice price (defaults to PO price)
   lot_number: string
@@ -75,6 +77,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
       // current total so you can correct it.
       out[l.id] = {
         received:          l.quantity_received > 0 ? l.quantity_received : l.quantity_ordered,
+        short_closed:      l.saved_short_closed,
         received_date:     l.saved_received_date ?? today,
         invoice_unit_cost: l.unit_cost,
         lot_number:        l.saved_lot ?? '',
@@ -119,9 +122,28 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
     if (path) await removeReceiptCoa(path)
   }
 
+  // A line is "settled" when it's received in full OR its shortfall is closed
+  // off. The PO only shows Partial while at least one line is still short AND
+  // left open ("still to come").
   const willBePartial = useMemo(() => {
-    return lines.some((l) => (state[l.id]?.received ?? 0) < l.quantity_ordered)
+    return lines.some((l) => {
+      const s = state[l.id]
+      return (s?.received ?? 0) < l.quantity_ordered && !s?.short_closed
+    })
   }, [lines, state])
+
+  // "Close PO" — write off every outstanding shortfall at once.
+  function closeAllShort() {
+    setState((prev) => {
+      const out = { ...prev }
+      for (const l of lines) {
+        if ((out[l.id]?.received ?? 0) < l.quantity_ordered) {
+          out[l.id] = { ...out[l.id], short_closed: true }
+        }
+      }
+      return out
+    })
+  }
 
   function onSave() {
     setError(null)
@@ -137,6 +159,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
         const s = state[l.id]
         return (s?.received ?? 0) !== l.quantity_received
           || (isTransfer && !!s?.note.trim())
+          || (s?.short_closed ?? false) !== l.saved_short_closed
           || (s?.received_date ?? '') !== (l.saved_received_date ?? today)
           || (s?.lot_number ?? '') !== (l.saved_lot ?? '')
           || (s?.expiry_date ?? '') !== (l.saved_expiry ?? '')
@@ -145,6 +168,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
       .map((l) => ({
         line_id:           l.id,
         received:          state[l.id].received,
+        short_closed:      state[l.id].short_closed,
         received_date:     state[l.id].received_date,
         invoice_unit_cost: state[l.id].invoice_unit_cost,
         note:              state[l.id].note,
@@ -237,6 +261,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
               const isShort     = received < l.quantity_ordered
               const qtyOver     = received > l.quantity_ordered
               const changed     = received !== l.quantity_received
+                || (s.short_closed ?? false) !== l.saved_short_closed
                 || (s.received_date ?? '') !== (l.saved_received_date ?? today)
                 || (s.lot_number ?? '') !== (l.saved_lot ?? '')
                 || (s.expiry_date ?? '') !== (l.saved_expiry ?? '')
@@ -269,8 +294,34 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
                       className={`w-24 text-right text-xs border rounded px-1.5 py-1 tabular-nums ${changed ? 'border-amber-300 bg-amber-50' : 'border-gray-300'}`}
                     />
                     {l.quantity_received > 0 && <div className="text-[10px] text-gray-400 mt-0.5">was {l.quantity_received.toLocaleString()}</div>}
-                    {isShort && <div className="text-[10px] text-amber-800 mt-0.5">⚠ {(l.quantity_ordered - received).toLocaleString()} short of order</div>}
                     {qtyOver && <div className="text-[10px] text-amber-800 mt-0.5">⚠ over order by {(received - l.quantity_ordered).toLocaleString()}</div>}
+                    {/* Shortfall: still-to-come (keep open) vs close-off (write off). */}
+                    {isShort && !isTransfer && (
+                      s.short_closed ? (
+                        <div className="mt-1 text-[10px] text-emerald-800">
+                          ✓ shortfall {(l.quantity_ordered - received).toLocaleString()} closed off
+                          <button
+                            type="button"
+                            onClick={() => updateRow(l.id, { short_closed: false })}
+                            className="ml-1 underline text-emerald-700 hover:text-emerald-900"
+                          >reopen</button>
+                        </div>
+                      ) : (
+                        <div className="mt-1">
+                          <div className="text-[10px] text-amber-800">⚠ {(l.quantity_ordered - received).toLocaleString()} short of order</div>
+                          <div className="inline-flex mt-0.5 border border-gray-300 rounded overflow-hidden text-[10px]">
+                            <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 font-medium">Still to come</span>
+                            <button
+                              type="button"
+                              onClick={() => updateRow(l.id, { short_closed: true })}
+                              className="px-1.5 py-0.5 border-l border-gray-300 text-gray-600 hover:bg-emerald-50 hover:text-emerald-800"
+                              title="Nothing more coming — write off the shortfall and close this line"
+                            >Close short</button>
+                          </div>
+                        </div>
+                      )
+                    )}
+                    {isShort && isTransfer && <div className="text-[10px] text-amber-800 mt-0.5">⚠ {(l.quantity_ordered - received).toLocaleString()} short of order</div>}
                   </td>
                   <td className="px-3 py-2">
                     <input
@@ -378,12 +429,20 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
         </div>
         <div className="flex gap-2 flex-shrink-0">
           <Link href={`/purchase-orders/${poId}`} className="px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50">Cancel</Link>
+          {!isTransfer && willBePartial && (
+            <button
+              type="button"
+              onClick={closeAllShort}
+              className="px-3 py-1.5 text-xs border border-emerald-700 text-emerald-800 rounded-md hover:bg-emerald-50 font-medium"
+              title="Write off every outstanding shortfall — nothing more is coming"
+            >Close PO — nothing more to come</button>
+          )}
           <button
             disabled={pending}
             onClick={onSave}
             className="px-3 py-1.5 text-xs bg-emerald-700 text-white rounded-md hover:bg-emerald-800 disabled:opacity-50"
           >
-            {pending ? 'Saving…' : isTransfer ? 'Confirm receipt' : 'Confirm receipt + update SOH'}
+            {pending ? 'Saving…' : isTransfer ? 'Confirm receipt' : willBePartial ? 'Confirm receipt + update SOH' : 'Confirm & close PO + update SOH'}
           </button>
         </div>
       </div>

@@ -137,11 +137,13 @@ export async function loadStockLedger(): Promise<StockLedger> {
   if ((openPos ?? []).length) {
     const poById = new Map((openPos ?? []).map((p) => [p.id, p]))
     const { data: openLines } = await supabase.from('purchase_order_lines')
-      .select('purchase_order_id, product_id, quantity_ordered, quantity_received')
+      .select('purchase_order_id, product_id, quantity_ordered, quantity_received, short_closed')
       .in('purchase_order_id', (openPos ?? []).map((p) => p.id))
       .not('product_id', 'is', null) as {
-        data: Array<{ purchase_order_id: string; product_id: string; quantity_ordered: number; quantity_received: number }> | null }
+        data: Array<{ purchase_order_id: string; product_id: string; quantity_ordered: number; quantity_received: number; short_closed: boolean | null }> | null }
     for (const l of openLines ?? []) {
+      // Short-closed line: shortfall written off — nothing more to come.
+      if (l.short_closed === true) continue
       const remaining = Number(l.quantity_ordered) - Number(l.quantity_received)
       if (remaining <= 0) continue
       const po = poById.get(l.purchase_order_id)
