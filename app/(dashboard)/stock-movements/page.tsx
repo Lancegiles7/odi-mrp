@@ -12,6 +12,9 @@ import { loadStockoutWatch } from '@/lib/stockout-watch-data'
 import { StockoutWatch } from '@/components/stock-movements/stockout-watch'
 import { loadStockBreakdown } from '@/lib/stock-breakdown-data'
 import { StockBreakdown } from '@/components/stock-movements/stock-breakdown'
+import { UploadsHub } from '@/components/stock-movements/uploads-hub'
+import { fyStartFor, fyMonths, shortMonth } from '@/lib/budget-vs-actual'
+import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: 'Stock Movements' }
 // Always render fresh — receipts / write-offs / actuals / manual counts change
@@ -29,15 +32,18 @@ const TABS: { key: View; label: string }[] = [
   { key: 'packaging', label: 'Packaging' },
 ]
 
-type Hub = 'summary' | 'watch' | 'breakdown'
+type Hub = 'summary' | 'watch' | 'uploads' | 'breakdown'
 const HUB_TABS: { key: Hub; label: string }[] = [
   { key: 'summary', label: 'Summary' },
   { key: 'watch', label: 'Stockout Watch' },
+  { key: 'uploads', label: 'Uploads' },
   { key: 'breakdown', label: 'Breakdown' },
 ]
 
 export default async function StockMovementsPage({ searchParams }: { searchParams: { view?: string; group?: string; hub?: string } }) {
-  const hub: Hub = searchParams.hub === 'watch' ? 'watch' : searchParams.hub === 'breakdown' ? 'breakdown' : 'summary'
+  const hub: Hub = searchParams.hub === 'watch' ? 'watch'
+    : searchParams.hub === 'uploads' ? 'uploads'
+    : searchParams.hub === 'breakdown' ? 'breakdown' : 'summary'
   const view: View = searchParams.view === 'ingredients' ? 'ingredients'
     : searchParams.view === 'packaging' ? 'packaging' : 'products'
 
@@ -63,6 +69,8 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
 
       {hub === 'watch' ? (
         <StockoutWatchView />
+      ) : hub === 'uploads' ? (
+        <UploadsView />
       ) : hub === 'breakdown' ? (
         <StockBreakdownView />
       ) : (
@@ -94,6 +102,18 @@ async function StockoutWatchView() {
 async function StockBreakdownView() {
   const data = await loadStockBreakdown()
   return <StockBreakdown data={data} />
+}
+
+async function UploadsView() {
+  const supabase = createClient()
+  const monthKeys = fyMonths(fyStartFor(new Date()))
+  const { data: locks } = await supabase
+    .from('month_locks').select('year_month')
+    .gte('year_month', monthKeys[0]).lte('year_month', monthKeys[monthKeys.length - 1]) as { data: Array<{ year_month: string }> | null }
+  const locked = new Set((locks ?? []).map((l) => l.year_month))
+  const months = monthKeys.map((m) => ({ key: m, label: shortMonth(m), closed: locked.has(m) }))
+  const defaultMonth = months.find((m) => !m.closed)?.key ?? months[0]?.key ?? ''
+  return <UploadsHub months={months} defaultMonth={defaultMonth} />
 }
 
 async function ProductsView({ label }: { label: (m: string) => string }) {
