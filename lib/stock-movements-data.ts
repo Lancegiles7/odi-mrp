@@ -47,7 +47,7 @@ export async function loadStockLedger(): Promise<StockLedger> {
 
   const [
     { data: products }, { data: receipts }, { data: actuals },
-    { data: writeoffs }, { data: production }, demand, transfers,
+    { data: writeoffs }, { data: production }, demand, transfers, { data: expo },
   ] = await Promise.all([
     supabase.from('products')
       .select('id, sku_code, name, product_type')
@@ -66,6 +66,8 @@ export async function loadStockLedger(): Promise<StockLedger> {
         .order('product_id').order('year_month')
         .range(from, to) as unknown as PromiseLike<{ data: Array<{ product_id: string; year_month: string; units: number; channel: string | null }> | null; error: { message: string } | null }>),
     loadBuildTransfers(),
+    supabase.from('expo_sales')
+      .select('product_id, market, year_month, units') as { data: Array<{ product_id: string; market: string; year_month: string; units: number }> | null },
   ])
 
   // AU channels differ by table: product_actuals uses the `au_*` prefix
@@ -201,6 +203,15 @@ export async function loadStockLedger(): Promise<StockLedger> {
   const actualThrough = maxOf(outboundNz, outboundAu) ?? maxOf(inboundNz, inboundAu)
   const actualMonths   = months.filter((m) => actualThrough != null && m <= actualThrough)
   const forecastMonths = months.filter((m) => actualThrough == null || m > actualThrough)
+
+  // Expo / POS-event sales deplete stock as outbound. Added AFTER actualThrough
+  // is fixed so a current-month expo can't flip that month to "closed"; each
+  // lands in its own month per market (NZ expo → NZ, Brisbane → AU). Only actual
+  // months are summed into the balance, so a forecast-month expo stays inert here
+  // (Stockout Watch subtracts the current month's expo separately).
+  for (const e of expo ?? []) {
+    addTo(mktIsAu(e.market) ? outboundAu : outboundNz, e.product_id, norm(e.year_month), Number(e.units))
+  }
 
   const rows = buildStockLedger({
     products: products ?? [], actualMonths, forecastMonths, auStartMonth: AU_START,

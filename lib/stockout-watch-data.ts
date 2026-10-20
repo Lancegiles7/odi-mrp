@@ -89,6 +89,19 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
     recvByProduct.set(r.product_id, (recvByProduct.get(r.product_id) ?? 0) + Number(r.units))
   }
 
+  // 4b. This month's expo (POS-event) sales — also deplete on-hand. Kept out of
+  // the run-rate (expo is a one-off spike, not ongoing demand). Closed-month
+  // expo is already in the ledger EOM baseline; this covers the current month.
+  const { data: expoRows } = await supabase
+    .from('expo_sales')
+    .select('product_id, units, market, year_month')
+    .eq('year_month', periodStart) as { data: Array<{ product_id: string; units: number; market: string; year_month: string }> | null }
+  const expoByProduct = new Map<string, number>()
+  for (const e of expoRows ?? []) {
+    if ((e.market ?? 'NZ').toUpperCase() === 'AU') continue
+    expoByProduct.set(e.product_id, (expoByProduct.get(e.product_id) ?? 0) + Number(e.units))
+  }
+
   // 5. Incoming open PO lines (NZ, not short-closed).
   const { data: poLines } = await supabase
     .from('purchase_order_lines')
@@ -124,7 +137,7 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
   for (const pid of Array.from(soldByProduct.keys())) {
     const meta = skuName.get(pid)
     if (!meta) continue
-    const onHand = (eomByProduct.get(pid) ?? 0) + (recvByProduct.get(pid) ?? 0) - (soldByProduct.get(pid) ?? 0)
+    const onHand = (eomByProduct.get(pid) ?? 0) + (recvByProduct.get(pid) ?? 0) - (soldByProduct.get(pid) ?? 0) - (expoByProduct.get(pid) ?? 0)
     const incoming = (incomingByProduct.get(pid) ?? []).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
     rows.push({
       product_id: pid, sku: meta.sku, name: meta.name, group: meta.group, market: 'NZ',
