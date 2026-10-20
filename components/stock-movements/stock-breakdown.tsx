@@ -5,7 +5,7 @@ import type { BreakdownData, BreakdownRow } from '@/lib/stock-breakdown-data'
 import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
 
 const nf = (n: number) => (n ? Math.round(n).toLocaleString('en-NZ') : '—')
-const salesTotal = (r: BreakdownRow) => r.nz_d2c + r.au_d2c + r.nz_retail + r.au_retail + r.nz_samples + r.au_samples
+const salesTotal = (r: BreakdownRow) => r.nz_d2c + r.au_d2c + r.nz_retail + r.au_retail + r.nz_samples + r.au_samples + r.expo_nz + r.expo_au
 
 const COLS: { key: keyof BreakdownRow; label: string }[] = [
   { key: 'nz_d2c', label: 'NZ e‑com' },
@@ -14,6 +14,8 @@ const COLS: { key: keyof BreakdownRow; label: string }[] = [
   { key: 'au_retail', label: 'AU retail' },
   { key: 'nz_samples', label: 'NZ samples' },
   { key: 'au_samples', label: 'AU samples' },
+  { key: 'expo_nz', label: 'Expo NZ' },
+  { key: 'expo_au', label: 'Expo AU' },
   { key: 'writeoff', label: 'Write‑offs' },
 ]
 
@@ -108,7 +110,7 @@ export function StockBreakdown({ data }: { data: BreakdownData }) {
         </table>
       </div>
       <div className="px-4 py-2 text-[11px] text-gray-400">
-        NZ e‑com, AU e‑com &amp; AU retail from Shopify · NZ retail from Upstock · the current month shows month‑to‑date. $ view coming once per‑channel pricing is wired.
+        NZ e‑com, AU e‑com &amp; AU retail from Shopify · NZ retail from Upstock · Expo NZ/AU from Shopify POS events · the current month shows month‑to‑date. $ view coming once per‑channel pricing is wired.
       </div>
     </div>
   )

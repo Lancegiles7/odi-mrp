@@ -20,6 +20,8 @@ export interface BreakdownRow {
   au_retail: number
   nz_samples: number
   au_samples: number
+  expo_nz: number
+  expo_au: number
   writeoff: number
 }
 export interface BreakdownData {
@@ -34,13 +36,13 @@ const mktIsAu = (m: string | null) => (m ?? 'NZ').toUpperCase() === 'AU'
 
 const SALES_CHANNELS = ['nz_d2c', 'au_d2c', 'nz_retail', 'au_retail', 'nz_samples', 'au_samples'] as const
 type Chan = typeof SALES_CHANNELS[number]
-const emptyRow = (): Record<Chan, number> & { writeoff: number } =>
-  ({ nz_d2c: 0, au_d2c: 0, nz_retail: 0, au_retail: 0, nz_samples: 0, au_samples: 0, writeoff: 0 })
+const emptyRow = (): Record<Chan, number> & { writeoff: number; expo_nz: number; expo_au: number } =>
+  ({ nz_d2c: 0, au_d2c: 0, nz_retail: 0, au_retail: 0, nz_samples: 0, au_samples: 0, writeoff: 0, expo_nz: 0, expo_au: 0 })
 
 export async function loadStockBreakdown(): Promise<BreakdownData> {
   const supabase = createClient()
 
-  const [{ data: products }, { data: actuals }, { data: writeoffs }, { data: interim }] = await Promise.all([
+  const [{ data: products }, { data: actuals }, { data: writeoffs }, { data: interim }, { data: expo }] = await Promise.all([
     supabase.from('products').select('id, sku_code, name, product_type').is('deleted_at', null).eq('is_active', true) as unknown as
       Promise<{ data: Array<{ id: string; sku_code: string; name: string; product_type: string | null }> | null }>,
     supabase.from('product_actuals').select('product_id, year_month, units, channel') as unknown as
@@ -49,6 +51,8 @@ export async function loadStockBreakdown(): Promise<BreakdownData> {
       Promise<{ data: Array<{ product_id: string; year_month: string; units: number; market: string | null }> | null }>,
     supabase.from('interim_sales').select('product_id, channel, units, period_start, as_of_date').order('as_of_date', { ascending: false }) as unknown as
       Promise<{ data: Array<{ product_id: string; channel: string; units: number; period_start: string; as_of_date: string }> | null }>,
+    supabase.from('expo_sales').select('product_id, market, year_month, units') as unknown as
+      Promise<{ data: Array<{ product_id: string; market: string; year_month: string; units: number }> | null }>,
   ])
 
   const prodById = new Map((products ?? []).map((p) => [p.id, p]))
@@ -70,6 +74,10 @@ export async function loadStockBreakdown(): Promise<BreakdownData> {
   }
   for (const w of writeoffs ?? []) {
     bump(norm(w.year_month), w.product_id, (r) => { r.writeoff += Number(w.units) })
+  }
+  for (const e of expo ?? []) {
+    const au = mktIsAu(e.market)
+    bump(norm(e.year_month), e.product_id, (r) => { if (au) r.expo_au += Number(e.units); else r.expo_nz += Number(e.units) })
   }
 
   // Current open month from the latest interim snapshot (shown as MTD).
