@@ -105,7 +105,11 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
   const incomingByProduct = new Map<string, StockoutIncoming[]>()
   for (const l of poLines ?? []) {
     const po = poById.get(l.purchase_order_id)
-    if (!po || po.po_type === 'transfer') continue
+    if (!po) continue
+    // NZ-destination only. Keep BOTH purchase POs and transfers: products made
+    // offshore (e.g. noodles in AU) reach NZ via AU→NZ transfer, so an incoming
+    // NZ-market transfer is real incoming NZ stock — excluding it hid it as
+    // "nothing on order". The transfer's market is its destination market.
     if ((po.market ?? 'NZ').toUpperCase() === 'AU') continue
     if (!['submitted', 'partially_received'].includes(po.status)) continue
     if (l.short_closed) continue
