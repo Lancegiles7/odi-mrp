@@ -8,6 +8,8 @@ import { IngredientStockTable } from '@/components/stock-movements/ingredient-st
 import { InwardsUpload } from '@/components/stock-movements/inwards-upload'
 import { MonthlyNotes } from '@/components/stock-movements/monthly-notes'
 import { loadStockMovementNotes } from '@/app/(dashboard)/stock-movements/actions'
+import { loadStockoutWatch } from '@/lib/stockout-watch-data'
+import { StockoutWatch } from '@/components/stock-movements/stockout-watch'
 
 export const metadata: Metadata = { title: 'Stock Movements' }
 // Always render fresh — receipts / write-offs / actuals / manual counts change
@@ -25,7 +27,14 @@ const TABS: { key: View; label: string }[] = [
   { key: 'packaging', label: 'Packaging' },
 ]
 
-export default async function StockMovementsPage({ searchParams }: { searchParams: { view?: string; group?: string } }) {
+type Hub = 'summary' | 'watch'
+const HUB_TABS: { key: Hub; label: string }[] = [
+  { key: 'summary', label: 'Summary' },
+  { key: 'watch', label: 'Stockout Watch' },
+]
+
+export default async function StockMovementsPage({ searchParams }: { searchParams: { view?: string; group?: string; hub?: string } }) {
+  const hub: Hub = searchParams.hub === 'watch' ? 'watch' : 'summary'
   const view: View = searchParams.view === 'ingredients' ? 'ingredients'
     : searchParams.view === 'packaging' ? 'packaging' : 'products'
 
@@ -36,24 +45,45 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
           <h1 className="text-2xl font-semibold">Stock Movements</h1>
           <p className="text-sm text-gray-500 mt-1">Running finished-goods, ingredient and packaging stocktake — per country and combined.</p>
         </div>
-        {view === 'products' && <InwardsUpload />}
+        {hub === 'summary' && view === 'products' && <InwardsUpload />}
       </div>
 
-      {/* Section tabs */}
+      {/* Hub tabs */}
       <div className="inline-flex bg-white border border-gray-300 rounded-lg p-0.5 gap-0.5">
-        {TABS.map((t) => (
-          <Link key={t.key} href={t.key === 'products' ? '/stock-movements' : `/stock-movements?view=${t.key}`}
-            className={`text-sm font-medium px-4 py-1.5 rounded-md ${view === t.key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+        {HUB_TABS.map((t) => (
+          <Link key={t.key} href={t.key === 'summary' ? '/stock-movements' : `/stock-movements?hub=${t.key}`}
+            className={`text-sm font-medium px-4 py-1.5 rounded-md ${hub === t.key ? 'bg-emerald-700 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
             {t.label}
           </Link>
         ))}
       </div>
 
-      {view === 'products' && <ProductsView label={monthLabel} />}
-      {view === 'ingredients' && <IngredientsView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
-      {view === 'packaging' && <PackagingView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
+      {hub === 'watch' ? (
+        <StockoutWatchView />
+      ) : (
+        <>
+          {/* Section tabs */}
+          <div className="inline-flex bg-white border border-gray-300 rounded-lg p-0.5 gap-0.5">
+            {TABS.map((t) => (
+              <Link key={t.key} href={t.key === 'products' ? '/stock-movements' : `/stock-movements?view=${t.key}`}
+                className={`text-sm font-medium px-4 py-1.5 rounded-md ${view === t.key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+                {t.label}
+              </Link>
+            ))}
+          </div>
+
+          {view === 'products' && <ProductsView label={monthLabel} />}
+          {view === 'ingredients' && <IngredientsView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
+          {view === 'packaging' && <PackagingView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
+        </>
+      )}
     </div>
   )
+}
+
+async function StockoutWatchView() {
+  const data = await loadStockoutWatch()
+  return <StockoutWatch data={data} />
 }
 
 async function ProductsView({ label }: { label: (m: string) => string }) {
