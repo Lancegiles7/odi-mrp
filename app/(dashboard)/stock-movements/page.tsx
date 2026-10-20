@@ -10,6 +10,8 @@ import { MonthlyNotes } from '@/components/stock-movements/monthly-notes'
 import { loadStockMovementNotes } from '@/app/(dashboard)/stock-movements/actions'
 import { loadStockoutWatch } from '@/lib/stockout-watch-data'
 import { StockoutWatch } from '@/components/stock-movements/stockout-watch'
+import { loadStockBreakdown } from '@/lib/stock-breakdown-data'
+import { StockBreakdown } from '@/components/stock-movements/stock-breakdown'
 
 export const metadata: Metadata = { title: 'Stock Movements' }
 // Always render fresh — receipts / write-offs / actuals / manual counts change
@@ -27,14 +29,15 @@ const TABS: { key: View; label: string }[] = [
   { key: 'packaging', label: 'Packaging' },
 ]
 
-type Hub = 'summary' | 'watch'
+type Hub = 'summary' | 'watch' | 'breakdown'
 const HUB_TABS: { key: Hub; label: string }[] = [
   { key: 'summary', label: 'Summary' },
   { key: 'watch', label: 'Stockout Watch' },
+  { key: 'breakdown', label: 'Breakdown' },
 ]
 
 export default async function StockMovementsPage({ searchParams }: { searchParams: { view?: string; group?: string; hub?: string } }) {
-  const hub: Hub = searchParams.hub === 'watch' ? 'watch' : 'summary'
+  const hub: Hub = searchParams.hub === 'watch' ? 'watch' : searchParams.hub === 'breakdown' ? 'breakdown' : 'summary'
   const view: View = searchParams.view === 'ingredients' ? 'ingredients'
     : searchParams.view === 'packaging' ? 'packaging' : 'products'
 
@@ -60,6 +63,8 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
 
       {hub === 'watch' ? (
         <StockoutWatchView />
+      ) : hub === 'breakdown' ? (
+        <StockBreakdownView />
       ) : (
         <>
           {/* Section tabs */}
@@ -84,6 +89,11 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
 async function StockoutWatchView() {
   const data = await loadStockoutWatch()
   return <StockoutWatch data={data} />
+}
+
+async function StockBreakdownView() {
+  const data = await loadStockBreakdown()
+  return <StockBreakdown data={data} />
 }
 
 async function ProductsView({ label }: { label: (m: string) => string }) {
