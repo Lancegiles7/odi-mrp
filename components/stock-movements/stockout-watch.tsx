@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import type { StockoutData, StockoutRow } from '@/lib/stockout-watch-data'
+import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
 
 const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const nf = (n: number) => Math.round(n).toLocaleString('en-NZ')
@@ -75,7 +76,7 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
           <span className="text-xs text-gray-400">run-rate = MTD ÷ {data.rows[0]?.daysElapsed ?? '—'} days</span>
         </div>
 
-        {view === 'ov' ? <Overview rows={data.rows} asOf={asOf} /> : <Weekly rows={data.rows} asOf={asOf} weekStarts={weekStarts} />}
+        {view === 'ov' ? <Overview rows={data.rows} asOf={asOf} /> : <Weekly rows={data.rows} weekStarts={weekStarts} />}
       </div>
     </div>
   )
@@ -133,7 +134,37 @@ function Overview({ rows, asOf }: { rows: StockoutRow[]; asOf: string }) {
   )
 }
 
-function Weekly({ rows, asOf, weekStarts }: { rows: StockoutRow[]; asOf: string; weekStarts: Date[] }) {
+// Projected end-of-week units on hand for each week (can go negative).
+function weeklyStock(r: StockoutRow, weekStarts: Date[]): number[] {
+  const wd = daily(r) * 7
+  let stock = r.onHand
+  return weekStarts.map((s0) => {
+    const s1 = new Date(s0.getTime() + 7 * 86_400_000)
+    for (const inc of r.incoming) {
+      if (!inc.date) continue
+      const id = new Date(inc.date + 'T00:00:00')
+      if (id >= s0 && id < s1) stock += inc.units
+    }
+    stock -= wd
+    return stock
+  })
+}
+
+function Weekly({ rows, weekStarts }: { rows: StockoutRow[]; weekStarts: Date[] }) {
+  // Group by product group, ordered like the Summary grid.
+  const order = PRODUCT_GROUPS.map((g) => g.value as string)
+  const grouped = new Map<string, StockoutRow[]>()
+  for (const r of rows) {
+    const key = r.group ?? '__other__'
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key)!.push(r)
+  }
+  const groupKeys = Array.from(grouped.keys()).sort((a, b) => {
+    const ia = order.indexOf(a), ib = order.indexOf(b)
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
+  })
+  const colCount = 4 + weekStarts.length
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
@@ -149,29 +180,44 @@ function Weekly({ rows, asOf, weekStarts }: { rows: StockoutRow[]; asOf: string;
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
-            const dr = daily(r), wd = dr * 7
-            let stock = r.onHand
-            const cells = weekStarts.map((s0, i) => {
-              const s1 = new Date(s0.getTime() + 7 * 86_400_000)
-              for (const inc of r.incoming) {
-                if (!inc.date) continue
-                const id = new Date(inc.date + 'T00:00:00')
-                if (id >= s0 && id < s1) stock += inc.units
-              }
-              stock -= wd
-              const cls = stock < 0 ? CELL.red : stock < wd ? CELL.amber : CELL.green
-              return <td key={i} className={`px-2 py-2 text-right tabular-nums border-l border-gray-100 ${cls}`}>{stock < 0 ? '0' : nf(stock)}</td>
-            })
-            const wks = wd > 0 ? r.onHand / wd : 999
+          {groupKeys.map((key) => {
+            const gRows = grouped.get(key)!
+            const gLabel = key === '__other__' ? 'Other' : (PRODUCT_GROUP_LABELS[key] ?? key)
+            const subOn = gRows.reduce((s, r) => s + r.onHand, 0)
+            const subSold = gRows.reduce((s, r) => s + r.soldMtd, 0)
+            const subWeeks = weekStarts.map((_, i) => gRows.reduce((s, r) => s + Math.max(0, weeklyStock(r, weekStarts)[i]), 0))
             return (
-              <tr key={r.product_id} className="border-t border-gray-100">
-                <td className="px-4 py-2"><div className="font-medium">{r.name}</div><div className="text-[10px] text-gray-500 font-mono">{r.sku}</div></td>
-                <td className="px-3 py-2 text-right tabular-nums">{nf(r.onHand)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{nf(r.soldMtd)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{wks < 0.2 ? 'now' : wks.toFixed(1)}</td>
-                {cells}
-              </tr>
+              <Fragment key={key}>
+                <tr className="bg-gray-100/80">
+                  <td colSpan={colCount} className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-600 border-y border-gray-200">
+                    {gLabel} <span className="ml-1 normal-case font-normal text-gray-400">{gRows.length}</span>
+                  </td>
+                </tr>
+                {gRows.map((r) => {
+                  const wd = daily(r) * 7
+                  const wkStock = weeklyStock(r, weekStarts)
+                  const wks = wd > 0 ? r.onHand / wd : 999
+                  return (
+                    <tr key={r.product_id} className="border-t border-gray-100">
+                      <td className="px-4 py-2"><div className="font-medium">{r.name}</div><div className="text-[10px] text-gray-500 font-mono">{r.sku}</div></td>
+                      <td className="px-3 py-2 text-right tabular-nums">{nf(r.onHand)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{nf(r.soldMtd)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{wks < 0.2 ? 'now' : wks.toFixed(1)}</td>
+                      {wkStock.map((stock, i) => {
+                        const cls = stock < 0 ? CELL.red : stock < wd ? CELL.amber : CELL.green
+                        return <td key={i} className={`px-2 py-2 text-right tabular-nums border-l border-gray-100 ${cls}`}>{stock < 0 ? '0' : nf(stock)}</td>
+                      })}
+                    </tr>
+                  )
+                })}
+                <tr className="bg-gray-50 font-semibold text-gray-700">
+                  <td className="px-4 py-1.5">{gLabel} — subtotal</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{nf(subOn)}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{nf(subSold)}</td>
+                  <td className="px-3 py-1.5"></td>
+                  {subWeeks.map((v, i) => <td key={i} className="px-2 py-1.5 text-right tabular-nums border-l border-gray-100">{nf(v)}</td>)}
+                </tr>
+              </Fragment>
             )
           })}
         </tbody>

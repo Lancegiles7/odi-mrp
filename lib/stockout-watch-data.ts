@@ -18,6 +18,7 @@ export interface StockoutRow {
   product_id: string
   sku: string
   name: string
+  group: string | null
   market: 'NZ'
   onHand: number
   soldMtd: number
@@ -57,7 +58,7 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
     const eom = closed ? (r.actual[closed]?.eom ?? r.opening) : r.opening
     eomByProduct.set(r.product_id, eom)
   }
-  const skuName = new Map(ledger.rows.filter((r) => r.market === 'NZ').map((r) => [r.product_id, { sku: r.sku, name: r.name }]))
+  const skuName = new Map(ledger.rows.filter((r) => r.market === 'NZ').map((r) => [r.product_id, { sku: r.sku, name: r.name, group: r.group }]))
 
   if (!periodStart || !asOf) {
     return { rows: [], periodStart: null, asOf: null, hasInterim: false }
@@ -122,7 +123,7 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
     const onHand = (eomByProduct.get(pid) ?? 0) + (recvByProduct.get(pid) ?? 0) - (soldByProduct.get(pid) ?? 0)
     const incoming = (incomingByProduct.get(pid) ?? []).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
     rows.push({
-      product_id: pid, sku: meta.sku, name: meta.name, market: 'NZ',
+      product_id: pid, sku: meta.sku, name: meta.name, group: meta.group, market: 'NZ',
       onHand: Math.round(onHand), soldMtd: Math.round(soldByProduct.get(pid) ?? 0), daysElapsed, incoming,
     })
   }
