@@ -117,11 +117,13 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
       if (r.received_date && r.received_date > asOf) continue
       recv.set(r.product_id, (recv.get(r.product_id) ?? 0) + Number(r.units))
     }
-    // Expo this month, this market.
-    const expo = new Map<string, number>()
+    // Expo (POS-event) sales this month — folded INTO MTD sold, so "Sold MTD"
+    // is the total units sold (incl. expo) and on-hand reconciles cleanly
+    // (end-of-closed stock − sold incl. expo). Closed-month expo is already in
+    // the ledger EOM baseline; this is the current month only.
     for (const e of expoRows ?? []) {
       if (mkt(e.market) !== market) continue
-      expo.set(e.product_id, (expo.get(e.product_id) ?? 0) + Number(e.units))
+      sold.set(e.product_id, (sold.get(e.product_id) ?? 0) + Number(e.units))
     }
     // Incoming open PO lines whose destination market = this market.
     const incoming = new Map<string, StockoutIncoming[]>()
@@ -139,7 +141,7 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
     for (const pid of Array.from(sold.keys())) {
       const m = meta[market].get(pid)
       if (!m) continue
-      const onHand = (eom[market].get(pid) ?? 0) + (recv.get(pid) ?? 0) - (sold.get(pid) ?? 0) - (expo.get(pid) ?? 0)
+      const onHand = (eom[market].get(pid) ?? 0) + (recv.get(pid) ?? 0) - (sold.get(pid) ?? 0)
       const inc = (incoming.get(pid) ?? []).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
       rows.push({
         product_id: pid, sku: m.sku, name: m.name, group: m.group, market,
