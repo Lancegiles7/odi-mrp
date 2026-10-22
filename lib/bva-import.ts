@@ -72,9 +72,16 @@ export function d2cFromShopify(rows: Row[], ym: string): D2cActuals {
   return { revenue, orders: orders.size, units }
 }
 
+/** Retail orders permanently excluded from every Upstock import — Woolworths
+ *  online test orders #3290/#3291 that must never re-enter NZ retail actuals.
+ *  Stored without the leading '#'; matched after stripping it. */
+export const EXCLUDED_RETAIL_ORDERS = new Set(['3290', '3291'])
+const isExcludedRetailOrder = (orderNo: unknown): boolean =>
+  EXCLUDED_RETAIL_ORDERS.has(str(orderNo).replace(/^#/, '').trim())
+
 /** Upstock export → Retail actuals for `ym`. Wholesale revenue (Line Amount);
  *  retail pouches counted as single units (×6); Woolworths split off by
- *  customer name. */
+ *  customer name. Test orders in EXCLUDED_RETAIL_ORDERS are dropped. */
 export function retailFromUpstock(rows: Row[], ym: string): RetailActuals {
   const units = zeroUnits()
   let revenue = 0
@@ -82,6 +89,7 @@ export function retailFromUpstock(rows: Row[], ym: string): RetailActuals {
   const other = new Set<string>()
   for (const r of rows) {
     if (monthOf(r['Created Date']) !== ym) continue
+    if (isExcludedRetailOrder(r['Order Number'])) continue
     revenue += num(r['Line Amount'])
     const code = str(r['Product Code'])
     if (code) {
@@ -333,9 +341,10 @@ export function perProductUnits(shopify: Row[], upstock: Row[], samplesAoa: unkn
     bucket[sku] = (bucket[sku] ?? 0) + qty
   }
 
-  // Retail — Upstock, mapped to FG sku × pack size.
+  // Retail — Upstock, mapped to FG sku × pack size. Excluded test orders dropped.
   for (const r of upstock) {
     if (monthOf(r['Created Date']) !== ym) continue
+    if (isExcludedRetailOrder(r['Order Number'])) continue
     const code = str(r['Product Code'])
     if (!code) continue
     const match = resolveRetail(code, str(r['Product Name']))
