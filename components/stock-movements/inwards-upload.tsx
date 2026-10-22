@@ -13,7 +13,7 @@ export function InwardsUpload() {
   const [done, setDone] = useState<{
     imported?: number; skippedPo?: number; unmatched?: string[]
     nzImported?: number; auImported?: number; nzUnits?: number; auUnits?: number
-    suspectDates?: string[]
+    suspectDates?: string[]; skippedLocked?: number; lockedThrough?: string | null
   } | null>(null)
 
   const fmt = (n?: number) => (n ?? 0).toLocaleString()
@@ -63,6 +63,11 @@ export function InwardsUpload() {
                   {!!done.skippedPo && (
                     <div className="text-gray-700">
                       {done.skippedPo} row{done.skippedPo === 1 ? '' : 's'} skipped &mdash; already receipted against a PO in the MRP, so counting the sheet row too would double the stock.
+                    </div>
+                  )}
+                  {!!done.skippedLocked && (
+                    <div className="text-violet-700">
+                      🔒 {done.skippedLocked} row{done.skippedLocked === 1 ? '' : 's'} skipped &mdash; in locked months (through {done.lockedThrough}). Those months stay frozen; unlock to change them.
                     </div>
                   )}
                   {!!done.unmatched?.length && (

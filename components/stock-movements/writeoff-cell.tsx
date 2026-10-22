@@ -6,8 +6,8 @@ import { setProductWriteoff } from '@/app/(dashboard)/stock-movements/actions'
 
 /** Editable finished-goods write-off for one product / month / market.
  *  Saves on blur (or Enter) and refreshes so the EOM re-rolls. */
-export function WriteoffCell({ product_id, market, month, units }: {
-  product_id: string; market: 'NZ' | 'AU'; month: string; units: number
+export function WriteoffCell({ product_id, market, month, units, locked = false }: {
+  product_id: string; market: 'NZ' | 'AU'; month: string; units: number; locked?: boolean
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -21,6 +21,15 @@ export function WriteoffCell({ product_id, market, month, units }: {
       await setProductWriteoff({ product_id, year_month: month, market, units: u })
       router.refresh()
     })
+  }
+
+  // Locked month: show the figure read-only (nothing can nudge frozen history).
+  if (locked) {
+    return (
+      <span className="inline-block w-14 text-right text-[11px] tabular-nums text-gray-400 px-1 py-0.5" title="Locked month — unlock to edit">
+        {units ? Math.round(units).toLocaleString('en-NZ') : '—'}
+      </span>
+    )
   }
 
   return (

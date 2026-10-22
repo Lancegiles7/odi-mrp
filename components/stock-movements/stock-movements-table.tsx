@@ -6,6 +6,7 @@ import { InboundCell } from '@/components/stock-movements/inbound-cell'
 import { TransferChips } from '@/components/stock-movements/transfer-chips'
 import { WriteoffCell } from '@/components/stock-movements/writeoff-cell'
 import { ForecastProdCell } from '@/components/stock-movements/forecast-prod-cell'
+import { isMonthLocked } from '@/lib/stock-lock'
 import { FgValueSummaryRows } from '@/components/stock-movements/fg-value-summary'
 import type { FgValueSummary } from '@/lib/stock-movements-data'
 
@@ -20,13 +21,14 @@ function eomClass(v: number): string {
 }
 
 export function StockMovementsTable({
-  rows, actualMonths, forecastMonths, label, valueSummary,
+  rows, actualMonths, forecastMonths, label, valueSummary, lockedThrough = null,
 }: {
   rows: StockRow[]
   valueSummary?: FgValueSummary
   actualMonths: string[]
   forecastMonths: string[]
   label: (m: string) => string
+  lockedThrough?: string | null
 }) {
   const order = PRODUCT_GROUPS.map((g) => g.value as string)
   const grouped = new Map<string, StockRow[]>()
@@ -116,7 +118,7 @@ export function StockMovementsTable({
                       {gLabel} <span className="ml-1 normal-case font-normal text-gray-400">{groupRows.length}</span>
                     </td>
                   </tr>
-                  {groupRows.map((r) => <LedgerRow key={r.product_id} r={r} actualMonths={actualMonths} forecastMonths={forecastMonths} />)}
+                  {groupRows.map((r) => <LedgerRow key={r.product_id} r={r} actualMonths={actualMonths} forecastMonths={forecastMonths} lockedThrough={lockedThrough} />)}
                   <SubtotalRow label={`${gLabel} — subtotal`} rows={groupRows} actualMonths={actualMonths} forecastMonths={forecastMonths} />
                 </Fragment>
               )
@@ -152,7 +154,7 @@ function MarketBadge({ market }: { market: 'NZ' | 'AU' }) {
   )
 }
 
-function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMonths: string[]; forecastMonths: string[] }) {
+function LedgerRow({ r, actualMonths, forecastMonths, lockedThrough = null }: { r: StockRow; actualMonths: string[]; forecastMonths: string[]; lockedThrough?: string | null }) {
   const isAu = r.market === 'AU'
   // AUS rows are the second of a stacked pair — hang them under the NZ row
   // (thinner top border, muted name) and blank out months before they start.
@@ -174,7 +176,7 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
           <Fragment key={m}>
             <InboundCell value={c.inbound} receipts={c.receipts ?? []} stillToReceipt={c.stillToReceipt ?? []} partialReceipt={c.partialReceipt ?? []} transfers={c.transfers ?? []} />
             <td className="px-1.5 py-2 text-right text-blue-700">{cell(c.outbound)}</td>
-            <td className="px-1 py-1.5 text-right"><WriteoffCell product_id={r.product_id} market={r.market} month={m} units={c.writeoff} /></td>
+            <td className="px-1 py-1.5 text-right"><WriteoffCell product_id={r.product_id} market={r.market} month={m} units={c.writeoff} locked={isMonthLocked(m, lockedThrough)} /></td>
             <td className={`px-1.5 py-2 text-right font-semibold bg-gray-50/60 border-r border-gray-100 ${eomClass(c.eom)}`}>{nf(c.eom)}</td>
           </Fragment>
         )

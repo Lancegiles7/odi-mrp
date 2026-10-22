@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { parseInwardsReceipts, type InwardsReceipt } from '@/lib/inwards-import'
 import { candidateSkus, resolveProductSku } from '@/lib/bva-import'
+import { getAppSettings } from '@/lib/settings'
+import { isMonthLocked, lockLabel } from '@/lib/stock-lock'
 
 // ============================================================
 // importInwardsReceipts — parse the Inwards Finished Goods sheet and
@@ -14,7 +16,7 @@ import { candidateSkus, resolveProductSku } from '@/lib/bva-import'
 export async function importInwardsReceipts(formData: FormData): Promise<{
   ok: boolean; error?: string; imported?: number; skippedPo?: number; unmatched?: string[]
   nzImported?: number; auImported?: number; nzUnits?: number; auUnits?: number
-  suspectDates?: string[]
+  suspectDates?: string[]; skippedLocked?: number; lockedThrough?: string | null
 }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -90,19 +92,28 @@ export async function importInwardsReceipts(formData: FormData): Promise<{
       const k = key(r.product_id, r.received_month, r.units, r.market ?? 'NZ')
       poLeft.set(k, (poLeft.get(k) ?? 0) + 1)
     }
-    const kept: typeof inserts = []
+    const dedup: typeof inserts = []
     let skippedPo = 0
     for (const row of inserts) {
       const k = key(row.product_id, row.received_month, row.units, row.market)
       const left = poLeft.get(k) ?? 0
       if (left > 0) { poLeft.set(k, left - 1); skippedPo++; continue }
-      kept.push(row)
+      dedup.push(row)
     }
+
+    // Stock lock: leave every locked month (≤ stock_locked_through) exactly as it
+    // is. Don't clear or re-insert those rows — only months after the lock refresh.
+    const lock = (await getAppSettings()).stock_locked_through
+    const kept = lock ? dedup.filter((r) => !isMonthLocked(r.received_month, lock)) : dedup
+    const skippedLocked = dedup.length - kept.length
 
     // Replace the file-sourced rows (the sheet is the source of truth for what
     // it covers); leave PO/manual receipts alone. The sheet carries both
-    // countries now, so this clears every inwards_upload row regardless of market.
-    const { error: delErr } = await supabase.from('finished_goods_receipts').delete().eq('source', 'inwards_upload')
+    // countries now, so this clears every inwards_upload row — except locked
+    // months, which stay frozen.
+    let del = supabase.from('finished_goods_receipts').delete().eq('source', 'inwards_upload')
+    if (lock) del = del.gt('received_month', `${lock.slice(0, 7)}-01`)
+    const { error: delErr } = await del
     if (delErr) return { ok: false, error: `Couldn't clear previous inwards rows: ${delErr.message}` }
     if (kept.length > 0) {
       const { error: insErr } = await supabase.from('finished_goods_receipts').insert(kept as never)
@@ -117,7 +128,7 @@ export async function importInwardsReceipts(formData: FormData): Promise<{
     return {
       ok: true, imported: kept.length, skippedPo, unmatched: Array.from(unmatched),
       nzImported: nz.length, auImported: au.length, nzUnits: sum(nz), auUnits: sum(au),
-      suspectDates: suspect,
+      suspectDates: suspect, skippedLocked, lockedThrough: lock ? lockLabel(lock) : null,
     }
   } catch (e) {
     return { ok: false, error: `Could not read the file: ${(e as Error).message}` }
@@ -211,6 +222,9 @@ export async function setProductWriteoff(input: {
 
   const month = input.year_month.slice(0, 7) + '-01'
   const units = input.units != null && Number.isFinite(input.units) ? input.units : null
+
+  const lock = (await getAppSettings()).stock_locked_through
+  if (isMonthLocked(month, lock)) return { ok: false, error: `${lockLabel(lock)} and earlier are locked — unlock to edit.` }
 
   if (units == null || units === 0) {
     const { error } = await supabase.from('product_writeoffs')

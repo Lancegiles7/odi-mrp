@@ -13,8 +13,12 @@ import { StockoutWatch } from '@/components/stock-movements/stockout-watch'
 import { loadStockBreakdown } from '@/lib/stock-breakdown-data'
 import { StockBreakdown } from '@/components/stock-movements/stock-breakdown'
 import { UploadsHub } from '@/components/stock-movements/uploads-hub'
+import { StockLockControl } from '@/components/stock-movements/stock-lock-control'
 import { fyStartFor, fyMonths, shortMonth } from '@/lib/budget-vs-actual'
 import { createClient } from '@/lib/supabase/server'
+import { getAppSettings } from '@/lib/settings'
+import { lockLabel } from '@/lib/stock-lock'
+import { ROLES } from '@/lib/constants'
 
 export const metadata: Metadata = { title: 'Stock Movements' }
 // Always render fresh — receipts / write-offs / actuals / manual counts change
@@ -47,11 +51,16 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
   const view: View = searchParams.view === 'ingredients' ? 'ingredients'
     : searchParams.view === 'packaging' ? 'packaging' : 'products'
 
+  const lock = await loadLockState()
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold">Stock Movements</h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-semibold">Stock Movements</h1>
+            <StockLockControl lockedThrough={lock.lockedThrough} lockedLabel={lock.lockedLabel} lockedByName={lock.lockedByName} isAdmin={lock.isAdmin} />
+          </div>
           <p className="text-sm text-gray-500 mt-1">Running finished-goods, ingredient and packaging stocktake — per country and combined.</p>
         </div>
         {hub === 'summary' && view === 'products' && <InwardsUpload />}
@@ -85,13 +94,36 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
             ))}
           </div>
 
-          {view === 'products' && <ProductsView label={monthLabel} />}
+          {view === 'products' && <ProductsView label={monthLabel} lockedThrough={lock.lockedThrough} />}
           {view === 'ingredients' && <IngredientsView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
           {view === 'packaging' && <PackagingView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
         </>
       )}
     </div>
   )
+}
+
+async function loadLockState() {
+  const supabase = createClient()
+  const settings = await getAppSettings()
+  const { data: { user } } = await supabase.auth.getUser()
+  let isAdmin = false
+  if (user) {
+    const { data: profile } = await supabase
+      .from('user_profiles').select('roles(name)').eq('id', user.id).maybeSingle() as { data: { roles: { name: string } | null } | null }
+    isAdmin = (profile?.roles?.name ?? null) === ROLES.ADMIN
+  }
+  let lockedByName: string | null = null
+  if (settings.stock_locked_by) {
+    const { data: locker } = await supabase
+      .from('user_profiles').select('full_name').eq('id', settings.stock_locked_by).maybeSingle() as { data: { full_name: string } | null }
+    lockedByName = locker?.full_name ?? null
+  }
+  return {
+    lockedThrough: settings.stock_locked_through,
+    lockedLabel: lockLabel(settings.stock_locked_through),
+    lockedByName, isAdmin,
+  }
 }
 
 async function StockoutWatchView() {
@@ -116,7 +148,7 @@ async function UploadsView() {
   return <UploadsHub months={months} defaultMonth={defaultMonth} />
 }
 
-async function ProductsView({ label }: { label: (m: string) => string }) {
+async function ProductsView({ label, lockedThrough }: { label: (m: string) => string; lockedThrough: string | null }) {
   const [ledger, notes] = await Promise.all([
     loadStockLedger(),
     loadStockMovementNotes('products'),
@@ -136,7 +168,7 @@ async function ProductsView({ label }: { label: (m: string) => string }) {
           No stock movements yet. Use <strong>Upload inwards</strong> to load the Inwards Finished Goods sheet.
         </div>
       ) : (
-        <StockMovementsTable rows={rows} actualMonths={actualMonths} forecastMonths={forecastMonths} label={label} valueSummary={valueSummary} />
+        <StockMovementsTable rows={rows} actualMonths={actualMonths} forecastMonths={forecastMonths} label={label} valueSummary={valueSummary} lockedThrough={lockedThrough} />
       )}
       {months.length > 0 && <MonthlyNotes scope="products" months={months} initial={notes} />}
     </div>

@@ -89,6 +89,39 @@ export async function updateSettings(formData: FormData) {
 }
 
 /**
+ * Set or clear the stock lock (admin-only). `month` is any day in the last month
+ * to freeze (stored first-of-month, e.g. '2026-09-01'); null clears the lock.
+ * While locked, every stock import/edit for months on or before this is refused.
+ */
+export async function setStockLock(month: string | null): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not signed in.' }
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('id, roles(name)')
+    .eq('id', user.id)
+    .single() as { data: { id: string; roles: { name: string } | null } | null }
+  if ((profile?.roles?.name ?? null) !== ROLES.ADMIN) return { ok: false, error: 'Only an admin can change the stock lock.' }
+
+  const value = month ? `${month.slice(0, 7)}-01` : null
+  const { error } = await supabase
+    .from('app_settings')
+    .update({
+      stock_locked_through: value,
+      stock_locked_at: value ? new Date().toISOString() : null,
+      stock_locked_by: value ? (profile?.id ?? null) : null,
+    } as never)
+    .eq('id', 1)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/stock-movements')
+  revalidatePath('/settings')
+  return { ok: true }
+}
+
+/**
  * Re-derive packaging.total_loaded_cost_nzd and ingredients.total_loaded_cost
  * for every item, using the supplied FX rate table. For packaging, also
  * recomputes the cached product.packaging total on each product whose

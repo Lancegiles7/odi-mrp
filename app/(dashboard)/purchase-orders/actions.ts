@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { convertGramsToIngredientUom } from '@/lib/ingredient-demand'
+import { getAppSettings } from '@/lib/settings'
+import { isMonthLocked, lockLabel } from '@/lib/stock-lock'
 
 export type POStatus = 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled'
 
@@ -551,6 +553,14 @@ export async function receivePoLines(input: {
   const isoDate = (v?: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v ?? '') ? (v as string) : null)
   const poReceiptIso = isoDate(input.received_date) ?? todayIso
 
+  // Stock lock: a receipt dated in a locked month (≤ stock_locked_through) would
+  // change frozen history — refuse the whole receive and say which month.
+  const stockLock = (await getAppSettings()).stock_locked_through
+  if (stockLock) {
+    const locked = input.receipts.find((r) => isMonthLocked(isoDate(r.received_date) ?? poReceiptIso, stockLock))
+    if (locked) return { ok: false, error: `Stock is locked through ${lockLabel(stockLock)} — unlock before receiving into a locked month.` }
+  }
+
   // Current opening figures + display UoM for the ingredients/packaging on this
   // PO, so we can convert the received qty into the demand view's unit and add it.
   const ingIds = Array.from(new Set(lines.filter((l) => l.ingredient_id).map((l) => l.ingredient_id as string)))
@@ -744,11 +754,18 @@ async function syncTransferReceipts(
     .eq('purchase_order_id', poId).not('product_id', 'is', null) as { data: Array<{ id: string; product_id: string | null; quantity_received: number; supplier_pack_size: number | null; received_date: string | null }> | null }
   const lineIds = (lines ?? []).map((l) => l.id)
 
+  // Stock lock: never touch legs in a locked month (≤ stock_locked_through) —
+  // leave those frozen when the transfer is re-saved, and don't add new ones there.
+  const stockLock = (await getAppSettings()).stock_locked_through
+  const lockDate = stockLock ? `${stockLock.slice(0, 7)}-01` : null
+
   // Always clear this transfer's prior receipts, then rebuild. Covers both
   // 'transfer' rows and any legacy 'manual' rows keyed to these transfer lines
   // (genuine manual receipts have no purchase_order_line_id, so they're safe).
   if (lineIds.length) {
-    await supabase.from('finished_goods_receipts').delete().in('source', ['transfer', 'manual']).in('purchase_order_line_id', lineIds)
+    let del = supabase.from('finished_goods_receipts').delete().in('source', ['transfer', 'manual']).in('purchase_order_line_id', lineIds)
+    if (lockDate) del = del.gt('received_month', lockDate)
+    await del
   }
   if (!lines || lines.length === 0) return {}
   if (po.stock_move !== 'NZ_TO_AU' && po.stock_move !== 'AU_TO_NZ') return {}   // logistics only
@@ -768,6 +785,7 @@ async function syncTransferReceipts(
     const units = recvPacks * (Number(l.supplier_pack_size) || 1)   // packs → individual units
     const date = iso(l.received_date) ?? iso(po.expected_delivery_date) ?? iso(po.pickup_date) ?? iso(po.order_date) ?? new Date().toISOString().slice(0, 10)
     const month = date.slice(0, 7) + '-01'
+    if (isMonthLocked(month, stockLock)) continue   // frozen month — leave as is
     rows.push({
       product_id: l.product_id, received_month: month, received_date: date, units: -units,
       source: 'transfer', po_number: po.po_number, market: srcMarket,
@@ -900,11 +918,27 @@ export async function correctReceivedQuantities(input: {
     { data: Array<{ purchase_order_line_id: string | null }> | null }
   const moved = new Set((movements ?? []).map((m) => m.purchase_order_line_id))
 
+  // Stock lock: a product line whose existing PO receipt sits in a locked month
+  // (≤ stock_locked_through) can't be corrected here — the re-log would move it to
+  // the current month and disturb frozen history. Skip those.
+  const stockLock = (await getAppSettings()).stock_locked_through
+  const lockedLineIds = new Set<string>()
+  if (stockLock) {
+    const productLineIds = lines.filter((l) => l.product_id).map((l) => l.id)
+    if (productLineIds.length) {
+      const { data: existing } = await supabase.from('finished_goods_receipts')
+        .select('purchase_order_line_id, received_month').eq('source', 'po_receipt')
+        .in('purchase_order_line_id', productLineIds) as { data: Array<{ purchase_order_line_id: string | null; received_month: string }> | null }
+      for (const r of existing ?? []) if (r.purchase_order_line_id && isMonthLocked(r.received_month, stockLock)) lockedLineIds.add(r.purchase_order_line_id)
+    }
+  }
+
   const skipped: string[] = []
   for (const c of input.corrections) {
     const line = lines.find((l) => l.id === c.line_id)
     if (!line) continue
     if (moved.has(line.id)) { skipped.push(line.description ?? line.id); continue }
+    if (lockedLineIds.has(line.id)) { skipped.push(line.description ?? line.id); continue }
     // Over-delivery allowed — no cap at ordered (matches the receive flow).
     const qty = Math.max(0, Math.round(Number(c.quantity_received) || 0))
     const { error } = await supabase

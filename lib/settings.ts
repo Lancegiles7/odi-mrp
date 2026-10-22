@@ -19,6 +19,10 @@ export const DEFAULT_FX_RATES: FxRatesJson = { NZD: 1.0, AUD: 1.20, USD: 1.62, E
 
 export type SettingsSnapshot = Pick<AppSettings, 'fx_rate' | 'gst_nz_pct' | 'gst_au_pct' | 'planning_start_month' | 'updated_at' | 'updated_by'> & {
   fx_rates: FxRatesJson
+  /** First day of the last LOCKED stock month (e.g. '2026-09-01'); null = no lock. */
+  stock_locked_through: string | null
+  stock_locked_at: string | null
+  stock_locked_by: string | null
 }
 
 /**
@@ -28,11 +32,23 @@ export type SettingsSnapshot = Pick<AppSettings, 'fx_rate' | 'gst_nz_pct' | 'gst
  */
 export async function getAppSettings(): Promise<SettingsSnapshot> {
   const supabase = createClient()
-  const { data } = await supabase
+  let { data, error } = await supabase
     .from('app_settings')
-    .select('fx_rate, gst_nz_pct, gst_au_pct, planning_start_month, updated_at, updated_by, fx_rates')
+    .select('fx_rate, gst_nz_pct, gst_au_pct, planning_start_month, updated_at, updated_by, fx_rates, stock_locked_through, stock_locked_at, stock_locked_by')
     .eq('id', 1)
-    .maybeSingle() as { data: (SettingsSnapshot & { fx_rates: FxRatesJson | null }) | null }
+    .maybeSingle() as { data: (SettingsSnapshot & { fx_rates: FxRatesJson | null }) | null; error: { message: string } | null }
+
+  // The stock-lock columns arrive in migration 079. If the code deploys before
+  // that migration runs, the select above errors — fall back to the base columns
+  // so settings (and costing, which depends on this) keep working meanwhile.
+  if (error) {
+    const base = await supabase
+      .from('app_settings')
+      .select('fx_rate, gst_nz_pct, gst_au_pct, planning_start_month, updated_at, updated_by, fx_rates')
+      .eq('id', 1)
+      .maybeSingle() as { data: (Omit<SettingsSnapshot, 'stock_locked_through' | 'stock_locked_at' | 'stock_locked_by'> & { fx_rates: FxRatesJson | null }) | null }
+    data = base.data ? { ...base.data, stock_locked_through: null, stock_locked_at: null, stock_locked_by: null } : null
+  }
 
   if (!data) {
     return {
@@ -43,6 +59,9 @@ export async function getAppSettings(): Promise<SettingsSnapshot> {
       updated_at: new Date().toISOString(),
       updated_by: null,
       fx_rates: DEFAULT_FX_RATES,
+      stock_locked_through: null,
+      stock_locked_at: null,
+      stock_locked_by: null,
     }
   }
   return { ...data, fx_rates: { ...DEFAULT_FX_RATES, ...(data.fx_rates ?? {}) } }

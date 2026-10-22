@@ -11,6 +11,8 @@ import {
   actualsToFigureLines, sampleSheetName, findSampleSheet, perProductUnits, monthsCovered,
   candidateSkus, resolveProductSku, writeoffsFromTracker,
 } from '@/lib/bva-import'
+import { getAppSettings } from '@/lib/settings'
+import { isMonthLocked, lockLabel } from '@/lib/stock-lock'
 
 const REVAL = '/reporting/budget-vs-actual'
 
@@ -36,6 +38,9 @@ export async function importBvaActuals(formData: FormData): Promise<{
   // Closed months keep their actuals — don't overwrite.
   const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', yearMonth).maybeSingle() as { data: { year_month: string } | null }
   if (lock) return { ok: false, error: `${ym} is closed (locked). Unlock it first to re-import.` }
+  // Stock lock: months on or before stock_locked_through are frozen.
+  const stockLock = (await getAppSettings()).stock_locked_through
+  if (isMonthLocked(yearMonth, stockLock)) return { ok: false, error: `Stock is locked through ${lockLabel(stockLock)} — unlock to import into ${ym}.` }
 
   const shopify = formData.get('shopify') as File | null
   const upstock = formData.get('upstock') as File | null
@@ -246,6 +251,8 @@ export async function uploadProductActuals(input: {
   // Block if month is locked (unless we add admin override later)
   const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', input.year_month).maybeSingle()
   if (lock) return { ok: false, error: 'Month is locked. Admin must unlock to make changes.' }
+  const stockLock = (await getAppSettings()).stock_locked_through
+  if (isMonthLocked(input.year_month, stockLock)) return { ok: false, error: `Stock is locked through ${lockLabel(stockLock)} — unlock to make changes.` }
 
   // Resolve SKUs → product ids
   const skus = input.rows.map((r) => r.sku.trim()).filter(Boolean)
@@ -326,6 +333,8 @@ export async function setOpeningSoh(input: {
 
   const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', input.year_month).maybeSingle()
   if (lock) return { ok: false, error: 'Month is locked.' }
+  const stockLock = (await getAppSettings()).stock_locked_through
+  if (isMonthLocked(input.year_month, stockLock)) return { ok: false, error: `Stock is locked through ${lockLabel(stockLock)}.` }
 
   // Read existing row so we preserve counted_eom + comment when patching opening_soh
   const { data: existing } = await supabase.from('monthly_stock_counts')
@@ -377,6 +386,8 @@ export async function setProductActual(input: {
 
   const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', input.year_month).maybeSingle()
   if (lock) return { ok: false, error: 'Month is locked.' }
+  const stockLock = (await getAppSettings()).stock_locked_through
+  if (isMonthLocked(input.year_month, stockLock)) return { ok: false, error: `Stock is locked through ${lockLabel(stockLock)}.` }
 
   if (input.units == null) {
     const { error } = await supabase.from('product_actuals').delete()
@@ -421,6 +432,8 @@ export async function setProductWriteoff(input: {
 
   const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', input.year_month).maybeSingle()
   if (lock) return { ok: false, error: 'Month is locked.' }
+  const stockLock = (await getAppSettings()).stock_locked_through
+  if (isMonthLocked(input.year_month, stockLock)) return { ok: false, error: `Stock is locked through ${lockLabel(stockLock)}.` }
 
   const units   = input.units != null && Number.isFinite(input.units) ? input.units : 0
   const comment = input.comment?.trim() || null
@@ -469,6 +482,8 @@ export async function setMonthlyStockCount(input: {
 
   const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', input.year_month).maybeSingle()
   if (lock) return { ok: false, error: 'Month is locked.' }
+  const stockLock = (await getAppSettings()).stock_locked_through
+  if (isMonthLocked(input.year_month, stockLock)) return { ok: false, error: `Stock is locked through ${lockLabel(stockLock)}.` }
 
   // If counted_eom is null AND opening_soh is null AND comment is null → delete the row
   if (input.counted_eom == null && input.opening_soh == null && !input.comment) {
@@ -515,6 +530,8 @@ export async function setConsumptionOverride(input: {
 
   const { data: lock } = await supabase.from('month_locks').select('year_month').eq('year_month', input.year_month).maybeSingle()
   if (lock) return { ok: false, error: 'Month is locked.' }
+  const stockLock = (await getAppSettings()).stock_locked_through
+  if (isMonthLocked(input.year_month, stockLock)) return { ok: false, error: `Stock is locked through ${lockLabel(stockLock)}.` }
 
   if (input.override_units == null) {
     const { error } = await supabase.from('monthly_consumption_overrides')
