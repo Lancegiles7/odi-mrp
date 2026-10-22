@@ -6,6 +6,9 @@ import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
 
 const nf = (n: number) => (n ? Math.round(n).toLocaleString('en-NZ') : '—')
 const salesTotal = (r: BreakdownRow) => r.nz_d2c + r.au_d2c + r.nz_retail + r.au_retail + r.nz_samples + r.au_samples + r.expo_nz + r.expo_au
+const inTotal = (r: BreakdownRow) => r.in_nz + r.in_au
+const inHead = 'border-l-2 border-sky-200 bg-sky-50/50'
+const inCell = 'border-l-2 border-sky-100 bg-sky-50/20'
 
 const COLS: { key: keyof BreakdownRow; label: string }[] = [
   { key: 'nz_d2c', label: 'NZ e‑com' },
@@ -42,6 +45,8 @@ export function StockBreakdown({ data }: { data: BreakdownData }) {
   const grand = rows.reduce((acc, r) => {
     for (const c of COLS) acc[c.key] = (acc[c.key] ?? 0) + (r[c.key] as number)
     acc.total = (acc.total ?? 0) + salesTotal(r)
+    acc.in_nz = (acc.in_nz ?? 0) + r.in_nz
+    acc.in_au = (acc.in_au ?? 0) + r.in_au
     return acc
   }, {} as Record<string, number>)
 
@@ -69,6 +74,9 @@ export function StockBreakdown({ data }: { data: BreakdownData }) {
               <th className="text-left px-4 py-2 font-medium">Product</th>
               {COLS.map((c) => <th key={c.key} className="text-right px-3 py-2 font-medium">{c.label}</th>)}
               <th className="text-right px-3 py-2 font-medium">Total sold</th>
+              <th className={`text-right px-3 py-2 font-medium text-sky-700 ${inHead}`}>In NZ</th>
+              <th className={`text-right px-3 py-2 font-medium text-sky-700 bg-sky-50/50`}>In AU</th>
+              <th className={`text-right px-3 py-2 font-medium text-sky-700 bg-sky-50/50`}>In total</th>
             </tr>
           </thead>
           <tbody>
@@ -80,7 +88,7 @@ export function StockBreakdown({ data }: { data: BreakdownData }) {
               return (
                 <Fragment key={key}>
                   <tr className="bg-gray-100/80">
-                    <td colSpan={COLS.length + 2} className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-600 border-y border-gray-200">
+                    <td colSpan={COLS.length + 5} className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-600 border-y border-gray-200">
                       {gLabel} <span className="ml-1 normal-case font-normal text-gray-400">{gRows.length}</span>
                     </td>
                   </tr>
@@ -89,12 +97,18 @@ export function StockBreakdown({ data }: { data: BreakdownData }) {
                       <td className="px-4 py-2"><div className="font-medium">{r.name}</div><div className="text-[10px] text-gray-500 font-mono">{r.sku}</div></td>
                       {COLS.map((c) => <td key={c.key} className={`px-3 py-2 text-right tabular-nums ${c.key === 'writeoff' && (r[c.key] as number) ? 'text-red-700' : ''}`}>{nf(r[c.key] as number)}</td>)}
                       <td className="px-3 py-2 text-right tabular-nums font-semibold">{nf(salesTotal(r))}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${inCell}`}>{nf(r.in_nz)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums bg-sky-50/20">{nf(r.in_au)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold bg-sky-50/20">{nf(inTotal(r))}</td>
                     </tr>
                   ))}
                   <tr className="bg-gray-50 font-semibold text-gray-700">
                     <td className="px-4 py-1.5">{gLabel} — subtotal</td>
                     {COLS.map((c) => <td key={c.key} className="px-3 py-1.5 text-right tabular-nums">{nf(sub[c.key])}</td>)}
                     <td className="px-3 py-1.5 text-right tabular-nums">{nf(subTotal)}</td>
+                    <td className={`px-3 py-1.5 text-right tabular-nums ${inCell}`}>{nf(gRows.reduce((s, r) => s + r.in_nz, 0))}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums bg-sky-50/20">{nf(gRows.reduce((s, r) => s + r.in_au, 0))}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums bg-sky-50/20">{nf(gRows.reduce((s, r) => s + inTotal(r), 0))}</td>
                   </tr>
                 </Fragment>
               )
@@ -105,12 +119,15 @@ export function StockBreakdown({ data }: { data: BreakdownData }) {
               <td className="px-4 py-2">All products</td>
               {COLS.map((c) => <td key={c.key} className="px-3 py-2 text-right tabular-nums">{nf(grand[c.key])}</td>)}
               <td className="px-3 py-2 text-right tabular-nums">{nf(grand.total)}</td>
+              <td className="px-3 py-2 text-right tabular-nums border-l-2 border-sky-300 text-sky-800">{nf(grand.in_nz)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-sky-800">{nf(grand.in_au)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-sky-800">{nf((grand.in_nz ?? 0) + (grand.in_au ?? 0))}</td>
             </tr>
           </tfoot>
         </table>
       </div>
       <div className="px-4 py-2 text-[11px] text-gray-400">
-        NZ e‑com, AU e‑com &amp; AU retail from Shopify · NZ retail from Upstock · Expo NZ/AU from Shopify POS events · the current month shows month‑to‑date. $ view coming once per‑channel pricing is wired.
+        NZ e‑com, AU e‑com &amp; AU retail from Shopify · NZ retail from Upstock · Expo NZ/AU from Shopify POS events · <span className="text-sky-700">Inwards = finished‑goods receipts by market (net of transfers), matching the Summary "IN"</span> · the current month shows month‑to‑date. $ view coming once per‑channel pricing is wired.
       </div>
     </div>
   )
