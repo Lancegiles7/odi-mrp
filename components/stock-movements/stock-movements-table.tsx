@@ -5,6 +5,7 @@ import { OpenPoChips } from '@/components/stock-movements/open-po-chips'
 import { InboundCell } from '@/components/stock-movements/inbound-cell'
 import { TransferChips } from '@/components/stock-movements/transfer-chips'
 import { WriteoffCell } from '@/components/stock-movements/writeoff-cell'
+import { ForecastProdCell } from '@/components/stock-movements/forecast-prod-cell'
 import { FgValueSummaryRows } from '@/components/stock-movements/fg-value-summary'
 import type { FgValueSummary } from '@/lib/stock-movements-data'
 
@@ -187,16 +188,10 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
               {/* Planned production, then open POs as "still to receipt" chips so
                   incoming orders are visible. The chips are informational (not added
                   to the EOM, which stays in step with the Production page's balance). */}
-              {cell(c.supply)}
+              <ForecastProdCell value={c.supply} fulfilments={c.fulfilments ?? []} />
               {(c.stillToReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.stillToReceipt} kind="still" /></div>}
               {(c.partialReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.partialReceipt} kind="partial" /></div>}
               {(c.transfers?.length ?? 0) > 0 && <div><TransferChips items={c.transfers} /></div>}
-              {(c.fulfilments ?? []).map((f) => (
-                <div key={f.po} className="mt-0.5 text-[9px] font-semibold px-1.5 rounded border bg-slate-50 text-slate-600 border-slate-200 inline-block"
-                  title={`${f.po}: received ${nf(f.received)} of ${nf(f.ordered)} ordered, then closed short`}>
-                  partially fulfilled · closed — {nf(f.received)} of {nf(f.ordered)} ({f.po})
-                </div>
-              ))}
               {c.noPo && <div className="mt-0.5 text-[9px] font-bold px-1.5 rounded border bg-amber-50 text-amber-700 border-amber-200 inline-block">⚑ no PO</div>}
             </td>
             <td className="px-1.5 py-2 text-right text-blue-700 bg-amber-50/20">{cell(c.demand)}</td>
