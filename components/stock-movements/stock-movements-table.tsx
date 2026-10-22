@@ -180,7 +180,7 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
       })}
       {forecastMonths.map((m, i) => {
         if (before(m)) return <BlankForecast key={m} first={i === 0} />
-        const c = r.forecast[m] ?? { produced: 0, supply: 0, demand: 0, eom: 0, transfer: 0, transfers: [], shortfall: false, stillToReceipt: [], partialReceipt: [], noPo: false }
+        const c = r.forecast[m] ?? { produced: 0, supply: 0, demand: 0, eom: 0, transfer: 0, transfers: [], shortfall: false, stillToReceipt: [], partialReceipt: [], noPo: false, fulfilments: [] }
         return (
           <Fragment key={m}>
             <td className={`px-1.5 py-2 text-right text-emerald-700 bg-amber-50/20 ${i === 0 ? 'border-l-2 border-amber-200' : 'border-l border-gray-100'}`}>
@@ -191,6 +191,12 @@ function LedgerRow({ r, actualMonths, forecastMonths }: { r: StockRow; actualMon
               {(c.stillToReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.stillToReceipt} kind="still" /></div>}
               {(c.partialReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.partialReceipt} kind="partial" /></div>}
               {(c.transfers?.length ?? 0) > 0 && <div><TransferChips items={c.transfers} /></div>}
+              {(c.fulfilments ?? []).map((f) => (
+                <div key={f.po} className="mt-0.5 text-[9px] font-semibold px-1.5 rounded border bg-slate-50 text-slate-600 border-slate-200 inline-block"
+                  title={`${f.po}: received ${nf(f.received)} of ${nf(f.ordered)} ordered, then closed short`}>
+                  partially fulfilled · closed — {nf(f.received)} of {nf(f.ordered)} ({f.po})
+                </div>
+              ))}
               {c.noPo && <div className="mt-0.5 text-[9px] font-bold px-1.5 rounded border bg-amber-50 text-amber-700 border-amber-200 inline-block">⚑ no PO</div>}
             </td>
             <td className="px-1.5 py-2 text-right text-blue-700 bg-amber-50/20">{cell(c.demand)}</td>

@@ -215,8 +215,8 @@ export async function loadStockLedger(): Promise<StockLedger> {
 
   const rows = buildStockLedger({
     products: products ?? [], actualMonths, forecastMonths, auStartMonth: AU_START,
-    nz: { inbound: inboundNz, outbound: outboundNz, writeoff: writeoffNz, produced: producedNz, demand: demandNz, inboundReceipts: receiptsNz, openPo: openPoNz, transfers: transfers.NZ },
-    au: { inbound: inboundAu, outbound: outboundAu, writeoff: writeoffAu, produced: producedAu, demand: demandAu, inboundReceipts: receiptsAu, openPo: openPoAu, transfers: transfers.AU },
+    nz: { inbound: inboundNz, outbound: outboundNz, writeoff: writeoffNz, produced: producedNz, planned: plannedNz, demand: demandNz, inboundReceipts: receiptsNz, openPo: openPoNz, transfers: transfers.NZ },
+    au: { inbound: inboundAu, outbound: outboundAu, writeoff: writeoffAu, produced: producedAu, planned: plannedAu, demand: demandAu, inboundReceipts: receiptsAu, openPo: openPoAu, transfers: transfers.AU },
   })
 
   return { rows, months, actualMonths, forecastMonths, actualThrough, transfers }

@@ -34,6 +34,15 @@ export interface OpenPoDetail {
   partial: boolean      // some of the line has already been received
 }
 
+/** A PO that was received short and then closed off (shortfall written off) —
+ *  no open chip exists for it, so this carries the "partially fulfilled · closed"
+ *  note onto the forecast month that holds the receipt. */
+export interface PoFulfilment {
+  po: string
+  received: number
+  ordered: number
+}
+
 export interface ActualCell {
   inbound: number
   outbound: number     // sold + samples (BvA actuals)
@@ -56,7 +65,8 @@ export interface ForecastCell {
   shortfall: boolean   // eom < 0
   stillToReceipt: OpenPoDetail[] // fully-open POs — counted as supply when ≥ the plan
   partialReceipt: OpenPoDetail[] // part-received PO lines — flagged only
-  noPo: boolean             // planned production this month with no covering open PO
+  noPo: boolean             // planned production this month with no PO behind it at all
+  fulfilments: PoFulfilment[] // short-closed PO receipts landing this month (chip)
 }
 
 export interface StockRow {
@@ -83,6 +93,7 @@ export interface MarketMaps {
   outbound: PM
   writeoff: PM
   produced: PM
+  planned?: PM    // production plan only (produced = plan OR receipts); drives "no PO"
   demand: PM
   opening?: Map<string, number>
   inboundReceipts?: Map<string, Map<string, ReceiptDetail[]>>
@@ -145,10 +156,27 @@ function buildRow(
     // into the balance. Overdue POs are rolled into the current month upstream.
     const supply = Math.max(produced, expected)
     eom = eom + supply - demand + transfer
-    const noPo = produced > 0 && open.length === 0
+    // A short-closed PO is excluded from the open-PO chips (nothing more to come),
+    // so a month holding only its receipt would otherwise read "no PO". Pull those
+    // receipts off the month's receipt list and show them as "partially fulfilled ·
+    // closed" instead, and suppress "no PO" whenever a PO receipt sits on the month.
+    const monthReceipts = maps.inboundReceipts?.get(p.id)?.get(m) ?? []
+    const poReceipts = monthReceipts.filter((rc) => rc.po)
+    const fulMap = new Map<string, PoFulfilment>()
+    for (const rc of poReceipts) {
+      if (!rc.shortClosed) continue
+      const f = fulMap.get(rc.po!) ?? { po: rc.po!, received: 0, ordered: rc.ordered ?? 0 }
+      f.received += rc.units
+      fulMap.set(rc.po!, f)
+    }
+    const fulfilments = Array.from(fulMap.values()).filter((f) => f.ordered > 0 && f.received < f.ordered)
+    // "No PO" = we're planning production this month with nothing — no open PO and
+    // no PO receipt — to back it. A plan met by a (short-closed) PO is not "no PO".
+    const planned = maps.planned ? at(maps.planned, p.id, m) : produced
+    const noPo = planned > 0 && open.length === 0 && poReceipts.length === 0
     if (produced || demand || open.length || transfers.length) activity = true
     if (!visible(m)) { carriedOpening = eom; continue }   // pre-launch build → opening
-    forecast[m] = { produced, supply, demand, eom, transfer, transfers, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo }
+    forecast[m] = { produced, supply, demand, eom, transfer, transfers, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo, fulfilments }
   }
 
   return {
