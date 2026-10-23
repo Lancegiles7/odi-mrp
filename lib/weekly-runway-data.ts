@@ -23,7 +23,7 @@ const HORIZON_WEEKS = 13
 
 export interface RunwayIncoming { units: number; po: string | null; kind: 'po' | 'planned'; date: string | null }
 export interface RunwayCell { demand: number; incoming: number; closing: number; detail: RunwayIncoming[] }
-export interface WeekCol { start: string; end: string; label: string; month: string; monthLabel: string; current: boolean }
+export interface WeekCol { start: string; end: string; label: string; endLabel: string; month: string; monthLabel: string; current: boolean }
 export interface RunwayRow {
   product_id: string
   sku: string
@@ -34,8 +34,10 @@ export interface RunwayRow {
   weeks: RunwayCell[]
   /** 1-based index of the first week closing ≤ 0, or null if never within horizon. */
   coverWeeks: number | null
-  runsOut: string | null   // label of that week
+  runsOut: string | null   // week-ending label of that week
   avgWeekly: number        // avg weekly demand over the horizon (for amber threshold)
+  /** No stock held and nothing incoming — parked, not counted as "running out". */
+  noStock: boolean
 }
 export interface WeeklyRunwayData {
   weeks: WeekCol[]
@@ -125,6 +127,7 @@ export async function loadWeeklyRunway(): Promise<WeeklyRunwayData> {
     weeks.push({
       start: ymd(s), end: ymd(e),
       label: `${s.getUTCDate()} ${MON3[s.getUTCMonth()]}`,
+      endLabel: `${e.getUTCDate()} ${MON3[e.getUTCMonth()]}`,
       month: m, monthLabel: monthLabelOf(m), current: i === 0,
     })
   }
@@ -228,7 +231,7 @@ export async function loadWeeklyRunway(): Promise<WeeklyRunwayData> {
 
       // Walk the weeks.
       let bal = onHand
-      let cover: number | null = null
+      let cover0: number | null = null
       const cells: RunwayCell[] = []
       let demandSum = 0
       for (let i = 0; i < weeks.length; i++) {
@@ -243,15 +246,19 @@ export async function loadWeeklyRunway(): Promise<WeeklyRunwayData> {
         const incUnits = inc[i].reduce((s, x) => s + x.units, 0)
         bal = bal - dem + incUnits
         cells.push({ demand: dem, incoming: incUnits, closing: Math.round(bal), detail: inc[i] })
-        if (cover === null && bal <= 0) cover = i + 1
+        if (cover0 === null && bal <= 0) cover0 = i + 1
       }
-      const hasActivity = onHand !== 0 || demandSum !== 0 || cells.some((c) => c.incoming !== 0)
+      const totalIncoming = cells.reduce((s, c) => s + c.incoming, 0)
+      const hasActivity = onHand !== 0 || demandSum !== 0 || totalIncoming !== 0
       if (!hasActivity) continue
+      // No stock held and nothing coming in → park it (don't flag "runs out").
+      const noStock = onHand <= 0 && totalIncoming <= 0
+      const cover = noStock ? null : cover0
       rows.push({
         product_id: pid, sku: m.sku, name: m.name, group: m.group, market,
         onHand: Math.round(onHand), weeks: cells, coverWeeks: cover,
-        runsOut: cover ? weeks[cover - 1].label : null,
-        avgWeekly: demandSum / weeks.length,
+        runsOut: cover ? weeks[cover - 1].endLabel : null,
+        avgWeekly: demandSum / weeks.length, noStock,
       })
     }
   }
