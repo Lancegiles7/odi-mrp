@@ -13,6 +13,8 @@ import { StockoutWatch } from '@/components/stock-movements/stockout-watch'
 import { loadStockBreakdown } from '@/lib/stock-breakdown-data'
 import { StockBreakdown } from '@/components/stock-movements/stock-breakdown'
 import { UploadsHub } from '@/components/stock-movements/uploads-hub'
+import { WeeklyRunway } from '@/components/stock-movements/weekly-runway'
+import { loadWeeklyRunway } from '@/lib/weekly-runway-data'
 import { StockLockControl } from '@/components/stock-movements/stock-lock-control'
 import { fyStartFor, fyMonths, shortMonth } from '@/lib/budget-vs-actual'
 import { createClient } from '@/lib/supabase/server'
@@ -44,7 +46,8 @@ const HUB_TABS: { key: Hub; label: string }[] = [
   { key: 'breakdown', label: 'Breakdown' },
 ]
 
-export default async function StockMovementsPage({ searchParams }: { searchParams: { view?: string; group?: string; hub?: string } }) {
+export default async function StockMovementsPage({ searchParams }: { searchParams: { view?: string; group?: string; hub?: string; sum?: string } }) {
+  const summaryView: 'monthly' | 'weekly' = searchParams.sum === 'weekly' ? 'weekly' : 'monthly'
   const hub: Hub = searchParams.hub === 'watch' ? 'watch'
     : searchParams.hub === 'uploads' ? 'uploads'
     : searchParams.hub === 'breakdown' ? 'breakdown' : 'summary'
@@ -94,7 +97,7 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
             ))}
           </div>
 
-          {view === 'products' && <ProductsView label={monthLabel} lockedThrough={lock.lockedThrough} />}
+          {view === 'products' && <ProductsView label={monthLabel} lockedThrough={lock.lockedThrough} summaryView={summaryView} />}
           {view === 'ingredients' && <IngredientsView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
           {view === 'packaging' && <PackagingView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
         </>
@@ -148,7 +151,27 @@ async function UploadsView() {
   return <UploadsHub months={months} defaultMonth={defaultMonth} />
 }
 
-async function ProductsView({ label, lockedThrough }: { label: (m: string) => string; lockedThrough: string | null }) {
+function SummaryViewToggle({ active }: { active: 'monthly' | 'weekly' }) {
+  const base = 'text-xs font-medium px-3 py-1 rounded-md'
+  return (
+    <div className="inline-flex bg-white border border-gray-300 rounded-lg p-0.5 gap-0.5">
+      <Link href="/stock-movements" className={`${base} ${active === 'monthly' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>Monthly</Link>
+      <Link href="/stock-movements?sum=weekly" className={`${base} ${active === 'weekly' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>Weekly runway</Link>
+    </div>
+  )
+}
+
+async function ProductsView({ label, lockedThrough, summaryView }: { label: (m: string) => string; lockedThrough: string | null; summaryView: 'monthly' | 'weekly' }) {
+  if (summaryView === 'weekly') {
+    const data = await loadWeeklyRunway()
+    return (
+      <div className="space-y-3">
+        <SummaryViewToggle active="weekly" />
+        <WeeklyRunway data={data} />
+      </div>
+    )
+  }
+
   const [ledger, notes] = await Promise.all([
     loadStockLedger(),
     loadStockMovementNotes('products'),
@@ -159,6 +182,7 @@ async function ProductsView({ label, lockedThrough }: { label: (m: string) => st
   const months = [...actualMonths, ...forecastMonths]
   return (
     <div className="space-y-3">
+      <SummaryViewToggle active="monthly" />
       <p className="text-sm text-gray-500">
         Inbound − sold/samples − write-offs = predicted EOM
         {lastActualLabel && <> · actuals through <span className="font-semibold text-gray-800">{lastActualLabel}</span>, forecast thereafter</>}
