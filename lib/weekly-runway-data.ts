@@ -21,8 +21,12 @@ import { loadStockLedger } from '@/lib/stock-movements-data'
 export type Market = 'NZ' | 'AU'
 const HORIZON_WEEKS = 13
 
-export interface RunwayIncoming { units: number; po: string | null; kind: 'po' | 'planned'; date: string | null }
-export interface RunwayCell { demand: number; incoming: number; closing: number; detail: RunwayIncoming[] }
+/** What an incoming is: a genuinely-received receipt, a no-PO production build,
+ *  or an open (not-yet-received) purchase PO / transfer. The "Confirmed" view
+ *  counts only receipt + planned; the "With open orders" view counts them all. */
+export type IncomingSource = 'receipt' | 'planned' | 'open_po' | 'open_transfer'
+export interface RunwayIncoming { units: number; po: string | null; date: string | null; source: IncomingSource }
+export interface RunwayCell { demand: number; detail: RunwayIncoming[] }
 export interface WeekCol { start: string; end: string; label: string; endLabel: string; month: string; monthLabel: string; current: boolean }
 export interface RunwayRow {
   product_id: string
@@ -31,13 +35,8 @@ export interface RunwayRow {
   group: string | null
   market: Market
   onHand: number
-  weeks: RunwayCell[]
-  /** 1-based index of the first week closing ≤ 0, or null if never within horizon. */
-  coverWeeks: number | null
-  runsOut: string | null   // week-ending label of that week
-  avgWeekly: number        // avg weekly demand over the horizon (for amber threshold)
-  /** No stock held and nothing incoming — parked, not counted as "running out". */
-  noStock: boolean
+  weeks: RunwayCell[]        // per-week demand + incoming detail; balances computed per view
+  avgWeekly: number          // avg weekly demand over the horizon (for amber threshold)
 }
 export interface WeeklyRunwayData {
   weeks: WeekCol[]
@@ -176,7 +175,7 @@ export async function loadWeeklyRunway(): Promise<WeeklyRunwayData> {
       recvToDate.set(r.product_id, (recvToDate.get(r.product_id) ?? 0) + Number(r.units))
     }
     // Open PO lines, this destination market.
-    const openPos = new Map<string, Array<{ units: number; date: string | null; po: string; month: string | null }>>()
+    const openPos = new Map<string, Array<{ units: number; date: string | null; po: string; month: string | null; transfer: boolean }>>()
     for (const l of poLines ?? []) {
       const po = poById.get(l.purchase_order_id)
       if (!po || mkt(po.market) !== market) continue
@@ -185,7 +184,7 @@ export async function loadWeeklyRunway(): Promise<WeeklyRunwayData> {
       const remaining = Number(l.quantity_ordered) - Number(l.quantity_received)
       if (remaining <= 0) continue
       if (!openPos.has(l.product_id)) openPos.set(l.product_id, [])
-      openPos.get(l.product_id)!.push({ units: remaining, date: po.expected_delivery_date, po: po.po_number, month: po.expected_delivery_date ? po.expected_delivery_date.slice(0, 7) : null })
+      openPos.get(l.product_id)!.push({ units: remaining, date: po.expected_delivery_date, po: po.po_number, month: po.expected_delivery_date ? po.expected_delivery_date.slice(0, 7) : null, transfer: po.po_type === 'transfer' })
     }
 
     for (const r of ledger.rows) {
@@ -207,17 +206,17 @@ export async function loadWeeklyRunway(): Promise<WeeklyRunwayData> {
         return getM(fc, pid, market, ym) / daysInMonthOf(ym)
       }
 
-      // Incoming per week.
+      // Incoming per week, tagged by source (so each view can include or exclude it).
       const inc: RunwayIncoming[][] = weeks.map(() => [])
       const monthsWithPo = new Set<string>()
       for (const p of openPos.get(pid) ?? []) {
         const wi = weekIndexOf(p.date)
         if (p.month) monthsWithPo.add(p.month)
-        if (wi >= 0) inc[wi].push({ units: p.units, po: p.po, kind: 'po', date: p.date })
+        if (wi >= 0) inc[wi].push({ units: p.units, po: p.po, date: p.date, source: p.transfer ? 'open_transfer' : 'open_po' })
       }
       for (const fr of futureReceipts.get(pid) ?? []) {
         const wi = weekIndexOf(fr.date)
-        if (wi >= 0) inc[wi].push({ units: fr.units, po: null, kind: 'po', date: fr.date })
+        if (wi >= 0) inc[wi].push({ units: fr.units, po: null, date: fr.date, source: 'receipt' })
       }
       // Planned build with no PO → last week of that (future) month.
       const futureMonths = Array.from(new Set(weeks.map((w) => w.month))).filter((ym) => ym > curMonth)
@@ -226,12 +225,10 @@ export async function loadWeeklyRunway(): Promise<WeeklyRunwayData> {
         const planned = getM(plan, pid, market, ym)
         if (planned <= 0) continue
         const wi = lastWeekOfMonth(ym)
-        if (wi >= 0) inc[wi].push({ units: planned, po: null, kind: 'planned', date: null })
+        if (wi >= 0) inc[wi].push({ units: planned, po: null, date: null, source: 'planned' })
       }
 
-      // Walk the weeks.
-      let bal = onHand
-      let cover0: number | null = null
+      // Per-week demand (balances are computed per view in the component).
       const cells: RunwayCell[] = []
       let demandSum = 0
       for (let i = 0; i < weeks.length; i++) {
@@ -243,27 +240,16 @@ export async function loadWeeklyRunway(): Promise<WeeklyRunwayData> {
         }
         dem = Math.round(dem)
         demandSum += dem
-        const incUnits = inc[i].reduce((s, x) => s + x.units, 0)
-        bal = bal - dem + incUnits
-        cells.push({ demand: dem, incoming: incUnits, closing: Math.round(bal), detail: inc[i] })
-        if (cover0 === null && bal <= 0) cover0 = i + 1
+        cells.push({ demand: dem, detail: inc[i] })
       }
-      const totalIncoming = cells.reduce((s, c) => s + c.incoming, 0)
-      const hasActivity = onHand !== 0 || demandSum !== 0 || totalIncoming !== 0
-      if (!hasActivity) continue
-      // No stock held and nothing coming in → park it (don't flag "runs out").
-      const noStock = onHand <= 0 && totalIncoming <= 0
-      const cover = noStock ? null : cover0
+      const totalIncoming = cells.reduce((s, c) => s + c.detail.reduce((t, d) => t + d.units, 0), 0)
+      if (onHand === 0 && demandSum === 0 && totalIncoming === 0) continue
       rows.push({
         product_id: pid, sku: m.sku, name: m.name, group: m.group, market,
-        onHand: Math.round(onHand), weeks: cells, coverWeeks: cover,
-        runsOut: cover ? weeks[cover - 1].endLabel : null,
-        avgWeekly: demandSum / weeks.length, noStock,
+        onHand: Math.round(onHand), weeks: cells, avgWeekly: demandSum / weeks.length,
       })
     }
   }
 
-  // Soonest to run out first.
-  rows.sort((a, b) => (a.coverWeeks ?? 999) - (b.coverWeeks ?? 999))
   return { weeks, rows, asOf, horizonWeeks: HORIZON_WEEKS }
 }
