@@ -96,15 +96,39 @@ export default async function ReceivePoPage({ params }: PageProps) {
     : { data: [] as Array<{ id: string; received_date: string | null }> }
   const transferDateByLine = new Map((transferDates ?? []).map((r) => [r.id, r.received_date]))
 
-  // Saved received date per line (from the finished-goods receipt log) so the
-  // form shows the real date already on record instead of defaulting to today.
+  // Saved batches per line (so re-opening Receive shows every batch already on
+  // record): product lines from the finished-goods receipt log, ingredient /
+  // packaging lines from their stock movements. Both hold units + lot + expiry + COA.
   const lineIds = (lines ?? []).map((l) => l.id)
   const { data: fgSaved } = lineIds.length
     ? await supabase.from('finished_goods_receipts')
-        .select('purchase_order_line_id, received_date, batch_ref, expiry_date, coa_file_path, coa_file_name')
-        .in('purchase_order_line_id', lineIds) as { data: Array<{ purchase_order_line_id: string | null; received_date: string | null; batch_ref: string | null; expiry_date: string | null; coa_file_path: string | null; coa_file_name: string | null }> | null }
-    : { data: [] as Array<{ purchase_order_line_id: string | null; received_date: string | null; batch_ref: string | null; expiry_date: string | null; coa_file_path: string | null; coa_file_name: string | null }> }
-  const savedByLine = new Map((fgSaved ?? []).filter((r) => r.purchase_order_line_id).map((r) => [r.purchase_order_line_id as string, r]))
+        .select('purchase_order_line_id, received_date, units, batch_ref, expiry_date, coa_file_path, coa_file_name')
+        .eq('source', 'po_receipt')
+        .in('purchase_order_line_id', lineIds) as { data: Array<{ purchase_order_line_id: string | null; received_date: string | null; units: number; batch_ref: string | null; expiry_date: string | null; coa_file_path: string | null; coa_file_name: string | null }> | null }
+    : { data: [] as Array<{ purchase_order_line_id: string | null; received_date: string | null; units: number; batch_ref: string | null; expiry_date: string | null; coa_file_path: string | null; coa_file_name: string | null }> }
+  const { data: mvSaved } = lineIds.length
+    ? await supabase.from('stock_movements')
+        .select('purchase_order_line_id, quantity, lot_number, expiry_date, coa_file_path, coa_file_name')
+        .eq('reference_type', 'purchase_order').eq('movement_type', 'purchase_received')
+        .in('purchase_order_line_id', lineIds) as { data: Array<{ purchase_order_line_id: string | null; quantity: number; lot_number: string | null; expiry_date: string | null; coa_file_path: string | null; coa_file_name: string | null }> | null }
+    : { data: [] as Array<{ purchase_order_line_id: string | null; quantity: number; lot_number: string | null; expiry_date: string | null; coa_file_path: string | null; coa_file_name: string | null }> }
+
+  type SavedBatch = { units: number; lot_number: string | null; expiry_date: string | null; coa_file_path: string | null; coa_file_name: string | null }
+  const batchesByLine = new Map<string, SavedBatch[]>()
+  const fgDateByLine = new Map<string, string | null>()
+  for (const r of fgSaved ?? []) {
+    if (!r.purchase_order_line_id) continue
+    const arr = batchesByLine.get(r.purchase_order_line_id) ?? []
+    arr.push({ units: Number(r.units), lot_number: r.batch_ref, expiry_date: r.expiry_date, coa_file_path: r.coa_file_path, coa_file_name: r.coa_file_name })
+    batchesByLine.set(r.purchase_order_line_id, arr)
+    if (!fgDateByLine.has(r.purchase_order_line_id)) fgDateByLine.set(r.purchase_order_line_id, r.received_date)
+  }
+  for (const m of mvSaved ?? []) {
+    if (!m.purchase_order_line_id || Number(m.quantity) <= 0) continue
+    const arr = batchesByLine.get(m.purchase_order_line_id) ?? []
+    arr.push({ units: Number(m.quantity), lot_number: m.lot_number, expiry_date: m.expiry_date, coa_file_path: m.coa_file_path, coa_file_name: m.coa_file_name })
+    batchesByLine.set(m.purchase_order_line_id, arr)
+  }
 
   const lineRows = (lines ?? []).map((l) => ({
     id: l.id,
@@ -124,11 +148,8 @@ export default async function ReceivePoPage({ params }: PageProps) {
     is_product:        !!l.product_id,
     saved_received_date: isTransfer
       ? (transferDateByLine.get(l.id) ?? null)
-      : (savedByLine.get(l.id)?.received_date ?? null),
-    saved_lot:           savedByLine.get(l.id)?.batch_ref ?? null,
-    saved_expiry:        savedByLine.get(l.id)?.expiry_date ?? null,
-    saved_coa_path:      savedByLine.get(l.id)?.coa_file_path ?? null,
-    saved_coa_name:      savedByLine.get(l.id)?.coa_file_name ?? null,
+      : (fgDateByLine.get(l.id) ?? null),
+    saved_batches:     batchesByLine.get(l.id) ?? [],
     unit_cost:         l.unit_cost != null ? Number(l.unit_cost) : null,
     unit_of_measure:   l.unit_of_measure,
     notes:             l.notes ?? '',

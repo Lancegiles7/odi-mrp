@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { receivePoLines, receiveTransferLines, uploadReceiptCoa, removeReceiptCoa } from '@/app/(dashboard)/purchase-orders/actions'
 
+interface SavedBatch {
+  units: number
+  lot_number: string | null
+  expiry_date: string | null
+  coa_file_path: string | null
+  coa_file_name: string | null
+}
+
 interface LineRow {
   id: string
   label: string
@@ -12,12 +20,9 @@ interface LineRow {
   quantity_ordered: number
   quantity_received: number
   is_product: boolean
-  saved_short_closed: boolean           // shortfall already written off on record
-  saved_received_date: string | null   // values already on record for this line
-  saved_lot: string | null
-  saved_expiry: string | null
-  saved_coa_path: string | null
-  saved_coa_name: string | null
+  saved_short_closed: boolean
+  saved_received_date: string | null
+  saved_batches: SavedBatch[]          // batches already on record for this line
   unit_cost: number | null
   unit_of_measure: string
   notes: string
@@ -27,44 +32,74 @@ interface Props {
   poId: string
   poNumber: string
   supplierName: string
-  // Transfer orders confirm qty + date only — no pricing, lot/COA or stock impact.
   isTransfer?: boolean
   expectedDate: string | null
   lines: LineRow[]
 }
 
-interface RowState {
-  received: number                   // TOTAL received for this line (edit-in-place)
-  short_closed: boolean              // true = shortfall written off (nothing more to come)
-  received_date: string              // ISO yyyy-mm-dd the stock physically arrived (per line)
-  invoice_unit_cost: number | null   // user-entered invoice price (defaults to PO price)
+interface BatchState {
+  key: string
+  units: string                      // text input
   lot_number: string
   expiry_date: string                // ISO yyyy-mm-dd, '' when unset
   coa_file_path: string | null
   coa_file_name: string | null
   coa_uploading: boolean
   coa_error: string | null
-  note: string
 }
 
-// Soft-warn when stock arrives within this many days of its expiry.
+interface RowState {
+  short_closed: boolean
+  received_date: string
+  invoice_unit_cost: number | null
+  note: string
+  received: number                   // transfers only (single qty)
+  batches: BatchState[]              // purchases (≥1)
+}
+
 const EXPIRY_WARN_DAYS = 90
+let batchSeq = 0
+const newKey = () => `b${batchSeq++}`
+const num = (v: string | number | null | undefined) => { const n = Number(v); return Number.isFinite(n) ? Math.max(0, n) : 0 }
 
 function daysUntil(iso: string): number | null {
   if (!iso) return null
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const today = new Date(); today.setHours(0, 0, 0, 0)
   const d = new Date(iso + 'T00:00:00')
   if (Number.isNaN(d.getTime())) return null
   return Math.round((d.getTime() - today.getTime()) / 86_400_000)
+}
+
+function initBatches(l: LineRow): BatchState[] {
+  const blank = (b?: SavedBatch): BatchState => ({
+    key: newKey(),
+    units: String(b?.units ?? ''),
+    lot_number: b?.lot_number ?? '',
+    expiry_date: b?.expiry_date ?? '',
+    coa_file_path: b?.coa_file_path ?? null,
+    coa_file_name: b?.coa_file_name ?? null,
+    coa_uploading: false,
+    coa_error: null,
+  })
+  if (l.saved_batches.length) return l.saved_batches.map((b) => blank(b))
+  // Fresh line → one batch pre-filled to the full ordered (or current received) qty.
+  const b = blank()
+  b.units = String(l.quantity_received > 0 ? l.quantity_received : l.quantity_ordered)
+  return [b]
+}
+
+/** Stable signature of what would be saved, to detect which lines changed. */
+function savedBatchSig(b: SavedBatch[]): string {
+  return b.map((x) => `${num(x.units)}:${x.lot_number ?? ''}:${x.expiry_date ?? ''}:${x.coa_file_path ?? ''}`).join(';')
+}
+function stateBatchSig(b: BatchState[]): string {
+  return b.filter((x) => num(x.units) > 0).map((x) => `${num(x.units)}:${x.lot_number.trim()}:${x.expiry_date.trim()}:${x.coa_file_path ?? ''}`).join(';')
 }
 
 export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, expectedDate, lines }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  // "Set all" convenience — changing it stamps every line's received date.
-  // Each line still holds its own date so split deliveries can differ.
   const today = new Date().toISOString().slice(0, 10)
   const [receivedDate, setReceivedDate] = useState<string>(today)
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -72,21 +107,13 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
   const [state, setState] = useState<Record<string, RowState>>(() => {
     const out: Record<string, RowState> = {}
     for (const l of lines) {
-      // Pre-fill the total: a fresh line defaults to the full ordered qty (the
-      // common "received in full" case); an already-received line shows its
-      // current total so you can correct it.
       out[l.id] = {
-        received:          l.quantity_received > 0 ? l.quantity_received : l.quantity_ordered,
         short_closed:      l.saved_short_closed,
         received_date:     l.saved_received_date ?? today,
         invoice_unit_cost: l.unit_cost,
-        lot_number:        l.saved_lot ?? '',
-        expiry_date:       l.saved_expiry ?? '',
-        coa_file_path:     l.saved_coa_path,
-        coa_file_name:     l.saved_coa_name,
-        coa_uploading:     false,
-        coa_error:         null,
         note:              '',
+        received:          l.quantity_received > 0 ? l.quantity_received : l.quantity_ordered,
+        batches:           isTransfer ? [] : initBatches(l),
       }
     }
     return out
@@ -95,105 +122,90 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
   function updateRow(id: string, patch: Partial<RowState>) {
     setState((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }))
   }
-
-  async function onCoaPick(lineId: string, file: File | null) {
-    if (!file) return
-    updateRow(lineId, { coa_uploading: true, coa_error: null })
-    const fd = new FormData()
-    fd.set('line_id', lineId)
-    fd.set('file', file)
-    const res = await uploadReceiptCoa(fd)
-    if (!res.ok) {
-      updateRow(lineId, { coa_uploading: false, coa_error: res.error ?? 'Upload failed' })
-      return
-    }
-    updateRow(lineId, {
-      coa_uploading: false,
-      coa_file_path: res.file_path ?? null,
-      coa_file_name: res.file_name ?? null,
+  function updateBatch(lineId: string, key: string, patch: Partial<BatchState>) {
+    setState((prev) => ({ ...prev, [lineId]: { ...prev[lineId], batches: prev[lineId].batches.map((b) => (b.key === key ? { ...b, ...patch } : b)) } }))
+  }
+  function addBatch(lineId: string) {
+    setState((prev) => ({ ...prev, [lineId]: { ...prev[lineId], batches: [...prev[lineId].batches, { key: newKey(), units: '', lot_number: '', expiry_date: '', coa_file_path: null, coa_file_name: null, coa_uploading: false, coa_error: null }] } }))
+  }
+  function removeBatch(lineId: string, key: string) {
+    setState((prev) => {
+      const batches = prev[lineId].batches.filter((b) => b.key !== key)
+      return { ...prev, [lineId]: { ...prev[lineId], batches: batches.length ? batches : prev[lineId].batches } }
     })
   }
 
-  async function onCoaRemove(lineId: string) {
-    const path = state[lineId]?.coa_file_path
-    // Clear UI immediately; best-effort delete of the orphaned object.
-    updateRow(lineId, { coa_file_path: null, coa_file_name: null, coa_error: null })
-    if (fileInputs.current[lineId]) fileInputs.current[lineId]!.value = ''
+  const received = (l: LineRow) => (isTransfer ? (state[l.id]?.received ?? 0) : state[l.id].batches.reduce((s, b) => s + num(b.units), 0))
+
+  async function onCoaPick(lineId: string, key: string, file: File | null) {
+    if (!file) return
+    updateBatch(lineId, key, { coa_uploading: true, coa_error: null })
+    const fd = new FormData(); fd.set('line_id', lineId); fd.set('file', file)
+    const res = await uploadReceiptCoa(fd)
+    if (!res.ok) { updateBatch(lineId, key, { coa_uploading: false, coa_error: res.error ?? 'Upload failed' }); return }
+    updateBatch(lineId, key, { coa_uploading: false, coa_file_path: res.file_path ?? null, coa_file_name: res.file_name ?? null })
+  }
+  async function onCoaRemove(lineId: string, key: string) {
+    const path = state[lineId]?.batches.find((b) => b.key === key)?.coa_file_path
+    updateBatch(lineId, key, { coa_file_path: null, coa_file_name: null, coa_error: null })
+    const ref = fileInputs.current[`${lineId}:${key}`]; if (ref) ref.value = ''
     if (path) await removeReceiptCoa(path)
   }
 
-  // A line is "settled" when it's received in full OR its shortfall is closed
-  // off. The PO only shows Partial while at least one line is still short AND
-  // left open ("still to come").
-  const willBePartial = useMemo(() => {
-    return lines.some((l) => {
-      const s = state[l.id]
-      return (s?.received ?? 0) < l.quantity_ordered && !s?.short_closed
-    })
-  }, [lines, state])
+  const willBePartial = useMemo(() => lines.some((l) => received(l) < l.quantity_ordered && !state[l.id]?.short_closed), [lines, state]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // "Close PO" — write off every outstanding shortfall at once.
   function closeAllShort() {
     setState((prev) => {
       const out = { ...prev }
-      for (const l of lines) {
-        if ((out[l.id]?.received ?? 0) < l.quantity_ordered) {
-          out[l.id] = { ...out[l.id], short_closed: true }
-        }
-      }
+      for (const l of lines) if (received(l) < l.quantity_ordered) out[l.id] = { ...out[l.id], short_closed: true }
       return out
     })
   }
 
   function onSave() {
     setError(null)
-    const anyUploading = lines.some((l) => state[l.id]?.coa_uploading)
-    if (anyUploading) {
-      setError('A COA is still uploading — wait for it to finish.')
-      return
+    if (!isTransfer && lines.some((l) => state[l.id].batches.some((b) => b.coa_uploading))) {
+      setError('A COA is still uploading — wait for it to finish.'); return
     }
 
-    // Send lines whose total OR received-date changed (edit-in-place).
     const receipts = lines
       .filter((l) => {
         const s = state[l.id]
-        return (s?.received ?? 0) !== l.quantity_received
-          || (isTransfer && !!s?.note.trim())
-          || (s?.short_closed ?? false) !== l.saved_short_closed
-          || (s?.received_date ?? '') !== (l.saved_received_date ?? today)
-          || (s?.lot_number ?? '') !== (l.saved_lot ?? '')
-          || (s?.expiry_date ?? '') !== (l.saved_expiry ?? '')
-          || (s?.coa_file_path ?? null) !== (l.saved_coa_path ?? null)
+        const dateChanged = (s?.received_date ?? '') !== (l.saved_received_date ?? today)
+        const shortChanged = (s?.short_closed ?? false) !== l.saved_short_closed
+        if (isTransfer) return received(l) !== l.quantity_received || !!s?.note.trim() || shortChanged || dateChanged
+        return received(l) !== l.quantity_received || shortChanged || dateChanged
+          || stateBatchSig(s.batches) !== savedBatchSig(l.saved_batches)
+          || !!s.note.trim()
       })
-      .map((l) => ({
-        line_id:           l.id,
-        received:          state[l.id].received,
-        short_closed:      state[l.id].short_closed,
-        received_date:     state[l.id].received_date,
-        invoice_unit_cost: state[l.id].invoice_unit_cost,
-        note:              state[l.id].note,
-        lot_number:        state[l.id].lot_number,
-        expiry_date:       state[l.id].expiry_date,
-        coa_file_path:     state[l.id].coa_file_path,
-        coa_file_name:     state[l.id].coa_file_name,
-      }))
+      .map((l) => {
+        const s = state[l.id]
+        const base = {
+          line_id: l.id,
+          received: received(l),
+          short_closed: s.short_closed,
+          received_date: s.received_date,
+          invoice_unit_cost: s.invoice_unit_cost,
+          note: s.note,
+        }
+        if (isTransfer) return base
+        return {
+          ...base,
+          batches: s.batches
+            .filter((b) => num(b.units) > 0)
+            .map((b) => ({ units: num(b.units), lot_number: b.lot_number.trim() || null, expiry_date: b.expiry_date.trim() || null, coa_file_path: b.coa_file_path, coa_file_name: b.coa_file_name })),
+        }
+      })
 
-    if (receipts.length === 0) {
-      setError('No changes to save — edit a Received quantity first.')
-      return
-    }
-    if (receipts.some((r) => !r.received_date)) {
-      setError('Set a Date received on every line you’re changing.')
-      return
-    }
+    if (receipts.length === 0) { setError('No changes to save — edit a Received quantity first.'); return }
+    if (receipts.some((r) => !r.received_date)) { setError('Set a Date received on every line you’re changing.'); return }
 
     start(async () => {
       const res = isTransfer
         ? await receiveTransferLines({ po_id: poId, receipts })
         : await receivePoLines({ po_id: poId, receipts })
       if (!res.ok) { setError(res.error ?? 'Save failed'); return }
-      router.push(`/purchase-orders/${poId}`)
-      router.refresh()
+      router.push(`/purchase-orders/${poId}`); router.refresh()
     })
   }
 
@@ -204,37 +216,18 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
           <Link href={`/purchase-orders/${poId}`} className="text-xs text-gray-500 hover:underline">← Back to PO</Link>
           <div>
             <h1 className="text-base font-semibold">{isTransfer ? 'Receive transfer' : 'Receive'} — {poNumber}</h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {supplierName}{expectedDate ? ` · expected ${expectedDate}` : ''}
-            </p>
+            <p className="text-xs text-gray-500 mt-0.5">{supplierName}{expectedDate ? ` · expected ${expectedDate}` : ''}</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
-            Set all dates
-            <input
-              type="date"
-              value={receivedDate}
-              max={today}
-              onChange={(e) => {
-                const v = e.target.value
-                setReceivedDate(v)
-                setState((prev) => Object.fromEntries(
-                  Object.entries(prev).map(([id, r]) => [id, { ...r, received_date: v }]),
-                ))
-              }}
-              className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
-            />
-          </label>
-          <div className="text-xs text-gray-400 max-w-[170px]">
-            Fills every line · each line’s date can differ
-          </div>
-        </div>
+        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+          Set all dates
+          <input type="date" value={receivedDate} max={today}
+            onChange={(e) => { const v = e.target.value; setReceivedDate(v); setState((prev) => Object.fromEntries(Object.entries(prev).map(([id, r]) => [id, { ...r, received_date: v }]))) }}
+            className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900" />
+        </label>
       </div>
 
-      {error && (
-        <div className="px-5 py-2 text-xs text-red-700 bg-red-50 border-b border-red-200">{error}</div>
-      )}
+      {error && <div className="px-5 py-2 text-xs text-red-700 bg-red-50 border-b border-red-200">{error}</div>}
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -247,9 +240,7 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
               {!isTransfer && (<>
                 <th className="text-right px-3 py-2 font-medium">PO price</th>
                 <th className="text-right px-3 py-2 font-medium">Invoice price</th>
-                <th className="text-left px-3 py-2 font-medium">Lot #</th>
-                <th className="text-left px-3 py-2 font-medium">Expiry</th>
-                <th className="text-left px-3 py-2 font-medium">COA</th>
+                <th className="text-left px-3 py-2 font-medium">Batches — qty · lot # · expiry · COA</th>
               </>)}
               <th className="text-left px-3 py-2 font-medium">Note</th>
             </tr>
@@ -257,159 +248,98 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
           <tbody>
             {lines.map((l) => {
               const s = state[l.id]
-              const received    = s.received ?? 0
-              const isShort     = received < l.quantity_ordered
-              const qtyOver     = received > l.quantity_ordered
-              const changed     = received !== l.quantity_received
-                || (s.short_closed ?? false) !== l.saved_short_closed
-                || (s.received_date ?? '') !== (l.saved_received_date ?? today)
-                || (s.lot_number ?? '') !== (l.saved_lot ?? '')
-                || (s.expiry_date ?? '') !== (l.saved_expiry ?? '')
-                || (s.coa_file_path ?? null) !== (l.saved_coa_path ?? null)
-              // Price drift vs PO line price
-              const priceDrift = l.unit_cost != null && s.invoice_unit_cost != null
-                && Math.abs(s.invoice_unit_cost - l.unit_cost) > 0.001
-              const priceDelta = (priceDrift && l.unit_cost != null && s.invoice_unit_cost != null)
-                ? s.invoice_unit_cost - l.unit_cost : 0
-              const expDays = daysUntil(s.expiry_date)
-              const expirySoon = expDays != null && expDays <= EXPIRY_WARN_DAYS
-              const expiryPast = expDays != null && expDays < 0
-              const flagged = qtyOver || priceDrift || expirySoon
+              const rec = received(l)
+              const isShort = rec < l.quantity_ordered
+              const qtyOver = rec > l.quantity_ordered
+              const priceDrift = l.unit_cost != null && s.invoice_unit_cost != null && Math.abs(s.invoice_unit_cost - l.unit_cost) > 0.001
+              const priceDelta = (priceDrift && l.unit_cost != null && s.invoice_unit_cost != null) ? s.invoice_unit_cost - l.unit_cost : 0
+              const changed = rec !== l.quantity_received || (!isTransfer && stateBatchSig(s.batches) !== savedBatchSig(l.saved_batches))
+              const flagged = qtyOver || priceDrift
               return (
                 <tr key={l.id} className={`border-t border-gray-100 align-top ${flagged ? 'bg-amber-50/40' : ''}`}>
                   <td className="px-4 py-2">
                     <div className="font-medium">{l.label}</div>
                     {l.sku && <div className="text-[10px] text-gray-500 font-mono">{l.sku}</div>}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {l.quantity_ordered.toLocaleString()} {l.unit_of_measure}
-                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{l.quantity_ordered.toLocaleString()} {l.unit_of_measure}</td>
                   <td className="px-3 py-2 text-right">
-                    <input
-                      type="number"
-                      step="any"
-                      min={0}
-                      value={s.received}
-                      onChange={(e) => updateRow(l.id, { received: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)) })}
-                      className={`w-24 text-right text-xs border rounded px-1.5 py-1 tabular-nums ${changed ? 'border-amber-300 bg-amber-50' : 'border-gray-300'}`}
-                    />
-                    {l.quantity_received > 0 && <div className="text-[10px] text-gray-400 mt-0.5">was {l.quantity_received.toLocaleString()}</div>}
-                    {qtyOver && <div className="text-[10px] text-amber-800 mt-0.5">⚠ over order by {(received - l.quantity_ordered).toLocaleString()}</div>}
-                    {/* Shortfall: still-to-come (keep open) vs close-off (write off). */}
-                    {isShort && !isTransfer && (
-                      s.short_closed ? (
-                        <div className="mt-1 text-[10px] text-emerald-800">
-                          ✓ shortfall {(l.quantity_ordered - received).toLocaleString()} closed off
-                          <button
-                            type="button"
-                            onClick={() => updateRow(l.id, { short_closed: false })}
-                            className="ml-1 underline text-emerald-700 hover:text-emerald-900"
-                          >reopen</button>
-                        </div>
-                      ) : (
-                        <div className="mt-1">
-                          <div className="text-[10px] text-amber-800">⚠ {(l.quantity_ordered - received).toLocaleString()} short of order</div>
-                          <div className="inline-flex mt-0.5 border border-gray-300 rounded overflow-hidden text-[10px]">
-                            <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 font-medium">Still to come</span>
-                            <button
-                              type="button"
-                              onClick={() => updateRow(l.id, { short_closed: true })}
-                              className="px-1.5 py-0.5 border-l border-gray-300 text-gray-600 hover:bg-emerald-50 hover:text-emerald-800"
-                              title="Nothing more coming — write off the shortfall and close this line"
-                            >Close short</button>
-                          </div>
-                        </div>
-                      )
-                    )}
-                    {isShort && isTransfer && <div className="text-[10px] text-amber-800 mt-0.5">⚠ {(l.quantity_ordered - received).toLocaleString()} short of order</div>}
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="date"
-                      value={s.received_date}
-                      max={today}
-                      onChange={(e) => updateRow(l.id, { received_date: e.target.value })}
-                      className="text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900"
-                    />
-                  </td>
-                  {!isTransfer && (<>
-                  <td className="px-3 py-2 text-right tabular-nums text-gray-500">
-                    {l.unit_cost != null ? `$${l.unit_cost.toFixed(2)}` : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <input
-                      type="number"
-                      step="any"
-                      min={0}
-                      value={s.invoice_unit_cost ?? ''}
-                      onChange={(e) => updateRow(l.id, { invoice_unit_cost: e.target.value === '' ? null : Number(e.target.value) })}
-                      placeholder={l.unit_cost?.toString() ?? '0.00'}
-                      className={`w-24 text-right text-xs rounded px-1.5 py-1 tabular-nums ${priceDrift ? 'border border-amber-300 bg-amber-50' : 'border border-gray-200'}`}
-                      title="Per-unit price from the supplier invoice"
-                    />
-                    {priceDrift && (
-                      <div className="text-[10px] text-amber-800 mt-0.5">
-                        ⚠ {priceDelta > 0 ? '+' : ''}${priceDelta.toFixed(2)} vs PO
+                    {isTransfer ? (
+                      <input type="number" step="any" min={0} value={s.received}
+                        onChange={(e) => updateRow(l.id, { received: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)) })}
+                        className={`w-24 text-right text-xs border rounded px-1.5 py-1 tabular-nums ${changed ? 'border-amber-300 bg-amber-50' : 'border-gray-300'}`} />
+                    ) : (
+                      <div className={`font-semibold tabular-nums ${changed ? 'text-amber-800' : ''}`}>{rec.toLocaleString()} <span className="font-normal text-gray-400">{l.unit_of_measure}</span>
+                        {s.batches.length > 1 && <div className="text-[9px] font-normal text-gray-400">sum of {s.batches.length} batches</div>}
                       </div>
                     )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      value={s.lot_number}
-                      onChange={(e) => updateRow(l.id, { lot_number: e.target.value })}
-                      placeholder="Lot / batch #"
-                      className="w-28 text-xs border border-gray-200 rounded px-1.5 py-1 font-mono"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="date"
-                      value={s.expiry_date}
-                      onChange={(e) => updateRow(l.id, { expiry_date: e.target.value })}
-                      className={`text-xs rounded px-1.5 py-1 ${expirySoon ? 'border border-amber-300 bg-amber-50' : 'border border-gray-200'}`}
-                    />
-                    {expiryPast
-                      ? <div className="text-[10px] text-red-700 mt-0.5">⚠ already expired</div>
-                      : expirySoon && <div className="text-[10px] text-amber-800 mt-0.5">⚠ expires in ~{Math.max(0, Math.round((expDays ?? 0) / 7))} wks</div>}
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      ref={(el) => { fileInputs.current[l.id] = el }}
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf"
-                      className="hidden"
-                      onChange={(e) => onCoaPick(l.id, e.target.files?.[0] ?? null)}
-                    />
-                    {s.coa_uploading ? (
-                      <span className="text-[11px] text-gray-500">Uploading…</span>
-                    ) : s.coa_file_path ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 rounded px-1.5 py-1 max-w-[180px]">
-                        <span>📄</span>
-                        <span className="truncate" title={s.coa_file_name ?? ''}>{s.coa_file_name}</span>
-                        <button
-                          type="button"
-                          onClick={() => onCoaRemove(l.id)}
-                          className="text-emerald-700/60 hover:text-emerald-900 ml-0.5"
-                          title="Remove COA"
-                        >✕</button>
-                      </span>
+                    {l.quantity_received > 0 && <div className="text-[10px] text-gray-400 mt-0.5">was {l.quantity_received.toLocaleString()}</div>}
+                    {qtyOver && <div className="text-[10px] text-amber-800 mt-0.5">⚠ over order by {(rec - l.quantity_ordered).toLocaleString()}</div>}
+                    {isShort && !isTransfer && (s.short_closed ? (
+                      <div className="mt-1 text-[10px] text-emerald-800">✓ shortfall {(l.quantity_ordered - rec).toLocaleString()} closed off
+                        <button type="button" onClick={() => updateRow(l.id, { short_closed: false })} className="ml-1 underline text-emerald-700 hover:text-emerald-900">reopen</button>
+                      </div>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => fileInputs.current[l.id]?.click()}
-                        className="inline-flex items-center gap-1 text-[11px] border border-gray-300 rounded px-2 py-1 text-gray-600 hover:bg-gray-50"
-                      >⤓ Attach COA</button>
-                    )}
-                    {s.coa_error && <div className="text-[10px] text-red-700 mt-0.5">{s.coa_error}</div>}
+                      <div className="mt-1">
+                        <div className="text-[10px] text-amber-800">⚠ {(l.quantity_ordered - rec).toLocaleString()} short of order</div>
+                        <div className="inline-flex mt-0.5 border border-gray-300 rounded overflow-hidden text-[10px]">
+                          <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 font-medium">Still to come</span>
+                          <button type="button" onClick={() => updateRow(l.id, { short_closed: true })} className="px-1.5 py-0.5 border-l border-gray-300 text-gray-600 hover:bg-emerald-50 hover:text-emerald-800" title="Nothing more coming — write off the shortfall and close this line">Close short</button>
+                        </div>
+                      </div>
+                    ))}
+                    {isShort && isTransfer && <div className="text-[10px] text-amber-800 mt-0.5">⚠ {(l.quantity_ordered - rec).toLocaleString()} short of order</div>}
                   </td>
+                  <td className="px-3 py-2">
+                    <input type="date" value={s.received_date} max={today} onChange={(e) => updateRow(l.id, { received_date: e.target.value })}
+                      className="text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900" />
+                  </td>
+                  {!isTransfer && (<>
+                    <td className="px-3 py-2 text-right tabular-nums text-gray-500">{l.unit_cost != null ? `$${l.unit_cost.toFixed(2)}` : '—'}</td>
+                    <td className="px-3 py-2 text-right">
+                      <input type="number" step="any" min={0} value={s.invoice_unit_cost ?? ''} onChange={(e) => updateRow(l.id, { invoice_unit_cost: e.target.value === '' ? null : Number(e.target.value) })}
+                        placeholder={l.unit_cost?.toString() ?? '0.00'} title="Per-unit price from the supplier invoice"
+                        className={`w-24 text-right text-xs rounded px-1.5 py-1 tabular-nums ${priceDrift ? 'border border-amber-300 bg-amber-50' : 'border border-gray-200'}`} />
+                      {priceDrift && <div className="text-[10px] text-amber-800 mt-0.5">⚠ {priceDelta > 0 ? '+' : ''}${priceDelta.toFixed(2)} vs PO</div>}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="space-y-1.5">
+                        {s.batches.map((b, bi) => {
+                          const expDays = daysUntil(b.expiry_date)
+                          const expirySoon = expDays != null && expDays <= EXPIRY_WARN_DAYS
+                          const expiryPast = expDays != null && expDays < 0
+                          const fkey = `${l.id}:${b.key}`
+                          return (
+                            <div key={b.key} className="flex items-start gap-1.5">
+                              {s.batches.length > 1 && <span className="text-[9px] text-gray-400 w-3 pt-1.5">{bi + 1}</span>}
+                              <input type="number" step="any" min={0} value={b.units} onChange={(e) => updateBatch(l.id, b.key, { units: e.target.value })}
+                                placeholder="qty" className="w-20 text-right text-xs border border-gray-300 rounded px-1.5 py-1 tabular-nums" />
+                              <input value={b.lot_number} onChange={(e) => updateBatch(l.id, b.key, { lot_number: e.target.value })}
+                                placeholder="Lot #" className="w-28 text-xs border border-gray-200 rounded px-1.5 py-1 font-mono" />
+                              <div>
+                                <input type="date" value={b.expiry_date} onChange={(e) => updateBatch(l.id, b.key, { expiry_date: e.target.value })}
+                                  className={`text-xs rounded px-1.5 py-1 ${expirySoon ? 'border border-amber-300 bg-amber-50' : 'border border-gray-200'}`} />
+                                {expiryPast ? <div className="text-[10px] text-red-700 mt-0.5">⚠ expired</div>
+                                  : expirySoon && <div className="text-[10px] text-amber-800 mt-0.5">⚠ ~{Math.max(0, Math.round((expDays ?? 0) / 7))} wks</div>}
+                              </div>
+                              <input ref={(el) => { fileInputs.current[fkey] = el }} type="file" accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf" className="hidden" onChange={(e) => onCoaPick(l.id, b.key, e.target.files?.[0] ?? null)} />
+                              {b.coa_uploading ? <span className="text-[11px] text-gray-500 pt-1.5">Uploading…</span>
+                                : b.coa_file_path ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 rounded px-1.5 py-1 max-w-[150px]">
+                                    <span>📄</span><span className="truncate" title={b.coa_file_name ?? ''}>{b.coa_file_name}</span>
+                                    <button type="button" onClick={() => onCoaRemove(l.id, b.key)} className="text-emerald-700/60 hover:text-emerald-900 ml-0.5" title="Remove COA">✕</button>
+                                  </span>
+                                ) : <button type="button" onClick={() => fileInputs.current[fkey]?.click()} className="inline-flex items-center gap-1 text-[11px] border border-gray-300 rounded px-2 py-1 text-gray-600 hover:bg-gray-50">⤓ COA</button>}
+                              {s.batches.length > 1 && <button type="button" onClick={() => removeBatch(l.id, b.key)} className="text-gray-300 hover:text-red-600 pt-1" title="Remove batch">✕</button>}
+                              {b.coa_error && <span className="text-[10px] text-red-700 pt-1.5">{b.coa_error}</span>}
+                            </div>
+                          )
+                        })}
+                        <button type="button" onClick={() => addBatch(l.id)} className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 hover:bg-emerald-100">＋ Add batch</button>
+                      </div>
+                    </td>
                   </>)}
                   <td className="px-3 py-2">
-                    <input
-                      value={s.note}
-                      onChange={(e) => updateRow(l.id, { note: e.target.value })}
-                      placeholder="QA note · backorder"
-                      className="w-full min-w-[120px] text-xs border border-gray-200 rounded px-1.5 py-1"
-                    />
+                    <input value={s.note} onChange={(e) => updateRow(l.id, { note: e.target.value })} placeholder="QA note · backorder" className="w-full min-w-[120px] text-xs border border-gray-200 rounded px-1.5 py-1" />
                   </td>
                 </tr>
               )
@@ -420,28 +350,17 @@ export function ReceiveForm({ poId, poNumber, supplierName, isTransfer = false, 
 
       <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-4">
         <div className="text-xs text-gray-600">
-          {willBePartial
-            ? <>Status will move to <span className="font-semibold text-amber-800">Partial</span>.</>
-            : <>Status will move to <span className="font-semibold text-emerald-700">Received</span>.</>}
+          {willBePartial ? <>Status will move to <span className="font-semibold text-amber-800">Partial</span>.</> : <>Status will move to <span className="font-semibold text-emerald-700">Received</span>.</>}
           {isTransfer
             ? <>{' '}Confirms what arrived at the destination site. Logistics record only — Stock on Hand isn&apos;t changed by transfers.</>
-            : <>{' '}On confirm, received qty moves into <b>Stock on Hand</b> at <b>Main Warehouse</b>; Lot&nbsp;#, Expiry and COA are saved against each receipt and shown in the PO&apos;s receipt history.</>}
+            : <>{' '}On confirm, received qty moves into <b>Stock on Hand</b> at <b>Main Warehouse</b>; each batch&apos;s Lot&nbsp;#, Expiry and COA are saved against its own receipt and shown in the PO&apos;s receipt history.</>}
         </div>
         <div className="flex gap-2 flex-shrink-0">
           <Link href={`/purchase-orders/${poId}`} className="px-3 py-1.5 text-xs border border-gray-300 rounded-md hover:bg-gray-50">Cancel</Link>
           {!isTransfer && willBePartial && (
-            <button
-              type="button"
-              onClick={closeAllShort}
-              className="px-3 py-1.5 text-xs border border-emerald-700 text-emerald-800 rounded-md hover:bg-emerald-50 font-medium"
-              title="Write off every outstanding shortfall — nothing more is coming"
-            >Close PO — nothing more to come</button>
+            <button type="button" onClick={closeAllShort} className="px-3 py-1.5 text-xs border border-emerald-700 text-emerald-800 rounded-md hover:bg-emerald-50 font-medium" title="Write off every outstanding shortfall — nothing more is coming">Close PO — nothing more to come</button>
           )}
-          <button
-            disabled={pending}
-            onClick={onSave}
-            className="px-3 py-1.5 text-xs bg-emerald-700 text-white rounded-md hover:bg-emerald-800 disabled:opacity-50"
-          >
+          <button disabled={pending} onClick={onSave} className="px-3 py-1.5 text-xs bg-emerald-700 text-white rounded-md hover:bg-emerald-800 disabled:opacity-50">
             {pending ? 'Saving…' : isTransfer ? 'Confirm receipt' : willBePartial ? 'Confirm receipt + update SOH' : 'Confirm & close PO + update SOH'}
           </button>
         </div>

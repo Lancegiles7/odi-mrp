@@ -503,6 +503,15 @@ export async function receivePoLines(input: {
     received_date?: string         // ISO yyyy-mm-dd the stock physically arrived (per line)
     invoice_unit_cost: number | null
     note: string | null
+    // A line can be received as several batches, each with its own lot/expiry/COA.
+    // When omitted, the single lot_number/expiry/coa below are treated as one batch.
+    batches?: Array<{
+      units: number
+      lot_number?: string | null
+      expiry_date?: string | null
+      coa_file_path?: string | null
+      coa_file_name?: string | null
+    }>
     lot_number?: string | null
     expiry_date?: string | null      // ISO yyyy-mm-dd
     coa_file_path?: string | null
@@ -592,11 +601,22 @@ export async function receivePoLines(input: {
     // Edit-in-place: `received` is the TOTAL now on the line, not a delta.
     // delta drives inventory movements (may be negative when correcting down).
     // Over-delivery is allowed — no cap at the ordered quantity.
-    const received = Math.max(0, Number(r.received) || 0)
+    // A line can be received as several batches, each with its own lot / expiry /
+    // COA. Normalise to a batch list — the single lot/expiry fields are one batch.
+    const rawBatches = (r.batches && r.batches.length)
+      ? r.batches
+      : [{ units: Number(r.received) || 0, lot_number: r.lot_number, expiry_date: r.expiry_date, coa_file_path: r.coa_file_path, coa_file_name: r.coa_file_name }]
+    const batchList = rawBatches
+      .map((b) => ({
+        units:         Math.max(0, Number(b.units) || 0),
+        lot_number:    b.lot_number?.trim() || null,
+        expiry_date:   b.expiry_date?.trim() || null,
+        coa_file_path: b.coa_file_path?.trim() || null,
+        coa_file_name: b.coa_file_name?.trim() || null,
+      }))
+      .filter((b) => b.units > 0)
+    const received = batchList.reduce((s, b) => s + b.units, 0)
     const delta = received - Number(line.quantity_received)
-    // Note: we DON'T skip when delta === 0 — the caller only sends lines whose
-    // qty OR received-date changed, and a date-only change still needs the
-    // finished-goods receipt re-dated below.
 
     const receiptIso = isoDate(r.received_date) ?? poReceiptIso
 
@@ -608,69 +628,77 @@ export async function receivePoLines(input: {
       .from('purchase_order_lines').update(updates).eq('id', r.line_id)
     if (lineErr) return { ok: false, error: lineErr.message }
 
-    // Stock movement — ingredient / packaging lines only (products don't touch
-    // ingredient inventory), and only when the qty actually moved.
-    if ((line.ingredient_id || line.packaging_id) && delta !== 0) {
-      const invoiceCost = (r.invoice_unit_cost != null && Number.isFinite(r.invoice_unit_cost) && r.invoice_unit_cost >= 0)
-        ? r.invoice_unit_cost
-        : line.unit_cost
-      const { error: mvErr } = await supabase
-        .from('stock_movements')
-        .insert({
+    const invoiceCost = (r.invoice_unit_cost != null && Number.isFinite(r.invoice_unit_cost) && r.invoice_unit_cost >= 0)
+      ? r.invoice_unit_cost
+      : line.unit_cost
+
+    // Ingredient / packaging — rewrite this line's PO stock movements, one per
+    // batch (products don't touch ingredient inventory). The monthly ledger reads
+    // quantity_received, so the line total above keeps it right; these rows are the
+    // lot audit and the opening-stock figure moves by the net delta.
+    if (line.ingredient_id || line.packaging_id) {
+      await supabase.from('stock_movements').delete()
+        .eq('purchase_order_line_id', line.id).eq('reference_type', 'purchase_order')
+      if (batchList.length) {
+        const mvRows = batchList.map((b) => ({
           ingredient_id:          line.ingredient_id,
           packaging_id:           line.packaging_id,
           location_id:            mainLoc.id,
-          movement_type:          delta > 0 ? 'purchase_received' : 'correction',
-          quantity:               delta,
+          movement_type:          'purchase_received',
+          quantity:               b.units,
           unit_of_measure:        line.unit_of_measure,
           reference_type:         'purchase_order',
           purchase_order_line_id: line.id,
           unit_cost:              invoiceCost,
           notes:                  r.note?.trim() ?? '',
-          lot_number:             delta > 0 ? (r.lot_number?.trim() || null) : null,
-          expiry_date:            delta > 0 ? (r.expiry_date?.trim() || null) : null,
-          coa_file_path:          delta > 0 ? (r.coa_file_path?.trim() || null) : null,
-          coa_file_name:          delta > 0 ? (r.coa_file_name?.trim() || null) : null,
+          lot_number:             b.lot_number,
+          expiry_date:            b.expiry_date,
+          coa_file_path:          b.coa_file_path,
+          coa_file_name:          b.coa_file_name,
           created_by:             profile?.id ?? null,
-        } as never)
-      if (mvErr) return { ok: false, error: `Stock movement failed: ${mvErr.message}` }
+        }))
+        const { error: mvErr } = await supabase.from('stock_movements').insert(mvRows as never)
+        if (mvErr) return { ok: false, error: `Stock movement failed: ${mvErr.message}` }
+      }
 
       // Adjust the demand view's opening-stock figure by the delta (signed).
-      const lineUom = (line.unit_of_measure ?? '').trim().toLowerCase()
-      if (line.ingredient_id) {
-        const itemUom = ingById.get(line.ingredient_id)?.unit_of_measure ?? null
-        const qty = lineUom === 'g' ? convertGramsToIngredientUom(delta, itemUom) : delta
-        ingBump.set(line.ingredient_id, (ingBump.get(line.ingredient_id) ?? 0) + qty)
-      } else if (line.packaging_id) {
-        const itemUom = pakById.get(line.packaging_id)?.unit_of_measure ?? null
-        const qty = lineUom === 'g' ? convertGramsToIngredientUom(delta, itemUom) : delta
-        pakBump.set(line.packaging_id, (pakBump.get(line.packaging_id) ?? 0) + qty)
+      if (delta !== 0) {
+        const lineUom = (line.unit_of_measure ?? '').trim().toLowerCase()
+        if (line.ingredient_id) {
+          const itemUom = ingById.get(line.ingredient_id)?.unit_of_measure ?? null
+          const qty = lineUom === 'g' ? convertGramsToIngredientUom(delta, itemUom) : delta
+          ingBump.set(line.ingredient_id, (ingBump.get(line.ingredient_id) ?? 0) + qty)
+        } else if (line.packaging_id) {
+          const itemUom = pakById.get(line.packaging_id)?.unit_of_measure ?? null
+          const qty = lineUom === 'g' ? convertGramsToIngredientUom(delta, itemUom) : delta
+          pakBump.set(line.packaging_id, (pakBump.get(line.packaging_id) ?? 0) + qty)
+        }
       }
     }
 
-    // Finished-goods product line — reconcile its Stock Movements receipt to the
-    // new total (one po_receipt row per line, dated the line's received date), so
-    // editing the amount never double- or under-counts. NON-FATAL: never block
-    // the receipt if this logging fails.
+    // Finished-goods product line — rewrite its Stock Movements receipts, one
+    // po_receipt row per batch (dated the line's received date), so editing never
+    // double- or under-counts. NON-FATAL: never block the receipt if logging fails.
     if (line.product_id) {
       await supabase.from('finished_goods_receipts')
         .delete().eq('purchase_order_line_id', line.id).eq('source', 'po_receipt')
-      if (received > 0) {
-        const { error: fgErr } = await supabase.from('finished_goods_receipts').insert({
+      if (batchList.length) {
+        const fgRows = batchList.map((b) => ({
           product_id:             line.product_id,
           received_month:         `${receiptIso.slice(0, 7)}-01`,
           received_date:          receiptIso,
-          units:                  received,
+          units:                  b.units,
           source:                 'po_receipt',
           po_number:              po?.po_number ?? null,
           purchase_order_line_id: line.id,
           market:                 poMarket,
-          batch_ref:              r.lot_number?.trim() || null,
-          expiry_date:            r.expiry_date?.trim() || null,
-          coa_file_path:          r.coa_file_path?.trim() || null,
-          coa_file_name:          r.coa_file_name?.trim() || null,
+          batch_ref:              b.lot_number,
+          expiry_date:            b.expiry_date,
+          coa_file_path:          b.coa_file_path,
+          coa_file_name:          b.coa_file_name,
           created_by:             profile?.id ?? null,
-        } as never)
+        }))
+        const { error: fgErr } = await supabase.from('finished_goods_receipts').insert(fgRows as never)
         if (fgErr) console.error(`[receivePoLines] Stock-Movements receipt log failed for line ${line.id}: ${fgErr.message}`)
       }
     }
