@@ -8,6 +8,7 @@ import { getPlanningWindow, fyLabel } from '@/lib/settings'
 import { PlanningHistoryToggle } from '@/components/shared/planning-history-toggle'
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
+import { CreatePoButton, type CreatePoLine } from '@/components/production/create-po-button'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
@@ -51,6 +52,28 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     ...ln,
     poCoverByMonth: coverFor(poCover, ln.product.id, ln.markets, activeMonths),
   }))
+
+  // "Create PO from plan" data: supplier list + the last purchase price per
+  // product (to pre-fill draft lines). A product's maker is free text, so the
+  // supplier is best-guessed and confirmable in the dialog.
+  const [{ data: suppliersRaw }, { data: priceLines }] = await Promise.all([
+    supabase.from('suppliers').select('id, name').order('name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
+    supabase.from('purchase_order_lines').select('product_id, unit_cost, created_at')
+      .not('product_id', 'is', null).not('unit_cost', 'is', null)
+      .order('created_at', { ascending: false }) as unknown as Promise<{ data: Array<{ product_id: string; unit_cost: number }> | null }>,
+  ])
+  const suppliers = suppliersRaw ?? []
+  const lastPriceByProduct = new Map<string, number>()
+  for (const l of priceLines ?? []) if (l.product_id && !lastPriceByProduct.has(l.product_id)) lastPriceByProduct.set(l.product_id, Number(l.unit_cost))
+  const makerMonths = activeMonths.map((m) => ({ key: m, label: monthLabel(m) }))
+  const poLinesFor = (items: ProdLine[]): CreatePoLine[] => items.map((ln) => {
+    const poByMonth: Record<string, boolean> = {}
+    for (const m of activeMonths) { const c = ln.poCoverByMonth[m]; poByMonth[m] = !!c && ((c.firm ?? 0) > 0 || (c.draft ?? 0) > 0) }
+    return {
+      product_id: ln.product.id, name: ln.product.name, sku: ln.product.sku_code, market: ln.market,
+      prodByMonth: ln.productionByMonth, poByMonth, lastPrice: lastPriceByProduct.get(ln.product.id) ?? null,
+    }
+  })
 
   // Grouped view uses the all-active set; view-all uses the filtered set so
   // the strip respects the manufacturer filter.
@@ -168,9 +191,15 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                   {chip && <span className={`text-[10px] px-1.5 py-0.5 rounded ${chip}`}>{items.length} products</span>}
                   {!chip && <span className="text-xs text-gray-500">{items.length} products</span>}
                 </div>
-                {short > 0
-                  ? <span className="text-xs text-red-600 font-medium">{short} shortfall{short === 1 ? '' : 's'}</span>
-                  : <span className="text-xs text-gray-500">On track</span>}
+                <div className="flex items-center gap-3">
+                  {short > 0
+                    ? <span className="text-xs text-red-600 font-medium">{short} shortfall{short === 1 ? '' : 's'}</span>
+                    : <span className="text-xs text-gray-500">On track</span>}
+                  {key !== UNASSIGNED && (
+                    <CreatePoButton maker={label} lines={poLinesFor(items)} months={makerMonths}
+                      suppliers={suppliers} defaultSupplierId={bestSupplierForMaker(label, suppliers)} />
+                  )}
+                </div>
               </summary>
 
               <div className="border-t border-gray-100 overflow-x-auto">
@@ -348,6 +377,21 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       </div>
     </div>
   )
+}
+
+/** Best-guess supplier for a free-text maker name (confirmable in the dialog).
+ *  Exact name wins; else a supplier whose name contains the maker (VMC →
+ *  Vision Made Co, I Eat Fresh AUS → …I Eat Fresh), avoiding the packaging "VMC". */
+function bestSupplierForMaker(maker: string, suppliers: Array<{ id: string; name: string }>): string | null {
+  const m = maker.trim().toLowerCase()
+  const alias: Record<string, string> = { 'vmc': 'vision made', 'i eat fresh aus': 'i eat fresh' }
+  const target = alias[m] ?? m
+  const exact = suppliers.find((s) => s.name.trim().toLowerCase() === m)
+  if (exact) return exact.id
+  const contains = suppliers.find((s) => s.name.toLowerCase().includes(target))
+  if (contains) return contains.id
+  const rev = suppliers.find((s) => target.includes(s.name.trim().toLowerCase()))
+  return rev?.id ?? null
 }
 
 function Fragmented() {

@@ -154,6 +154,52 @@ export async function createPurchaseOrder(input: {
 }
 
 // ============================================================
+// createPosFromProductionPlan — turn a month's production plan into draft PO(s).
+// One PO per market group (NZ in NZD, AU in AUD), created sequentially so the
+// auto-generated PO numbers don't collide. Each is a normal draft PO (status
+// 'draft', no delivery date) the user then finishes on the Receive/PO screens.
+// ============================================================
+export async function createPosFromProductionPlan(input: {
+  pos: Array<{
+    market: 'NZ' | 'AU'
+    supplier_id: string
+    lines: Array<{ product_id: string; quantity_ordered: number; unit_cost: number | null }>
+  }>
+}): Promise<{ ok: boolean; created?: Array<{ po_number: string; id: string; market: 'NZ' | 'AU' }>; error?: string }> {
+  const today = new Date().toISOString().slice(0, 10)
+  const created: Array<{ po_number: string; id: string; market: 'NZ' | 'AU' }> = []
+  for (const po of input.pos) {
+    const lines = po.lines.filter((l) => l.product_id && Number(l.quantity_ordered) > 0)
+    if (!po.supplier_id) return { ok: false, error: `Pick a supplier for the ${po.market} order.` }
+    if (!lines.length) continue
+    const po_number = await generatePoNumber('purchase')   // sequential — await each before the next
+    const res = await createPurchaseOrder({
+      po_number,
+      supplier_id: po.supplier_id,
+      po_type: 'purchase',
+      currency: po.market === 'AU' ? 'AUD' : 'NZD',
+      market: po.market,
+      order_date: today,
+      expected_delivery_date: null,
+      delivery_address_id: null,
+      delivery_notes: null,
+      notes: 'Created from the production plan',
+      external_notes: null,
+      lines: lines.map((l) => ({
+        line_type: 'product', ingredient_id: null, product_id: l.product_id, packaging_id: null,
+        description: null, quantity_ordered: Number(l.quantity_ordered),
+        unit_cost: l.unit_cost != null ? Number(l.unit_cost) : null, unit_of_measure: 'each', notes: null,
+      })),
+    })
+    if (!res.ok || !res.id) return { ok: false, error: res.error ?? 'Failed to create the draft PO', created }
+    created.push({ po_number, id: res.id, market: po.market })
+  }
+  if (!created.length) return { ok: false, error: 'No quantities to order.' }
+  revalidatePath('/production')
+  return { ok: true, created }
+}
+
+// ============================================================
 // Update PO header + replace lines (only allowed while draft)
 // ============================================================
 // ============================================================
