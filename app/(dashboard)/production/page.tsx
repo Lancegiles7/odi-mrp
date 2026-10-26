@@ -10,6 +10,7 @@ import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
 import { CreatePoButton, type CreatePoLine } from '@/components/production/create-po-button'
 import { SuggestProductionButton, type SuggestLine } from '@/components/production/suggest-production-button'
+import { SuggestionControls } from '@/components/production/suggestion-controls'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
@@ -78,6 +79,21 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       opening: ln.opening, forecast: ln.forecastByMonth, existingPlan: ln.productionByMonth, firmPo, transfers,
     }
   })
+  // Model-draft cells (source = 'suggested') in a section, from PLAN_FROM_MONTH
+  // on — drives the "✨ N suggested" count and the Accept-all / Clear controls.
+  const suggestionsFor = (items: ProdLine[]): { pairs: Array<{ product_id: string; market: 'NZ' | 'AU' }>; count: number } => {
+    const pairKeys = new Set<string>()
+    const pairs: Array<{ product_id: string; market: 'NZ' | 'AU' }> = []
+    let count = 0
+    for (const ln of items) for (const m of activeMonths) {
+      if (m < PLAN_FROM_MONTH) continue
+      if (ln.sourceByMonth[m] !== 'suggested') continue
+      count++
+      const k = `${ln.product.id}:${ln.market}`
+      if (!pairKeys.has(k)) { pairKeys.add(k); pairs.push({ product_id: ln.product.id, market: ln.market }) }
+    }
+    return { pairs, count }
+  }
   const poLinesFor = (items: ProdLine[]): CreatePoLine[] => items.map((ln) => {
     const poByMonth: Record<string, boolean> = {}
     for (const m of activeMonths) { const c = ln.poCoverByMonth[m]; poByMonth[m] = !!c && ((c.firm ?? 0) > 0 || (c.draft ?? 0) > 0) }
@@ -207,6 +223,10 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                   {short > 0
                     ? <span className="text-xs text-red-600 font-medium">{short} shortfall{short === 1 ? '' : 's'}</span>
                     : <span className="text-xs text-gray-500">On track</span>}
+                  {key !== UNASSIGNED && (() => {
+                    const sugg = suggestionsFor(items)
+                    return <SuggestionControls pairs={sugg.pairs} count={sugg.count} fromMonth={PLAN_FROM_MONTH} />
+                  })()}
                   {key !== UNASSIGNED && (
                     <SuggestProductionButton maker={label} lines={suggestLinesFor(items)} months={makerMonths} fromMonth={PLAN_FROM_MONTH} />
                   )}
@@ -269,6 +289,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                           lockedMonths={planning.lockedMonths}
                           forecastByMonth={ln.forecastByMonth}
                           productionByMonth={ln.productionByMonth}
+                          sourceByMonth={ln.sourceByMonth}
+                          suggestedByMonth={ln.suggestedByMonth}
                           transfersByMonth={ln.transfersByMonth}
                           poCoverByMonth={ln.poCoverByMonth}
                           commentedCells={commentedCells}
@@ -379,8 +401,10 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                     lockedMonths={planning.lockedMonths}
                     forecastByMonth={ln.forecastByMonth}
                     productionByMonth={ln.productionByMonth}
+                    sourceByMonth={ln.sourceByMonth}
+                    suggestedByMonth={ln.suggestedByMonth}
                     transfersByMonth={ln.transfersByMonth}
-                          poCoverByMonth={ln.poCoverByMonth}
+                    poCoverByMonth={ln.poCoverByMonth}
                     commentedCells={commentedCells}
                     showManufacturerChip
                   />

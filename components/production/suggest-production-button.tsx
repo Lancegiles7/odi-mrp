@@ -80,10 +80,19 @@ export function SuggestProductionButton({ maker, lines, months, fromMonth }: Pro
 
   function onApply() {
     setError(null)
-    const rows: Array<{ product_id: string; year_month: string; market: 'NZ' | 'AU'; units_planned: number }> = []
+    const rows: Array<{ product_id: string; year_month: string; market: 'NZ' | 'AU'; units_planned: number; source: 'manual' | 'suggested'; suggested_units: number | null }> = []
     for (const l of lines) for (const m of showMonths) {
       if ((l.firmPo[m.key] ?? 0) > 0) continue   // already ordered — leave as is
-      rows.push({ product_id: l.product_id, year_month: m.key, market: l.market, units_planned: prodOf(l, m.key) })
+      // A cell the user edited in the dialog lands as 'manual'; the rest are the
+      // model's draft. Either way we keep the model's figure in suggested_units.
+      const model = base[lid(l)]?.[m.key]?.suggested ?? 0
+      const edited = key(l, m.key) in ovr
+      rows.push({
+        product_id: l.product_id, year_month: m.key, market: l.market,
+        units_planned: prodOf(l, m.key),
+        source: edited ? 'manual' : 'suggested',
+        suggested_units: model,
+      })
     }
     if (!rows.length) { setError('Nothing to apply.'); return }
     start(async () => {

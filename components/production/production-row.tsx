@@ -22,6 +22,10 @@ interface Props {
   months: string[]
   forecastByMonth: Record<string, number>
   productionByMonth: Record<string, number>
+  /** Provenance per month: 'suggested' shows as a dashed-violet draft. */
+  sourceByMonth?: Record<string, 'manual' | 'suggested'>
+  /** Model's suggested number per month — shown greyed beside a manual override. */
+  suggestedByMonth?: Record<string, number | null>
   /** NZ ↔ AU transfer orders per month (signed: + in / − out). Read-only —
    *  raised in Purchase Orders. Counted in the balance, not as production. */
   transfersByMonth?: Record<string, TransferDetail[]>
@@ -49,6 +53,7 @@ interface Props {
 export function ProductionRow({
   productId, skuCode, productName, manufacturer, isActive,
   openingStock, openingSource, months, forecastByMonth, productionByMonth, transfersByMonth,
+  sourceByMonth, suggestedByMonth,
   poCoverByMonth, commentedCells, showManufacturerChip,
   market = 'NZ', marketTag, lockedMonths,
 }: Props) {
@@ -57,6 +62,10 @@ export function ProductionRow({
   // not shift the balances people plan against.
   const activeMonths = useMemo(() => months.filter((m) => !locked.has(m)), [months, locked])
   const [prod, setProd] = useState<Record<string, number>>(productionByMonth)
+  // Months the user has just edited this session — treated as confirmed
+  // (manual) straight away, so a suggested cell stops looking like a draft the
+  // moment it's typed over, before the page reloads.
+  const [edited, setEdited] = useState<Set<string>>(new Set())
   const opening = openingStock
   const [saving, setSaving] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -76,6 +85,7 @@ export function ProductionRow({
     const units = raw.trim() === '' ? 0 : Math.max(0, Math.round(Number(raw)))
     if (!Number.isFinite(units)) return
     setProd((p) => ({ ...p, [month]: units }))
+    setEdited((s) => (s.has(month) ? s : new Set(s).add(month)))
     setError(null)
     setSaving(async () => {
       const res = await updateProductionCell(productId, month, units, market)
@@ -150,6 +160,8 @@ export function ProductionRow({
             month={r.month}
             forecast={r.forecast}
             production={prod[r.month] ?? 0}
+            source={edited.has(r.month) ? 'manual' : (sourceByMonth?.[r.month] ?? 'manual')}
+            suggested={suggestedByMonth?.[r.month] ?? null}
             transfers={transfersByMonth?.[r.month] ?? []}
             poCover={poCoverByMonth?.[r.month]}
             balance={r.balance}
@@ -216,13 +228,15 @@ function ClosedMonthCells({
 }
 
 function FragmentCells({
-  productId, productName, month, forecast, production, transfers, poCover, balance, state, shortAmount, negCls, balTxt, hasComment, onCommit,
+  productId, productName, month, forecast, production, source, suggested, transfers, poCover, balance, state, shortAmount, negCls, balTxt, hasComment, onCommit,
 }: {
   productId: string
   productName: string
   month: string
   forecast: number
   production: number
+  source: 'manual' | 'suggested'
+  suggested: number | null
   transfers: TransferDetail[]
   poCover?: PoCover
   balance: number
@@ -234,11 +248,18 @@ function FragmentCells({
   onCommit: (raw: string) => void
 }) {
   const po = poCoverState(production, poCover)
+  // A PO (green/amber/draft) always wins the cell colour. With no PO, a model
+  // suggestion shows as a dashed-violet draft; a confirmed number stays plain.
+  const isSuggested = po === 'none' && source === 'suggested'
   const inputCls =
     po === 'match' ? 'bg-emerald-50 border-emerald-500 text-emerald-900'
     : po === 'diff'  ? 'bg-amber-50 border-amber-500 text-amber-900'
     : po === 'draft' ? 'bg-gray-200 border-gray-400 text-gray-700'
+    : isSuggested    ? 'bg-violet-50 border-violet-400 border-dashed text-violet-800 italic'
     :                  'bg-white border-gray-300'
+  // Show the model's figure greyed beside a manual override, until the user
+  // settles on a number (i.e. only when it differs from what's in the cell).
+  const showGhost = !isSuggested && suggested != null && suggested !== production
   // PO status lives in the hover tooltip only — an inline note overflowed
   // into the balance column.
   const poSummary = (() => {
@@ -285,9 +306,22 @@ function FragmentCells({
             }
           }}
           placeholder="0"
-          title={`${poTitle}\n\nProduction for ${monthLabel(month)} — Enter to save and move down`}
+          title={`${isSuggested ? `✨ Model suggestion for ${monthLabel(month)} — not yet confirmed. Type over it to confirm, or raise a PO to lock it in.\n\n` : ''}${poTitle}\n\nProduction for ${monthLabel(month)} — Enter to save and move down`}
           className={`w-16 text-right text-[11px] border rounded px-1 py-0.5 ${inputCls} focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-200 focus:outline-none`}
         />
+        {isSuggested && (
+          <div className="text-[8.5px] leading-none text-violet-500 mt-0.5" title="Suggested by the model — not yet confirmed">✨ suggested</div>
+        )}
+        {showGhost && (
+          <button
+            type="button"
+            onClick={() => onCommit(String(suggested))}
+            title={`Model suggested ${suggested!.toLocaleString()} — click to use it`}
+            className="block ml-auto text-[8.5px] leading-none text-violet-400 hover:text-violet-700 hover:underline mt-0.5"
+          >
+            ✨ {suggested!.toLocaleString()}
+          </button>
+        )}
         {transfers.length > 0 && <div className="leading-none"><TransferChips items={transfers} /></div>}
       </td>
       <td className={`relative px-2 text-right tabular-nums ${negCls} ${balTxt}`} style={{ height: 36 }}>

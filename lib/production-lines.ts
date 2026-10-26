@@ -38,6 +38,12 @@ export interface ProductionLine {
   opening: number
   forecastByMonth: Record<string, number>
   productionByMonth: Record<string, number>
+  /** Provenance of each month's production number: 'suggested' = from the
+   *  auto-planner (shown as a draft), 'manual' = a person set it. */
+  sourceByMonth: Record<string, 'manual' | 'suggested'>
+  /** The model's last suggested number per month (kept even after an override,
+   *  so the schedule can show it greyed beside a manual number). */
+  suggestedByMonth: Record<string, number | null>
   /** NZ ↔ AU transfer legs landing on / leaving this line, per month. */
   transfersByMonth: Record<string, TransferDetail[]>
   /** True when the product is split into NZ + AU lines (show the market tag). */
@@ -75,9 +81,9 @@ export async function loadProductionLines(supabase: SB, months: string[]): Promi
     ),
     supabase
       .from('production_plans')
-      .select('product_id, year_month, units_planned, market')
+      .select('product_id, year_month, units_planned, market, source, suggested_units')
       .gte('year_month', firstMonth)
-      .lte('year_month', lastMonth) as unknown as Promise<{ data: Array<ProductionPlan & { market: string | null }> | null }>,
+      .lte('year_month', lastMonth) as unknown as Promise<{ data: Array<ProductionPlan & { market: string | null; source: string | null; suggested_units: number | null }> | null }>,
     loadStockLedger(),
   ])
 
@@ -85,8 +91,34 @@ export async function loadProductionLines(supabase: SB, months: string[]): Promi
   const demandIdx = indexDemand(demand)
   // Production is planned per market; legacy rows default to NZ.
   const prodRows  = production ?? []
-  const prodIdxNz = indexProduction(prodRows.filter((r) => (r.market ?? 'NZ') !== 'AU'))
-  const prodIdxAu = indexProduction(prodRows.filter((r) => r.market === 'AU'))
+  const prodRowsNz = prodRows.filter((r) => (r.market ?? 'NZ') !== 'AU')
+  const prodRowsAu = prodRows.filter((r) => r.market === 'AU')
+  const prodIdxNz = indexProduction(prodRowsNz)
+  const prodIdxAu = indexProduction(prodRowsAu)
+
+  // Provenance (source + the model's suggested number) indexed per market, so
+  // the schedule can style each cell and show the model's figure beside a
+  // manual override. Separate from the units index to avoid touching the
+  // shared indexProduction used by other views.
+  type Meta = { source: 'manual' | 'suggested'; suggested: number | null }
+  const indexMeta = (rows: Array<{ product_id: string; year_month: string; source?: string | null; suggested_units?: number | null }>) => {
+    const idx = new Map<string, Map<string, Meta>>()
+    for (const r of rows) {
+      if (!idx.has(r.product_id)) idx.set(r.product_id, new Map())
+      const key = typeof r.year_month === 'string' ? r.year_month.slice(0, 10) : r.year_month
+      idx.get(r.product_id)!.set(key, {
+        source: r.source === 'suggested' ? 'suggested' : 'manual',
+        suggested: r.suggested_units ?? null,
+      })
+    }
+    return idx
+  }
+  const metaIdxNz = indexMeta(prodRowsNz)
+  const metaIdxAu = indexMeta(prodRowsAu)
+  const sourceCell = (idx: Map<string, Map<string, Meta>>, pid: string, m: string): 'manual' | 'suggested' =>
+    idx.get(pid)?.get(m)?.source ?? 'manual'
+  const suggestedCell = (idx: Map<string, Map<string, Meta>>, pid: string, m: string): number | null =>
+    idx.get(pid)?.get(m)?.suggested ?? null
 
   // Opening = closing (EOM) of the last closed month from Stock Movements.
   const closing = closingStockAt(ledger.rows, ledger.actualThrough)
@@ -95,6 +127,11 @@ export async function loadProductionLines(supabase: SB, months: string[]): Promi
 
   const byMonth = (fn: (m: string) => number): Record<string, number> => {
     const out: Record<string, number> = {}
+    for (const m of months) out[m] = fn(m)
+    return out
+  }
+  const byMonthOf = <T,>(fn: (m: string) => T): Record<string, T> => {
+    const out: Record<string, T> = {}
     for (const m of months) out[m] = fn(m)
     return out
   }
@@ -118,6 +155,8 @@ export async function loadProductionLines(supabase: SB, months: string[]): Promi
       opening: openingFor(p.id, 'NZ'),
       forecastByMonth:  byMonth((m) => hasAu ? getCountryTotal(demandIdx, p.id, m, 'NZ') : getGrandTotal(demandIdx, p.id, m)),
       productionByMonth: byMonth((m) => getProductionCell(prodIdxNz, p.id, m)),
+      sourceByMonth: byMonthOf((m) => sourceCell(metaIdxNz, p.id, m)),
+      suggestedByMonth: byMonthOf((m) => suggestedCell(metaIdxNz, p.id, m)),
       transfersByMonth: transfersFor(p.id, nzMarkets),
       showTag: hasAu,
       markets: nzMarkets,
@@ -129,6 +168,8 @@ export async function loadProductionLines(supabase: SB, months: string[]): Promi
         forecastByMonth:  byMonth((m) => getCountryTotal(demandIdx, p.id, m, 'AUS')),
         // AU production is only what's been planned — no make-to-demand default.
         productionByMonth: byMonth((m) => getProductionCell(prodIdxAu, p.id, m)),
+        sourceByMonth: byMonthOf((m) => sourceCell(metaIdxAu, p.id, m)),
+        suggestedByMonth: byMonthOf((m) => suggestedCell(metaIdxAu, p.id, m)),
         transfersByMonth: transfersFor(p.id, ['AU']),
         showTag: true,
         markets: ['AU'],

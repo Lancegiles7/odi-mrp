@@ -21,6 +21,9 @@ export async function updateProductionCell(
   const { data: profile } = await supabase
     .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
 
+  // A person typed this number → it's now a confirmed (manual) cell. We don't
+  // touch suggested_units, so the model's figure stays available to show beside
+  // the override on the schedule.
   const { error } = await supabase
     .from('production_plans')
     .upsert(
@@ -29,8 +32,9 @@ export async function updateProductionCell(
         year_month:    yearMonth,
         market:        mkt,
         units_planned: Math.round(unitsPlanned),
+        source:        'manual',
         updated_by:    profile?.id ?? null,
-      },
+      } as never,
       { onConflict: 'product_id,year_month,market' },
     )
 
@@ -46,7 +50,14 @@ export async function updateProductionCell(
 // (December onward), so existing earlier months are never touched.
 // ============================================================
 export async function applySuggestedProduction(input: {
-  rows: Array<{ product_id: string; year_month: string; market: 'NZ' | 'AU'; units_planned: number }>
+  rows: Array<{
+    product_id: string
+    year_month: string
+    market: 'NZ' | 'AU'
+    units_planned: number
+    source?: 'manual' | 'suggested'
+    suggested_units?: number | null
+  }>
 }): Promise<{ ok: boolean; applied?: number; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -54,14 +65,20 @@ export async function applySuggestedProduction(input: {
   const { data: profile } = await supabase
     .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
 
+  // Each cell is tagged 'suggested' (model number, shown as a draft) unless the
+  // user overrode it in the planner, in which case it's 'manual'. We keep the
+  // model's figure in suggested_units either way, so the schedule can show it
+  // greyed beside an override.
   const rows = input.rows
     .filter((r) => /^\d{4}-\d{2}-01$/.test(r.year_month) && Number.isFinite(r.units_planned) && r.units_planned >= 0)
     .map((r) => ({
-      product_id:    r.product_id,
-      year_month:    r.year_month,
-      market:        r.market === 'AU' ? 'AU' : 'NZ',
-      units_planned: Math.round(r.units_planned),
-      updated_by:    profile?.id ?? null,
+      product_id:      r.product_id,
+      year_month:      r.year_month,
+      market:          r.market === 'AU' ? 'AU' : 'NZ',
+      units_planned:   Math.round(r.units_planned),
+      source:          r.source === 'manual' ? 'manual' : 'suggested',
+      suggested_units: r.suggested_units == null ? null : Math.round(r.suggested_units),
+      updated_by:      profile?.id ?? null,
     }))
   if (!rows.length) return { ok: false, error: 'Nothing to apply.' }
 
@@ -72,6 +89,78 @@ export async function applySuggestedProduction(input: {
 
   revalidatePath('/production')
   return { ok: true, applied: rows.length }
+}
+
+// ============================================================
+// Accept / clear model suggestions for a manufacturer section.
+//   accept — confirm the model's draft numbers (source → 'manual'); the
+//            numbers stay, they just stop showing as drafts.
+//   clear  — drop the model's draft rows entirely (back to no plan). Only
+//            touches 'suggested' cells, so manual numbers are never affected.
+// Both act on the exact (product_id, market) cells in that section, from
+// `fromMonth` on, so a dual product's other-market cells aren't caught.
+// ============================================================
+async function suggestionIds(
+  supabase: ReturnType<typeof createClient>,
+  pairs: Array<{ product_id: string; market: 'NZ' | 'AU' }>,
+  fromMonth: string,
+): Promise<string[]> {
+  const pids = Array.from(new Set(pairs.map((p) => p.product_id)))
+  if (!pids.length) return []
+  const { data } = await supabase
+    .from('production_plans')
+    .select('id, product_id, market, year_month')
+    .in('product_id', pids)
+    .eq('source', 'suggested')
+    .gte('year_month', fromMonth) as unknown as {
+      data: Array<{ id: string; product_id: string; market: string | null; year_month: string }> | null
+    }
+  const want = new Set(pairs.map((p) => `${p.product_id}:${p.market}`))
+  return (data ?? [])
+    .filter((r) => want.has(`${r.product_id}:${(r.market ?? 'NZ') === 'AU' ? 'AU' : 'NZ'}`))
+    .map((r) => r.id)
+}
+
+export async function acceptSuggestions(input: {
+  pairs: Array<{ product_id: string; market: 'NZ' | 'AU' }>
+  fromMonth: string
+}): Promise<{ ok: boolean; changed?: number; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not_authenticated' }
+
+  const ids = await suggestionIds(supabase, input.pairs, input.fromMonth)
+  if (!ids.length) return { ok: true, changed: 0 }
+
+  const { error } = await supabase
+    .from('production_plans')
+    .update({ source: 'manual' } as never)
+    .in('id', ids)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/production')
+  return { ok: true, changed: ids.length }
+}
+
+export async function clearSuggestions(input: {
+  pairs: Array<{ product_id: string; market: 'NZ' | 'AU' }>
+  fromMonth: string
+}): Promise<{ ok: boolean; changed?: number; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not_authenticated' }
+
+  const ids = await suggestionIds(supabase, input.pairs, input.fromMonth)
+  if (!ids.length) return { ok: true, changed: 0 }
+
+  const { error } = await supabase
+    .from('production_plans')
+    .delete()
+    .in('id', ids)
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/production')
+  return { ok: true, changed: ids.length }
 }
 
 /**
