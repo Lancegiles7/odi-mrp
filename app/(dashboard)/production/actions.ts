@@ -40,6 +40,40 @@ export async function updateProductionCell(
   return { ok: true }
 }
 
+// ============================================================
+// applySuggestedProduction — write the auto-planner's suggested numbers into the
+// production plan (bulk upsert). The dialog only sends the months it's suggesting
+// (December onward), so existing earlier months are never touched.
+// ============================================================
+export async function applySuggestedProduction(input: {
+  rows: Array<{ product_id: string; year_month: string; market: 'NZ' | 'AU'; units_planned: number }>
+}): Promise<{ ok: boolean; applied?: number; error?: string }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not_authenticated' }
+  const { data: profile } = await supabase
+    .from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+
+  const rows = input.rows
+    .filter((r) => /^\d{4}-\d{2}-01$/.test(r.year_month) && Number.isFinite(r.units_planned) && r.units_planned >= 0)
+    .map((r) => ({
+      product_id:    r.product_id,
+      year_month:    r.year_month,
+      market:        r.market === 'AU' ? 'AU' : 'NZ',
+      units_planned: Math.round(r.units_planned),
+      updated_by:    profile?.id ?? null,
+    }))
+  if (!rows.length) return { ok: false, error: 'Nothing to apply.' }
+
+  const { error } = await supabase
+    .from('production_plans')
+    .upsert(rows as never, { onConflict: 'product_id,year_month,market' })
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath('/production')
+  return { ok: true, applied: rows.length }
+}
+
 /**
  * Update the manual opening-stock override on a product, and append an
  * audit row to product_opening_stock_history capturing who changed it,

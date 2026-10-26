@@ -9,6 +9,7 @@ import { PlanningHistoryToggle } from '@/components/shared/planning-history-togg
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
 import { CreatePoButton, type CreatePoLine } from '@/components/production/create-po-button'
+import { SuggestProductionButton, type SuggestLine } from '@/components/production/suggest-production-button'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
 import { MonthlyShortfallStrip } from '@/components/inventory/monthly-shortfall-strip'
 import { getCellsWithComments } from '@/app/(dashboard)/_actions/cell-comments'
@@ -66,6 +67,17 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   const lastPriceByProduct = new Map<string, number>()
   for (const l of priceLines ?? []) if (l.product_id && !lastPriceByProduct.has(l.product_id)) lastPriceByProduct.set(l.product_id, Number(l.unit_cost))
   const makerMonths = activeMonths.map((m) => ({ key: m, label: monthLabel(m) }))
+  // Auto-planner suggestions start from December (keep November as planned).
+  const PLAN_FROM_MONTH = '2026-12-01'
+  const suggestLinesFor = (items: ProdLine[]): SuggestLine[] => items.map((ln) => {
+    const firmPo: Record<string, number> = {}
+    const transfers: Record<string, number> = {}
+    for (const m of months) { firmPo[m] = ln.poCoverByMonth[m]?.firm ?? 0; transfers[m] = netOf(ln.transfersByMonth[m]) }
+    return {
+      product_id: ln.product.id, name: ln.product.name, sku: ln.product.sku_code, market: ln.market,
+      opening: ln.opening, forecast: ln.forecastByMonth, existingPlan: ln.productionByMonth, firmPo, transfers,
+    }
+  })
   const poLinesFor = (items: ProdLine[]): CreatePoLine[] => items.map((ln) => {
     const poByMonth: Record<string, boolean> = {}
     for (const m of activeMonths) { const c = ln.poCoverByMonth[m]; poByMonth[m] = !!c && ((c.firm ?? 0) > 0 || (c.draft ?? 0) > 0) }
@@ -195,6 +207,9 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                   {short > 0
                     ? <span className="text-xs text-red-600 font-medium">{short} shortfall{short === 1 ? '' : 's'}</span>
                     : <span className="text-xs text-gray-500">On track</span>}
+                  {key !== UNASSIGNED && (
+                    <SuggestProductionButton maker={label} lines={suggestLinesFor(items)} months={makerMonths} fromMonth={PLAN_FROM_MONTH} />
+                  )}
                   {key !== UNASSIGNED && (
                     <CreatePoButton maker={label} lines={poLinesFor(items)} months={makerMonths}
                       suppliers={suppliers} defaultSupplierId={bestSupplierForMaker(label, suppliers)} />
