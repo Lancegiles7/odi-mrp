@@ -14,14 +14,16 @@ const WEEKS = 8
 const GROUP_ORDER = PRODUCT_GROUPS.map((g) => g.value as string)
 
 const daily = (r: StockoutRow) => (r.soldMtd > 0 ? r.soldMtd / r.daysElapsed : 0)
-function sellout(r: StockoutRow, asOf: string): { txt: string; days: number } {
+// usePos=false walks the sellout on current stock alone (ignores open POs), so
+// you see the true cliff before crediting anything that's only on order.
+function sellout(r: StockoutRow, asOf: string, usePos: boolean): { txt: string; days: number } {
   const dr = daily(r)
   if (dr <= 0) return { txt: '—', days: 9999 }
   let stock = r.onHand
   const start = new Date(asOf + 'T00:00:00')
   for (let d = 0; d < 160; d++) {
     const iso = new Date(start.getTime() + d * 86_400_000).toISOString().slice(0, 10)
-    for (const i of r.incoming) if (i.date === iso) stock += i.units
+    if (usePos) for (const i of r.incoming) if (i.date === iso) stock += i.units
     stock -= dr
     if (stock < 0) return { txt: fmtD(iso), days: d }
   }
@@ -40,6 +42,9 @@ type MarketSel = Market | 'both'
 export function StockoutWatch({ data }: { data: StockoutData }) {
   const [view, setView] = useState<'ov' | 'wk'>('ov')
   const [market, setMarket] = useState<MarketSel>('both')
+  // Default to the bare position (POs off) — flip on to credit open POs.
+  const [pos, setPos] = useState<'without' | 'with'>('without')
+  const usePos = pos === 'with'
   const asOf = data.asOf ?? new Date().toISOString().slice(0, 10)
 
   const weekStarts = useMemo(() => {
@@ -57,7 +62,7 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
 
   const rows = market === 'both' ? data.rows : data.rows.filter((r) => r.market === market)
   const showMkt = market === 'both'
-  const atRisk = rows.filter((r) => toneOf(sellout(r, asOf).days) === 'red').length
+  const atRisk = rows.filter((r) => toneOf(sellout(r, asOf, usePos).days) === 'red').length
   const totalSold = rows.reduce((s, r) => s + r.soldMtd, 0)
   const monthLbl = data.periodStart ? fmtD(data.periodStart).split(' ')[1] : ''
 
@@ -75,13 +80,14 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
             <h2 className="text-sm font-semibold text-gray-900">Stockout Watch{monthLbl ? ` · ${monthLbl}` : ''}</h2>
             <Toggle value={market} onChange={(v) => setMarket(v as MarketSel)} options={[['both', 'NZ + AU'], ['NZ', 'NZ'], ['AU', 'AU']]} />
             <Toggle value={view} onChange={(v) => setView(v as 'ov' | 'wk')} options={[['ov', 'Overview'], ['wk', 'Weekly cover']]} />
+            <Toggle value={pos} onChange={(v) => setPos(v as 'without' | 'with')} options={[['without', 'Stock on hand only'], ['with', 'Incl. incoming POs']]} />
           </div>
           <span className="text-xs text-gray-400">run-rate = MTD ÷ {data.rows[0]?.daysElapsed ?? '—'} days</span>
         </div>
 
         {view === 'ov'
-          ? <Overview rows={rows} asOf={asOf} showMkt={showMkt} />
-          : <Weekly rows={rows} weekStarts={weekStarts} showMkt={showMkt} />}
+          ? <Overview rows={rows} asOf={asOf} showMkt={showMkt} usePos={usePos} />
+          : <Weekly rows={rows} weekStarts={weekStarts} showMkt={showMkt} usePos={usePos} />}
       </div>
     </div>
   )
@@ -109,7 +115,7 @@ function Stat({ k, v, tone = 'text-gray-900' }: { k: string; v: string; tone?: s
   )
 }
 
-function Overview({ rows, asOf, showMkt }: { rows: StockoutRow[]; asOf: string; showMkt: boolean }) {
+function Overview({ rows, asOf, showMkt, usePos }: { rows: StockoutRow[]; asOf: string; showMkt: boolean; usePos: boolean }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
@@ -128,7 +134,7 @@ function Overview({ rows, asOf, showMkt }: { rows: StockoutRow[]; asOf: string; 
         </thead>
         <tbody>
           {rows.map((r) => {
-            const so = sellout(r, asOf), t = toneOf(so.days), dr = daily(r)
+            const so = sellout(r, asOf, usePos), t = toneOf(so.days), dr = daily(r)
             const wks = dr > 0 ? r.onHand / (dr * 7) : 999
             return (
               <tr key={`${r.market}:${r.product_id}`} className={`border-t border-gray-100 ${t === 'red' ? 'bg-red-50/40' : ''}`}>
@@ -139,9 +145,12 @@ function Overview({ rows, asOf, showMkt }: { rows: StockoutRow[]; asOf: string; 
                 <td className="px-3 py-2 text-right tabular-nums">{dr.toFixed(0)}</td>
                 <td className="px-3 py-2">{wks < 0.2 ? 'now' : `~${wks.toFixed(1)} wks`}</td>
                 <td className="px-3 py-2">{so.txt}</td>
-                <td className="px-3 py-2 text-[11px]">
+                <td className={`px-3 py-2 text-[11px] ${!usePos ? 'text-gray-400' : ''}`}>
                   {r.incoming.length
-                    ? r.incoming.map((i, k) => <div key={k}>+{nf(i.units)} · {i.date ? fmtD(i.date) : '—'} ({i.po})</div>)
+                    ? <>
+                        {r.incoming.map((i, k) => <div key={k} className={!usePos ? 'line-through decoration-gray-300' : ''}>+{nf(i.units)} · {i.date ? fmtD(i.date) : '—'} ({i.po})</div>)}
+                        {!usePos && <div className="text-[9px] uppercase tracking-wide text-gray-400">not counted</div>}
+                      </>
                     : <span className="text-gray-300">— nothing on order</span>}
                 </td>
                 <td className="px-3 py-2"><span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${PILL[t]}`}>{t === 'red' ? 'AT RISK' : t === 'amber' ? 'WATCH' : 'OK'}</span></td>
@@ -154,12 +163,12 @@ function Overview({ rows, asOf, showMkt }: { rows: StockoutRow[]; asOf: string; 
   )
 }
 
-function weeklyStock(r: StockoutRow, weekStarts: Date[]): number[] {
+function weeklyStock(r: StockoutRow, weekStarts: Date[], usePos: boolean): number[] {
   const wd = daily(r) * 7
   let stock = r.onHand
   return weekStarts.map((s0) => {
     const s1 = new Date(s0.getTime() + 7 * 86_400_000)
-    for (const inc of r.incoming) {
+    if (usePos) for (const inc of r.incoming) {
       if (!inc.date) continue
       const id = new Date(inc.date + 'T00:00:00')
       if (id >= s0 && id < s1) stock += inc.units
@@ -169,7 +178,7 @@ function weeklyStock(r: StockoutRow, weekStarts: Date[]): number[] {
   })
 }
 
-function Weekly({ rows, weekStarts, showMkt }: { rows: StockoutRow[]; weekStarts: Date[]; showMkt: boolean }) {
+function Weekly({ rows, weekStarts, showMkt, usePos }: { rows: StockoutRow[]; weekStarts: Date[]; showMkt: boolean; usePos: boolean }) {
   // Section per (market, product group), ordered like the Summary grid.
   const markets: Market[] = showMkt ? ['NZ', 'AU'] : [(rows[0]?.market ?? 'NZ')]
   const sections: { key: string; label: string; rows: StockoutRow[] }[] = []
@@ -208,7 +217,7 @@ function Weekly({ rows, weekStarts, showMkt }: { rows: StockoutRow[]; weekStarts
           {sections.map((sec) => {
             const subOn = sec.rows.reduce((s, r) => s + r.onHand, 0)
             const subSold = sec.rows.reduce((s, r) => s + r.soldMtd, 0)
-            const subWeeks = weekStarts.map((_, i) => sec.rows.reduce((s, r) => s + Math.max(0, weeklyStock(r, weekStarts)[i]), 0))
+            const subWeeks = weekStarts.map((_, i) => sec.rows.reduce((s, r) => s + Math.max(0, weeklyStock(r, weekStarts, usePos)[i]), 0))
             return (
               <Fragment key={sec.key}>
                 <tr className="bg-gray-100/80">
@@ -218,7 +227,7 @@ function Weekly({ rows, weekStarts, showMkt }: { rows: StockoutRow[]; weekStarts
                 </tr>
                 {sec.rows.map((r) => {
                   const wd = daily(r) * 7
-                  const wkStock = weeklyStock(r, weekStarts)
+                  const wkStock = weeklyStock(r, weekStarts, usePos)
                   const wks = wd > 0 ? r.onHand / wd : 999
                   return (
                     <tr key={`${r.market}:${r.product_id}`} className="border-t border-gray-100">
