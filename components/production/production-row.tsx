@@ -22,6 +22,10 @@ interface Props {
   months: string[]
   forecastByMonth: Record<string, number>
   productionByMonth: Record<string, number>
+  /** PO-backed supply floor per month (receipts booked OR still-to-receipt open
+   *  PO). The balance counts max(production, this) so an incoming PO clears a
+   *  shortfall; the editable cell still shows the production plan. */
+  poSupplyByMonth?: Record<string, number>
   /** Provenance per month: 'suggested' shows as a dashed-violet draft. */
   sourceByMonth?: Record<string, 'manual' | 'suggested'>
   /** Model's suggested number per month — shown greyed beside a manual override. */
@@ -52,7 +56,7 @@ interface Props {
  */
 export function ProductionRow({
   productId, skuCode, productName, manufacturer, isActive,
-  openingStock, openingSource, months, forecastByMonth, productionByMonth, transfersByMonth,
+  openingStock, openingSource, months, forecastByMonth, productionByMonth, poSupplyByMonth, transfersByMonth,
   sourceByMonth, suggestedByMonth,
   poCoverByMonth, commentedCells, showManufacturerChip,
   market = 'NZ', marketTag, lockedMonths,
@@ -75,10 +79,13 @@ export function ProductionRow({
       activeMonths,
       opening,
       (m) => forecastByMonth[m] ?? 0,
-      (m) => prod[m] ?? 0,
+      // Supply counted = the larger of the production plan and the PO-backed
+      // incoming for the month (receipts booked or still-to-receipt open PO),
+      // mirroring Stock Movements. Editing the plan higher still wins.
+      (m) => Math.max(prod[m] ?? 0, poSupplyByMonth?.[m] ?? 0),
       (m) => (transfersByMonth?.[m] ?? []).reduce((s, t) => s + t.units, 0),
     ),
-    [activeMonths, opening, forecastByMonth, prod, transfersByMonth],
+    [activeMonths, opening, forecastByMonth, prod, poSupplyByMonth, transfersByMonth],
   )
 
   function commit(month: string, raw: string) {

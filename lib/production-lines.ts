@@ -38,6 +38,12 @@ export interface ProductionLine {
   opening: number
   forecastByMonth: Record<string, number>
   productionByMonth: Record<string, number>
+  /** PO-backed supply floor per month: real receipts logged this month OR the
+   *  still-to-receipt open-PO total, whichever is larger. The running balance
+   *  counts max(planned production, this floor) as supply — so a PO covering a
+   *  month removes the shortfall even when the production plan is lower. Mirrors
+   *  Stock Movements' `supply = max(produced, expected)`. */
+  poSupplyByMonth: Record<string, number>
   /** Provenance of each month's production number: 'suggested' = from the
    *  auto-planner (shown as a draft), 'manual' = a person set it. */
   sourceByMonth: Record<string, 'manual' | 'suggested'>
@@ -145,6 +151,22 @@ export async function loadProductionLines(supabase: SB, months: string[]): Promi
     return out
   }
 
+  // PO-backed supply per product / market / month, straight from the ledger:
+  // real receipts booked on the month OR the still-to-receipt open-PO total,
+  // whichever is larger (never the sum — a PO that backs a plan isn't doubled).
+  // The balance then counts max(plan, this) so an incoming PO clears a shortfall
+  // exactly as it already does on Stock Movements.
+  const ledgerRow = new Map<string, StockLedger['rows'][number]>()
+  for (const r of ledger.rows) ledgerRow.set(`${r.product_id}:${r.market}`, r)
+  const poBacked = (pid: string, market: 'NZ' | 'AU', m: string): number => {
+    const cell = ledgerRow.get(`${pid}:${market}`)?.forecast[m]
+    if (!cell) return 0
+    const expected = cell.stillToReceipt.reduce((s, o) => s + o.remaining, 0)
+    return Math.max(cell.received, expected)
+  }
+  const poSupplyFor = (pid: string, markets: Array<'NZ' | 'AU'>): Record<string, number> =>
+    byMonth((m) => markets.reduce((s, mk) => s + poBacked(pid, mk, m), 0))
+
   const lines: ProductionLine[] = []
   for (const p of allProducts) {
     const dual = !!(p.manufacturer_au && p.manufacturer_au.trim())
@@ -155,6 +177,7 @@ export async function loadProductionLines(supabase: SB, months: string[]): Promi
       opening: openingFor(p.id, 'NZ'),
       forecastByMonth:  byMonth((m) => hasAu ? getCountryTotal(demandIdx, p.id, m, 'NZ') : getGrandTotal(demandIdx, p.id, m)),
       productionByMonth: byMonth((m) => getProductionCell(prodIdxNz, p.id, m)),
+      poSupplyByMonth: poSupplyFor(p.id, nzMarkets),
       sourceByMonth: byMonthOf((m) => sourceCell(metaIdxNz, p.id, m)),
       suggestedByMonth: byMonthOf((m) => suggestedCell(metaIdxNz, p.id, m)),
       transfersByMonth: transfersFor(p.id, nzMarkets),
@@ -168,6 +191,7 @@ export async function loadProductionLines(supabase: SB, months: string[]): Promi
         forecastByMonth:  byMonth((m) => getCountryTotal(demandIdx, p.id, m, 'AUS')),
         // AU production is only what's been planned — no make-to-demand default.
         productionByMonth: byMonth((m) => getProductionCell(prodIdxAu, p.id, m)),
+        poSupplyByMonth: poSupplyFor(p.id, ['AU']),
         sourceByMonth: byMonthOf((m) => sourceCell(metaIdxAu, p.id, m)),
         suggestedByMonth: byMonthOf((m) => suggestedCell(metaIdxAu, p.id, m)),
         transfersByMonth: transfersFor(p.id, ['AU']),
@@ -187,7 +211,7 @@ export function productionShortfallCounts(lines: ProductionLine[], months: strin
   const totals = new Map<string, number>(months.map((m) => [m, 0]))
   const shorts = new Map<string, number>(months.map((m) => [m, 0]))
   for (const ln of lines) {
-    const rolling = calcRollingBalance(months, ln.opening, (m) => ln.forecastByMonth[m] ?? 0, (m) => ln.productionByMonth[m] ?? 0, (m) => netTransfers(ln.transfersByMonth[m]))
+    const rolling = calcRollingBalance(months, ln.opening, (m) => ln.forecastByMonth[m] ?? 0, (m) => Math.max(ln.productionByMonth[m] ?? 0, ln.poSupplyByMonth[m] ?? 0), (m) => netTransfers(ln.transfersByMonth[m]))
     for (const r of rolling) {
       if (r.forecast > 0)    totals.set(r.month, (totals.get(r.month) ?? 0) + 1)
       if (r.state === 'red') shorts.set(r.month, (shorts.get(r.month) ?? 0) + 1)

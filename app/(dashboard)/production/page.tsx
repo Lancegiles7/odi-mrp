@@ -126,7 +126,8 @@ export default async function ProductionPage({ searchParams }: PageProps) {
     for (const ln of items) {
       let bal = ln.opening
       for (const m of activeMonths) {
-        bal = bal + (ln.productionByMonth[m] ?? 0) + netOf(ln.transfersByMonth[m]) - (ln.forecastByMonth[m] ?? 0)
+        const supply = Math.max(ln.productionByMonth[m] ?? 0, ln.poSupplyByMonth[m] ?? 0)
+        bal = bal + supply + netOf(ln.transfersByMonth[m]) - (ln.forecastByMonth[m] ?? 0)
         if (bal < 0) n++
       }
     }
@@ -289,6 +290,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                           lockedMonths={planning.lockedMonths}
                           forecastByMonth={ln.forecastByMonth}
                           productionByMonth={ln.productionByMonth}
+                          poSupplyByMonth={ln.poSupplyByMonth}
                           sourceByMonth={ln.sourceByMonth}
                           suggestedByMonth={ln.suggestedByMonth}
                           transfersByMonth={ln.transfersByMonth}
@@ -401,6 +403,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                     lockedMonths={planning.lockedMonths}
                     forecastByMonth={ln.forecastByMonth}
                     productionByMonth={ln.productionByMonth}
+                    poSupplyByMonth={ln.poSupplyByMonth}
                     sourceByMonth={ln.sourceByMonth}
                     suggestedByMonth={ln.suggestedByMonth}
                     transfersByMonth={ln.transfersByMonth}

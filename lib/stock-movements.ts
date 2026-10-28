@@ -58,6 +58,7 @@ export interface ActualCell {
 export interface ForecastCell {
   produced: number     // production plan
   supply: number       // counted supply = max(production plan, still-to-receipt PO)
+  received: number      // real receipts booked this (open) month — PO-backed supply
   demand: number       // demand forecast
   eom: number          // supply = max(planned production, still-to-receipt PO)
   transfer: number     // net NZ ↔ AU transfer (+ in / − out)
@@ -142,6 +143,7 @@ function buildRow(
   const forecast: Record<string, ForecastCell> = {}
   for (const m of forecastMonths) {
     const produced = at(maps.produced, p.id, m)
+    const received = at(maps.inbound, p.id, m)   // real receipts logged on this open month
     const demand   = at(maps.demand, p.id, m)
     const open = openByMonth?.get(m) ?? []
     const stillToReceipt = open.filter((o) => !o.partial)
@@ -176,7 +178,7 @@ function buildRow(
     const noPo = planned > 0 && open.length === 0 && poReceipts.length === 0
     if (produced || demand || open.length || transfers.length) activity = true
     if (!visible(m)) { carriedOpening = eom; continue }   // pre-launch build → opening
-    forecast[m] = { produced, supply, demand, eom, transfer, transfers, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo, fulfilments }
+    forecast[m] = { produced, supply, received, demand, eom, transfer, transfers, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo, fulfilments }
   }
 
   return {
