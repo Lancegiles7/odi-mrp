@@ -9,6 +9,8 @@ import {
 import { indexDemand, monthLabel } from '@/lib/demand'
 import { getPlanningAnchor, getPlanningWindow, fyLabel } from '@/lib/settings'
 import { DemandProductTable, type DemandProductData, type CountryFilter } from '@/components/demand/demand-product-table'
+import { DemandUploadPanel } from '@/components/demand/upload-history'
+import { listDemandUploads } from '@/lib/demand-uploads'
 import { CompleteMonthButton } from '@/components/demand/complete-month-button'
 import { PlanningHistoryToggle } from '@/components/shared/planning-history-toggle'
 import type { DemandChannel, DemandForecast, ProductGroup } from '@/lib/types/database.types'
@@ -62,6 +64,7 @@ export default async function DemandPage({ searchParams }: PageProps) {
 
   const allProducts = products ?? []
   const idx = indexDemand(demandRows)
+  const uploads = await listDemandUploads(20)
 
   // Build per-product data block for the client component
   function dataFor(productId: string): DemandProductData {
@@ -180,6 +183,9 @@ export default async function DemandPage({ searchParams }: PageProps) {
           </Link>
         </div>
       </div>
+
+      {/* Forecast upload tracker — last updated stamp + history + what changed */}
+      <DemandUploadPanel uploads={uploads} />
 
       {/* Page-level country split tiles */}
       <div className="grid grid-cols-4 gap-3">

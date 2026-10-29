@@ -51,3 +51,23 @@ export async function updateDemandCell(
   revalidatePath('/production')
   return { ok: true }
 }
+
+/** Load the change set for one forecast upload (for the "what changed" view). */
+export async function fetchUploadChanges(uploadId: string) {
+  const { getDemandUploadChanges } = await import('@/lib/demand-uploads')
+  return getDemandUploadChanges(uploadId)
+}
+
+/** Save / clear the free-text note on a forecast upload. */
+export async function saveUploadNote(uploadId: string, note: string): Promise<{ ok: boolean }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false }
+  const trimmed = note.trim()
+  const { error } = await (supabase.from('demand_upload_log') as ReturnType<typeof supabase.from>)
+    .update({ note: trimmed || null })
+    .eq('id', uploadId)
+  if (error) return { ok: false }
+  revalidatePath('/demand')
+  return { ok: true }
+}

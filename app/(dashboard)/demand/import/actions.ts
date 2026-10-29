@@ -25,6 +25,9 @@ const PRODUCT_GROUP_MAP: Record<string, ProductGroup | null> = {
 
 export interface DemandImportPayload {
   source: string                         // e.g. 'import:2026-04-24'
+  file_name?:    string                  // original upload file name, for the audit trail
+  fiscal_years?: string[]                // FYs the user ticked, e.g. ['FY27','FY28']
+  note?:         string                  // optional free-text note ("from Model v5")
   rows: Array<{
     product_name: string
     sheet_group:  string                 // "Sachets", "Tubs", …
@@ -176,6 +179,10 @@ export async function commitDemandImport(payload: DemandImportPayload): Promise<
 
   const upserts = Array.from(byKey.values())
 
+  // Pre-import value of every non-edited cell the import touches, captured
+  // during the cleanup scan below, so the upload audit trail can record old → new.
+  const beforeUnits = new Map<string, number>()
+
   if (duplicateCount > 0) {
     result.errors.push({
       product: '(dedupe)',
@@ -207,18 +214,22 @@ export async function commitDemandImport(payload: DemandImportPayload): Promise<
     const idsToDelete: string[] = []
     for (let i = 0; i < matchedProductIds.length; i += PROD_CHUNK) {
       const pidSlice = matchedProductIds.slice(i, i + PROD_CHUNK)
-      const stale = await fetchAllRows<{ id: string; product_id: string; year_month: string; channel: string }>((from, to) =>
+      const stale = await fetchAllRows<{ id: string; product_id: string; year_month: string; channel: string; units: number }>((from, to) =>
         supabase.from('demand_forecasts')
-          .select('id, product_id, year_month, channel')
+          .select('id, product_id, year_month, channel, units')
           .in('product_id', pidSlice)
           .gte('year_month', windowStart).lte('year_month', windowEnd)
           .in('channel', importChannels)
           .eq('is_edited', false)
           .order('product_id').order('year_month').order('channel')
-          .range(from, to) as unknown as PromiseLike<{ data: Array<{ id: string; product_id: string; year_month: string; channel: string }> | null; error: { message: string } | null }>,
+          .range(from, to) as unknown as PromiseLike<{ data: Array<{ id: string; product_id: string; year_month: string; channel: string; units: number }> | null; error: { message: string } | null }>,
       )
       for (const r of stale) {
         const k = `${r.product_id}|${r.year_month.slice(0, 10)}|${r.channel}`
+        // Snapshot the pre-import value of every non-edited cell in scope
+        // (both those about to be overwritten and those about to be cleared)
+        // so we can log old → new once the upsert is done.
+        beforeUnits.set(k, r.units)
         if (!writtenKeys.has(k)) idsToDelete.push(r.id)
       }
     }
@@ -249,6 +260,50 @@ export async function commitDemandImport(payload: DemandImportPayload): Promise<
         result.cells_inserted += slice.length
       }
     }
+  }
+
+  // ── Upload audit trail ────────────────────────────────────────
+  // Log this run (when / who / file / years / note) plus the exact cells that
+  // moved, so the Demand page can stamp "last updated" and show what changed
+  // vs the previous upload. Must never break an import — any error is swallowed.
+  try {
+    type ChangeRow = { product_id: string; channel: string; year_month: string; old_units: number | null; new_units: number }
+    const changeRows: ChangeRow[] = []
+    // Overwrites: every written cell whose value differs from before.
+    for (const [k, w] of Array.from(byKey.entries())) {
+      const before = beforeUnits.has(k) ? beforeUnits.get(k)! : null
+      if (before === w.units) continue
+      changeRows.push({ product_id: w.product_id, channel: w.channel, year_month: w.year_month, old_units: before, new_units: w.units })
+    }
+    // Clears: non-edited cells that existed before but weren't written this run.
+    for (const [k, before] of Array.from(beforeUnits.entries())) {
+      if (byKey.has(k) || before === 0) continue
+      const [product_id, year_month, channel] = k.split('|')
+      changeRows.push({ product_id, channel, year_month, old_units: before, new_units: 0 })
+    }
+
+    const { data: logRow } = await (supabase.from('demand_upload_log') as ReturnType<typeof supabase.from>)
+      .insert({
+        uploaded_by:   updatedBy,
+        file_name:     payload.file_name ?? null,
+        fiscal_years:  payload.fiscal_years ?? [],
+        cells_changed: changeRows.length,
+        cells_written: result.cells_inserted,
+        cells_skipped: result.cells_skipped_edited,
+        note:          payload.note?.trim() || null,
+      })
+      .select('id')
+      .single() as unknown as { data: { id: string } | null }
+
+    if (logRow && changeRows.length > 0) {
+      const CHANGE_CHUNK = 500
+      for (let i = 0; i < changeRows.length; i += CHANGE_CHUNK) {
+        await (supabase.from('demand_upload_changes') as ReturnType<typeof supabase.from>)
+          .insert(changeRows.slice(i, i + CHANGE_CHUNK).map((c) => ({ ...c, upload_id: logRow.id })))
+      }
+    }
+  } catch {
+    /* audit logging is best-effort; never fail the import over it */
   }
 
   revalidatePath('/demand')

@@ -94,6 +94,7 @@ export default function DemandImportPage() {
   const [rows, setRows] = useState<ParsedRow[]>([])
   const [parseError, setParseError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+  const [note, setNote] = useState('')
   const [result, setResult] = useState<DemandImportResult | null>(null)
   const [fileName, setFileName] = useState<string>('')
   const [selectedFys, setSelectedFys] = useState<Set<string>>(new Set())
@@ -203,7 +204,13 @@ export default function DemandImportPage() {
       const d = String(today.getDate()).padStart(2, '0')
       const source = `import:${y}-${m}-${d}`
 
-      const payload: DemandImportPayload = { source, rows: selectedRows }
+      const payload: DemandImportPayload = {
+        source,
+        file_name: fileName || undefined,
+        fiscal_years: Array.from(selectedFys).sort(),
+        note: note.trim() || undefined,
+        rows: selectedRows,
+      }
       const res = await commitDemandImport(payload)
       setResult(res)
       setStage('result')
@@ -219,6 +226,7 @@ export default function DemandImportPage() {
     setResult(null)
     setFileName('')
     setSelectedFys(new Set())
+    setNote('')
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -359,6 +367,20 @@ export default function DemandImportPage() {
 
           <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
             <span>Re-import behaviour: cells you&apos;ve manually edited (amber on the demand page) are skipped. Pipefill is never touched by import.</span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Note <span className="text-gray-400 font-normal">(optional — e.g. model version this came from)</span>
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="from Model v5"
+              maxLength={200}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
+            />
           </div>
 
           <div className="flex justify-end gap-2">
