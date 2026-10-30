@@ -136,3 +136,15 @@ export async function setTransferShipment(transferId: string, shipmentId: string
   revalidateAll()
   return { ok: true }
 }
+
+/** Open shipments formatted for the "Goes on shipment" picker (fetched fresh when a
+ *  dialog opens, so a shipment created after the page loaded still shows up). */
+export async function openShipmentOptions(): Promise<Array<{ id: string; label: string }>> {
+  const { listOpenShipments } = await import('@/lib/shipments')
+  const ships = await listOpenShipments()
+  return ships.map((s) => {
+    const route = s.direction === 'AU_TO_NZ' ? 'AU→NZ' : 'NZ→AU'
+    const arr = s.arrive_date ? new Date(s.arrive_date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : 'no date'
+    return { id: s.id, label: `${s.shipment_number} · ${route} · arrive ${arr}` }
+  })
+}

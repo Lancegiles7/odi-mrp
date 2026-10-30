@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createTransferFromProduction } from '@/app/(dashboard)/purchase-orders/actions'
+import { openShipmentOptions } from '@/app/(dashboard)/shipments/actions'
 
 export interface CreateTransferLine {
   product_id: string
@@ -36,6 +37,7 @@ export function CreateTransferButton({ maker, lines, months, sites, shipments }:
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<{ po_number: string; id: string } | null>(null)
   const [shipmentId, setShipmentId] = useState('')
+  const [shipmentOpts, setShipmentOpts] = useState(shipments)
 
   const monthsWithPlan = useMemo(
     () => months.filter((m) => lines.some((l) => (l.prodByMonth[m.key] ?? 0) > 0)),
@@ -106,7 +108,7 @@ export function CreateTransferButton({ maker, lines, months, sites, shipments }:
 
   return (
     <>
-      <button onClick={(e) => { e.preventDefault(); setOpen(true); setDone(null); setError(null); setShipmentId('') }}
+      <button onClick={(e) => { e.preventDefault(); setOpen(true); setDone(null); setError(null); setShipmentId(''); openShipmentOptions().then(setShipmentOpts).catch(() => {}) }}
         className="text-xs font-semibold px-3 py-1.5 rounded-md bg-emerald-700 text-white hover:bg-emerald-800">
         ⇄ Create transfer
       </button>
@@ -179,7 +181,7 @@ export function CreateTransferButton({ maker, lines, months, sites, shipments }:
                     <label className="text-[11px] font-medium text-gray-600">Goes on shipment</label>
                     <select value={shipmentId} onChange={(e) => setShipmentId(e.target.value)} className="text-xs border border-gray-300 rounded px-2 py-1 max-w-[320px]">
                       <option value="">— none (standalone transfer) —</option>
-                      {shipments.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      {shipmentOpts.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                     </select>
                     {shipmentId && <span className="text-[10px] text-gray-400">takes the shipment&apos;s depart / arrive dates</span>}
                   </div>
