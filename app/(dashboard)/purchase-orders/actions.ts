@@ -200,6 +200,50 @@ export async function createPosFromProductionPlan(input: {
 }
 
 // ============================================================
+// createTransferFromProduction — one draft transfer (po_type 'transfer') from
+// the production screen. From/To sites and quantities come straight from the
+// dialog (nothing pre-filled); direction defaults to "No" (logistics only).
+// A normal draft the user then finishes on the transfer screen.
+// ============================================================
+export async function createTransferFromProduction(input: {
+  from_site_id: string
+  to_site_id: string
+  market: 'NZ' | 'AU'
+  stock_move: 'NZ_TO_AU' | 'AU_TO_NZ' | null
+  lines: Array<{ product_id: string; quantity: number }>
+}): Promise<{ ok: boolean; created?: { po_number: string; id: string }; error?: string }> {
+  if (!input.from_site_id || !input.to_site_id) return { ok: false, error: 'Pick both a From and a To site.' }
+  if (input.from_site_id === input.to_site_id)  return { ok: false, error: 'From and To sites must be different.' }
+  const lines = input.lines.filter((l) => l.product_id && Number(l.quantity) > 0)
+  if (!lines.length) return { ok: false, error: 'Enter at least one quantity to transfer.' }
+
+  const po_number = await generatePoNumber('transfer')
+  const res = await createPurchaseOrder({
+    po_number,
+    supplier_id:             input.from_site_id,
+    po_type:                 'transfer',
+    destination_supplier_id: input.to_site_id,
+    stock_move:              input.stock_move,
+    currency:                input.market === 'AU' ? 'AUD' : 'NZD',
+    market:                  input.market,
+    order_date:              new Date().toISOString().slice(0, 10),
+    expected_delivery_date:  null,
+    delivery_address_id:     null,
+    delivery_notes:          null,
+    notes:                   'Created from the production plan',
+    external_notes:          null,
+    lines: lines.map((l) => ({
+      line_type: 'product', ingredient_id: null, product_id: l.product_id, packaging_id: null,
+      description: null, quantity_ordered: Number(l.quantity),
+      unit_cost: null, unit_of_measure: 'each', notes: null,
+    })),
+  })
+  if (!res.ok || !res.id) return { ok: false, error: res.error ?? 'Failed to create the transfer' }
+  revalidatePath('/production')
+  return { ok: true, created: { po_number, id: res.id } }
+}
+
+// ============================================================
 // Update PO header + replace lines (only allowed while draft)
 // ============================================================
 // ============================================================

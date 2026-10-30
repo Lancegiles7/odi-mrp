@@ -9,6 +9,7 @@ import { PlanningHistoryToggle } from '@/components/shared/planning-history-togg
 import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
 import { CreatePoButton, type CreatePoLine } from '@/components/production/create-po-button'
+import { CreateTransferButton, type CreateTransferLine } from '@/components/production/create-transfer-button'
 import { SuggestProductionButton, type SuggestLine } from '@/components/production/suggest-production-button'
 import { SuggestionControls } from '@/components/production/suggestion-controls'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
@@ -58,13 +59,16 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   // "Create PO from plan" data: supplier list + the last purchase price per
   // product (to pre-fill draft lines). A product's maker is free text, so the
   // supplier is best-guessed and confirmable in the dialog.
-  const [{ data: suppliersRaw }, { data: priceLines }] = await Promise.all([
+  const [{ data: suppliersRaw }, { data: priceLines }, { data: sitesRaw }] = await Promise.all([
     supabase.from('suppliers').select('id, name').order('name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
     supabase.from('purchase_order_lines').select('product_id, unit_cost, created_at')
       .not('product_id', 'is', null).not('unit_cost', 'is', null)
       .order('created_at', { ascending: false }) as unknown as Promise<{ data: Array<{ product_id: string; unit_cost: number }> | null }>,
+    supabase.from('suppliers').select('id, name').not('site_type', 'is', null)
+      .order('site_type').order('name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
   ])
   const suppliers = suppliersRaw ?? []
+  const sites = sitesRaw ?? []
   const lastPriceByProduct = new Map<string, number>()
   for (const l of priceLines ?? []) if (l.product_id && !lastPriceByProduct.has(l.product_id)) lastPriceByProduct.set(l.product_id, Number(l.unit_cost))
   const makerMonths = activeMonths.map((m) => ({ key: m, label: monthLabel(m) }))
@@ -102,6 +106,10 @@ export default async function ProductionPage({ searchParams }: PageProps) {
       prodByMonth: ln.productionByMonth, poByMonth, lastPrice: lastPriceByProduct.get(ln.product.id) ?? null,
     }
   })
+  const transferLinesFor = (items: ProdLine[]): CreateTransferLine[] => items.map((ln) => ({
+    product_id: ln.product.id, name: ln.product.name, sku: ln.product.sku_code, market: ln.market,
+    prodByMonth: ln.productionByMonth,
+  }))
 
   // Grouped view uses the all-active set; view-all uses the filtered set so
   // the strip respects the manufacturer filter.
@@ -232,8 +240,11 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                     <SuggestProductionButton maker={label} lines={suggestLinesFor(items)} months={makerMonths} fromMonth={PLAN_FROM_MONTH} />
                   )}
                   {key !== UNASSIGNED && (
-                    <CreatePoButton maker={label} lines={poLinesFor(items)} months={makerMonths}
-                      suppliers={suppliers} defaultSupplierId={bestSupplierForMaker(label, suppliers)} />
+                    <>
+                      <CreatePoButton maker={label} lines={poLinesFor(items)} months={makerMonths}
+                        suppliers={suppliers} defaultSupplierId={bestSupplierForMaker(label, suppliers)} />
+                      <CreateTransferButton maker={label} lines={transferLinesFor(items)} months={makerMonths} sites={sites} />
+                    </>
                   )}
                 </div>
               </summary>
