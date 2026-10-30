@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all'
 import {
   rollingMonths, indexDemand, indexProduction,
-  getGrandTotal, getCountryTotal, getProductionCell, monthLabel,
+  getGrandTotal, getCountryTotal, getProductionCell, monthLabel, MONTH_SHORT,
 } from '@/lib/demand'
 import { getPlanningAnchor } from '@/lib/settings'
 import {
@@ -41,8 +41,8 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
   const market: Market =
     searchParams.market === 'nz' ? 'nz' : searchParams.market === 'au' ? 'au' : 'combined'
 
-  // Opening stock now comes from the Stock Movements ledger's end-of-August
-  // close (the window starts Sept, so Aug close = the opening). Built after the
+  // Opening stock comes from the ingredient Stock Movements ledger's close of
+  // the month before the window starts (last closed month). Built after the
   // ledger loads; `openingForMarket` is defined below.
 
   // ── Fetch everything we need in parallel ───────────────────
@@ -221,18 +221,26 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     arrivalsByIngredient,
   })
 
-  // ── Opening = Stock Movements end-of-August close (per market) ──
+  // ── Opening = Stock Movements close of the month BEFORE the window starts ──
+  // The window starts at the planning anchor (firstMonth), so this is the last
+  // closed month's end-of-month balance — e.g. window starts Oct → opening =
+  // the end-of-September ingredient stock-movements balance. Dynamic so it
+  // tracks the anchor instead of being pinned to one month (was hardcoded Aug,
+  // which left September skipped once the anchor rolled to October).
   const ingredientLedger = await loadIngredientStockLedger()
-  const AUG_CLOSE = '2026-08-01'
-  const smAugByIngredient = new Map<string, { nz: number; au: number }>()
+  const [oy, om] = firstMonth.split('-').map(Number)
+  const openPrev = new Date(Date.UTC(oy, om - 2, 1))
+  const openingMonth = `${openPrev.getUTCFullYear()}-${String(openPrev.getUTCMonth() + 1).padStart(2, '0')}-01`
+  const openingLabel = `end ${MONTH_SHORT[openPrev.getUTCMonth()]}`   // e.g. "end Sep"
+  const smOpenByIngredient = new Map<string, { nz: number; au: number }>()
   for (const r of ingredientLedger.rows) {
-    smAugByIngredient.set(r.entity_id, {
-      nz: r.nz.cells[AUG_CLOSE]?.eom ?? 0,
-      au: r.au.cells[AUG_CLOSE]?.eom ?? 0,
+    smOpenByIngredient.set(r.entity_id, {
+      nz: r.nz.cells[openingMonth]?.eom ?? 0,
+      au: r.au.cells[openingMonth]?.eom ?? 0,
     })
   }
   const openingForMarket = (ing: { id: string }) => {
-    const s = smAugByIngredient.get(ing.id)
+    const s = smOpenByIngredient.get(ing.id)
     if (!s) return 0
     return market === 'au' ? s.au : market === 'nz' ? s.nz : s.nz + s.au
   }
@@ -342,7 +350,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       </div>
 
       <div className="flex items-center gap-4 text-xs text-gray-500">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-white border border-dashed border-gray-300"></span> Opening stock (from Stock Movements · end Aug)</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-white border border-dashed border-gray-300"></span> Opening stock (from Stock Movements · {openingLabel})</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-50 border border-red-200"></span> Shortfall (opening won&rsquo;t cover cumulative demand)</span>
         <span className="text-gray-300">·</span>
         <span>Click an ingredient row to see which products are driving the demand.</span>
@@ -395,7 +403,7 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
                     <th className="text-left font-medium px-4 py-2">Ingredient</th>
                     <th className="text-right font-medium px-3 py-2">
                       Opening
-                      <span className="block text-[9px] normal-case tracking-normal text-gray-400 font-normal">end Aug · SM</span>
+                      <span className="block text-[9px] normal-case tracking-normal text-gray-400 font-normal">{openingLabel} · SM</span>
                     </th>
                     {months.map((m) => (
                       <th key={m} className="text-right font-medium px-2 py-2 border-l border-gray-200">{monthLabel(m)}</th>

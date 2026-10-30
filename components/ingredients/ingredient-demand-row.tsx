@@ -12,7 +12,7 @@ interface Props {
   months: string[]
   /** Set of "ingredientId|yyyy-mm-01" keys that already have at least one comment. */
   commentedCells: Set<string>
-  /** End-of-August close from Stock Movements — the read-only opening for the selected market. */
+  /** Last closed month's end-of-month close from Stock Movements — the read-only opening for the selected market. */
   opening: number
   /** Which build's stocktake to check against. Combined = NZ + AU. */
   market?: 'combined' | 'nz' | 'au'
@@ -29,8 +29,8 @@ function fmt(n: number): string {
 export function IngredientDemandRow({ row, months, commentedCells, opening, market = 'combined' }: Props) {
   const [open, setOpen] = useState(false)
 
-  // Opening = the end-of-August close from Stock Movements (read-only here).
-  // To change it, edit the Aug "Actual" count on the Stock Movements ledger.
+  // Opening = the last closed month's end-of-month close from Stock Movements (read-only here).
+  // To change it, edit that month's "Actual" count on the Stock Movements ledger.
   const stateByMonth   = useMemo(() => monthShortfallStates(row, opening, months), [row, opening, months])
   const balanceByMonth = useMemo(() => monthRunningBalances(row, opening, months), [row, opening, months])
   const shortByMonth   = useMemo(() => monthShortAmounts(row, opening, months),    [row, opening, months])
@@ -66,7 +66,7 @@ export function IngredientDemandRow({ row, months, commentedCells, opening, mark
           </div>
         </td>
 
-        <td className="px-3 py-2 text-right" title="From Stock Movements — end-of-August close (edit via the Aug Actual count on Stock Movements)">
+        <td className="px-3 py-2 text-right" title="From Stock Movements — the last closed month's end-of-month balance (edit via that month's Actual count on Stock Movements)">
           <span className="text-sm tabular-nums text-gray-700">{fmt(opening)}</span>
         </td>
 
