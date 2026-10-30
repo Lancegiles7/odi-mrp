@@ -52,14 +52,17 @@ export function lineUnits(item: BomItemWithIngredient): number {
 
 // Cost of one BOM line at a given per-unit-of-measure price. Count items cost
 // unit_quantity × per-unit price; weight items cost grams ÷ 1000 × per-kg price.
+// Left unrounded: a snack BOM is costed per piece (a 20 g ball) and then
+// multiplied up to the pack, so rounding each line to the cent here drifted
+// pack totals by up to ~18c. Totals round once, at the end.
 function costLine(item: BomItemWithIngredient, perUom: number): number {
   // Per-ingredient production yield (e.g. 5% on noodles) lifts the line cost so
   // it matches what the plan actually consumes. Product-level wastage is still
   // applied on the subtotal separately.
   const yieldMult = 1 + (Number(item.ingredients.yield_pct ?? 0) || 0)
   return isCountUom(item.ingredients.unit_of_measure)
-    ? round2(lineUnits(item) * perUom * yieldMult)
-    : round2((lineWetGrams(item) / 1000) * perUom * yieldMult)
+    ? lineUnits(item) * perUom * yieldMult
+    : (lineWetGrams(item) / 1000) * perUom * yieldMult
 }
 
 // Per-line price for a BOM item — costed on the wet input (no wastage here;
@@ -102,7 +105,7 @@ export function calcBomLineValues(
   const unitInKg      = isCount ? round4(lineUnits(item)) : round4(wetG / 1000)
   const pct           = sizeG > 0 ? round4(item.quantity_g / sizeG) : 0
   const serveAmt      = sizeG > 0 ? round2((item.quantity_g / sizeG) * servingSize) : 0
-  const pricePerUnit  = costLine(item, perUom)
+  const pricePerUnit  = round2(costLine(item, perUom))
 
   return {
     unit_in_kg:     unitInKg,
@@ -175,7 +178,8 @@ export function calcProductCostSummary(
   const servingSize       = Number(product.serving_size) || 0
   const servingMultiplier =
     sizeG > 0 && servingSize > sizeG ? servingSize / sizeG : 1
-  const ingredientTotal   = round2(ingredientTotalPerPack * servingMultiplier)
+  // Scaled from the unrounded per-pack figure so the pack total rounds once.
+  const ingredientTotal   = round2(ingredientSubtotal * (1 + wastagePct) * servingMultiplier)
 
   // FX: NZD per 1 AUD (e.g. 1.20). Used to convert each cost input between
   // markets. Single source of truth: settings.fx_rates.AUD. apply_fx is kept
