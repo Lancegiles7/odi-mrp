@@ -48,28 +48,39 @@ export function CreateTransferButton({ maker, lines, months, sites, shipments }:
   const [qty, setQty] = useState<Record<string, string>>({})
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
 
-  // Products this maker is making in the chosen month (seeds the line list).
-  const madeThisMonth = useMemo(
-    () => lines.filter((l) => (l.prodByMonth[month] ?? 0) > 0),
-    [lines, month],
-  )
+  // A transfer moves existing stock, so list EVERY product this maker handles —
+  // not just the ones with production planned this month. A product this maker
+  // makes for BOTH builds (NZ + AU) appears once (merged), so its qty input and
+  // key stay unique. Ones being produced this month show a "planned" hint.
+  const shownLines = useMemo(() => {
+    const byId = new Map<string, CreateTransferLine & { markets: Array<'NZ' | 'AU'> }>()
+    for (const l of lines) {
+      const e = byId.get(l.product_id)
+      if (!e) { byId.set(l.product_id, { ...l, prodByMonth: { ...l.prodByMonth }, markets: [l.market] }) }
+      else {
+        if (!e.markets.includes(l.market)) e.markets.push(l.market)
+        for (const [m, v] of Object.entries(l.prodByMonth)) e.prodByMonth[m] = (e.prodByMonth[m] ?? 0) + (v ?? 0)
+      }
+    }
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [lines])
 
   const isIncluded = (pid: string) => !excluded.has(pid)
   const toggle = (pid: string) => setExcluded((prev) => { const n = new Set(prev); n.has(pid) ? n.delete(pid) : n.add(pid); return n })
 
-  // Transfer currency/market follows the included lines: AU only → AU, else NZ.
+  // Transfer currency follows the included lines: AU-only → AUD, else NZD.
   const derivedMarket: 'NZ' | 'AU' = useMemo(() => {
-    const inc = madeThisMonth.filter((l) => isIncluded(l.product_id) && Number(qty[l.product_id] ?? '') > 0)
-    const src = inc.length ? inc : madeThisMonth
-    return src.length && src.every((l) => l.market === 'AU') ? 'AU' : 'NZ'
+    const inc = shownLines.filter((l) => isIncluded(l.product_id) && Number(qty[l.product_id] ?? '') > 0)
+    const src = inc.length ? inc : shownLines
+    return src.length && src.every((l) => l.markets.length === 1 && l.markets[0] === 'AU') ? 'AU' : 'NZ'
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [madeThisMonth, qty, excluded])
+  }, [shownLines, qty, excluded])
 
-  const readyCount = madeThisMonth.filter((l) => isIncluded(l.product_id) && Number(qty[l.product_id] ?? '') > 0).length
+  const readyCount = shownLines.filter((l) => isIncluded(l.product_id) && Number(qty[l.product_id] ?? '') > 0).length
 
   function onCreate() {
     setError(null)
-    const payloadLines = madeThisMonth
+    const payloadLines = shownLines
       .filter((l) => isIncluded(l.product_id))
       .map((l) => ({ product_id: l.product_id, quantity: Math.round(Number(qty[l.product_id]) || 0) }))
       .filter((l) => l.quantity > 0)
@@ -174,25 +185,27 @@ export function CreateTransferButton({ maker, lines, months, sites, shipments }:
                   </div>
 
                   {/* Lines */}
-                  {madeThisMonth.length === 0 ? (
-                    <div className="text-xs text-gray-500 py-4 text-center">No production planned for {monthLabel}.</div>
+                  {shownLines.length === 0 ? (
+                    <div className="text-xs text-gray-500 py-4 text-center">This maker has no products.</div>
                   ) : (
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100 text-[11px] font-semibold text-gray-600">
-                        <span>Products made this month</span><span>units to transfer</span>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden max-h-72 overflow-y-auto">
+                      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100 text-[11px] font-semibold text-gray-600 sticky top-0">
+                        <span>Products — enter units for the ones moving</span><span>units to transfer</span>
                       </div>
                       <table className="w-full text-xs">
                         <tbody>
-                          {madeThisMonth.map((l) => {
+                          {shownLines.map((l) => {
                             const inc = isIncluded(l.product_id)
                             return (
                               <tr key={l.product_id} className={`border-t border-gray-100 ${!inc ? 'opacity-40' : ''}`}>
                                 <td className="px-3 py-1.5">
                                   <div className="font-medium flex items-center gap-1.5">
                                     {l.name}
-                                    <span className={`text-[8px] font-extrabold px-1 rounded ${l.market === 'AU' ? 'bg-sky-100 text-sky-800' : 'bg-gray-900 text-white'}`}>{l.market === 'AU' ? 'AUS' : 'NZ'}</span>
+                                    {l.markets.map((mk) => (
+                                      <span key={mk} className={`text-[8px] font-extrabold px-1 rounded ${mk === 'AU' ? 'bg-sky-100 text-sky-800' : 'bg-gray-900 text-white'}`}>{mk === 'AU' ? 'AUS' : 'NZ'}</span>
+                                    ))}
                                   </div>
-                                  <div className="text-[10px] text-gray-400">planned this month: {nf(l.prodByMonth[month] ?? 0)}</div>
+                                  {(l.prodByMonth[month] ?? 0) > 0 && <div className="text-[10px] text-gray-400">planned {monthLabel}: {nf(l.prodByMonth[month] ?? 0)}</div>}
                                 </td>
                                 <td className="px-3 py-1.5 text-right">
                                   <input value={qty[l.product_id] ?? ''} disabled={!inc} inputMode="numeric" placeholder="0"
