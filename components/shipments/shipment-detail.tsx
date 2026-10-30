@@ -4,10 +4,14 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { updateShipment, deleteShipment, setTransferShipment } from '@/app/(dashboard)/shipments/actions'
-import type { ShipmentDetail as Detail, ShipmentStatus, ShipmentTransfer } from '@/lib/shipments'
+import type { ShipmentDetail as Detail, ShipmentStatus, ShipmentDirection, ShipmentTransfer, ContainerType, CostBasis, FreightCurrency } from '@/lib/shipments'
 import { RouteFlags, StatusPill, DIRECTION_LABEL } from '@/components/shipments/shipment-bits'
 
 const STATUSES: ShipmentStatus[] = ['planned', 'departed', 'arrived', 'cancelled']
+const CONTAINERS: Array<{ v: ContainerType; label: string }> = [
+  { v: '40ft', label: '40ft container' }, { v: '20ft', label: '20ft container' },
+  { v: 'lcl', label: 'LCL / part container' }, { v: 'air', label: 'Air freight' }, { v: 'other', label: 'Other' },
+]
 
 export function ShipmentDetail({ shipment, assignable }: { shipment: Detail; assignable: ShipmentTransfer[] }) {
   const router = useRouter()
@@ -16,6 +20,13 @@ export function ShipmentDetail({ shipment, assignable }: { shipment: Detail; ass
   const [arrive, setArrive] = useState(shipment.arrive_date ?? '')
   const [addId, setAddId] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  // Booking-detail fields (saved on blur / change).
+  const [booked, setBooked] = useState(shipment.booked_date ?? '')
+  const [cost, setCost] = useState(shipment.freight_cost != null ? String(shipment.freight_cost) : '')
+  const [carrier, setCarrier] = useState(shipment.carrier ?? '')
+  const [reference, setReference] = useState(shipment.reference ?? '')
+  const [notes, setNotes] = useState(shipment.notes ?? '')
 
   const save = (patch: Parameters<typeof updateShipment>[0]) =>
     start(async () => { const r = await updateShipment(patch); if (!r.ok) setError(r.error ?? 'Save failed'); else { setError(null); router.refresh() } })
@@ -45,7 +56,11 @@ export function ShipmentDetail({ shipment, assignable }: { shipment: Detail; ass
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-xl font-bold">{shipment.shipment_number}</span>
             <RouteFlags direction={shipment.direction} />
-            <span className="text-xs text-emerald-200/90">{DIRECTION_LABEL[shipment.direction]}</span>
+            <select value={shipment.direction} onChange={(e) => save({ id: shipment.id, direction: e.target.value as ShipmentDirection })}
+              className="text-xs bg-emerald-800 border border-emerald-700 rounded-md px-2 py-1 text-emerald-50">
+              <option value="AU_TO_NZ">{DIRECTION_LABEL.AU_TO_NZ}</option>
+              <option value="NZ_TO_AU">{DIRECTION_LABEL.NZ_TO_AU}</option>
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <select value={shipment.status} onChange={(e) => save({ id: shipment.id, status: e.target.value as ShipmentStatus })}
@@ -72,6 +87,66 @@ export function ShipmentDetail({ shipment, assignable }: { shipment: Detail; ass
           </div>
         </div>
         {error && <div className="text-xs text-rose-200 mt-2">{error}</div>}
+      </div>
+
+      {/* Booking details */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="text-[11px] uppercase font-semibold tracking-wide text-gray-500 mb-3">Booking details</div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-[11px] font-medium text-gray-600 mb-1">Booked date</label>
+            <input type="date" value={booked} onChange={(e) => setBooked(e.target.value)} onBlur={() => save({ id: shipment.id, booked_date: booked || null })}
+              className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-gray-600 mb-1">Container / freight</label>
+            <select value={shipment.container_type ?? ''} onChange={(e) => save({ id: shipment.id, container_type: (e.target.value || null) as ContainerType | null })}
+              className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5">
+              <option value="">— not set —</option>
+              {CONTAINERS.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}
+            </select>
+          </div>
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-[11px] font-medium text-gray-600 mb-1">Freight cost</label>
+            <div className="flex gap-1.5">
+              <select value={shipment.freight_currency ?? 'NZD'} onChange={(e) => save({ id: shipment.id, freight_currency: e.target.value as FreightCurrency })}
+                className="shrink-0 text-sm border border-gray-300 rounded-md px-1.5 py-1.5">
+                <option value="NZD">NZD</option><option value="AUD">AUD</option>
+              </select>
+              <input type="number" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0.00"
+                onBlur={() => save({ id: shipment.id, freight_cost: cost ? Number(cost) : null })}
+                className="flex-1 min-w-0 text-sm border border-gray-300 rounded-md px-2 py-1.5 tabular-nums" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-gray-600 mb-1">Cost basis</label>
+            <select value={shipment.cost_basis ?? ''} onChange={(e) => save({ id: shipment.id, cost_basis: (e.target.value || null) as CostBasis | null })}
+              className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5">
+              <option value="">— not set —</option>
+              <option value="quoted">Quoted</option>
+              <option value="estimated">Estimated</option>
+              <option value="actual">Actual</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-gray-600 mb-1">Carrier / forwarder</label>
+            <input type="text" value={carrier} onChange={(e) => setCarrier(e.target.value)} maxLength={120} placeholder="e.g. Mainfreight"
+              onBlur={() => save({ id: shipment.id, carrier: carrier || null })}
+              className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-gray-600 mb-1">Booking / reference no.</label>
+            <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={120} placeholder="BOL / container no."
+              onBlur={() => save({ id: shipment.id, reference: reference || null })}
+              className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5" />
+          </div>
+          <div className="col-span-2 md:col-span-3">
+            <label className="block text-[11px] font-medium text-gray-600 mb-1">Notes</label>
+            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={300} placeholder="special handling, split container, etc."
+              onBlur={() => save({ id: shipment.id, notes: notes || null })}
+              className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5" />
+          </div>
+        </div>
       </div>
 
       {/* Transfers on this shipment */}

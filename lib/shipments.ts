@@ -9,6 +9,9 @@ import { createClient } from '@/lib/supabase/server'
 
 export type ShipmentDirection = 'AU_TO_NZ' | 'NZ_TO_AU'
 export type ShipmentStatus = 'planned' | 'departed' | 'arrived' | 'cancelled'
+export type ContainerType = '40ft' | '20ft' | 'lcl' | 'air' | 'other'
+export type CostBasis = 'quoted' | 'estimated' | 'actual'
+export type FreightCurrency = 'NZD' | 'AUD'
 
 export interface Shipment {
   id: string
@@ -18,7 +21,16 @@ export interface Shipment {
   arrive_date: string | null
   status: ShipmentStatus
   notes: string | null
+  container_type: ContainerType | null
+  freight_cost: number | null
+  freight_currency: FreightCurrency | null
+  cost_basis: CostBasis | null
+  carrier: string | null
+  reference: string | null
+  booked_date: string | null
 }
+
+const SHIPMENT_COLS = 'id, shipment_number, direction, depart_date, arrive_date, status, notes, container_type, freight_cost, freight_currency, cost_basis, carrier, reference, booked_date'
 
 export interface ShipmentListRow extends Shipment {
   transfer_count: number
@@ -97,7 +109,7 @@ export async function listShipments(): Promise<ShipmentListRow[]> {
   const supabase = createClient()
   const { data: ships } = await supabase
     .from('shipments')
-    .select('id, shipment_number, direction, depart_date, arrive_date, status, notes')
+    .select(SHIPMENT_COLS)
     .order('depart_date', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false }) as { data: Shipment[] | null }
   const list = ships ?? []
@@ -126,7 +138,7 @@ export async function getShipment(id: string): Promise<ShipmentDetail | null> {
   const supabase = createClient()
   const { data: ship } = await supabase
     .from('shipments')
-    .select('id, shipment_number, direction, depart_date, arrive_date, status, notes')
+    .select(SHIPMENT_COLS)
     .eq('id', id).maybeSingle() as { data: Shipment | null }
   if (!ship) return null
 
@@ -176,7 +188,7 @@ export async function listOpenShipments(): Promise<Shipment[]> {
   const supabase = createClient()
   const { data } = await supabase
     .from('shipments')
-    .select('id, shipment_number, direction, depart_date, arrive_date, status, notes')
+    .select(SHIPMENT_COLS)
     .in('status', ['planned', 'departed'])
     .order('depart_date', { ascending: true, nullsFirst: false }) as { data: Shipment[] | null }
   return data ?? []

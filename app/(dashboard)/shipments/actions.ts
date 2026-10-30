@@ -2,7 +2,30 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { ShipmentDirection, ShipmentStatus } from '@/lib/shipments'
+import type { ShipmentDirection, ShipmentStatus, ContainerType, CostBasis, FreightCurrency } from '@/lib/shipments'
+
+/** The optional booking-detail fields, shared by create + update. */
+export interface ShipmentDetailsInput {
+  container_type?: ContainerType | null
+  freight_cost?: number | null
+  freight_currency?: FreightCurrency | null
+  cost_basis?: CostBasis | null
+  carrier?: string | null
+  reference?: string | null
+  booked_date?: string | null
+}
+
+function detailsPatch(input: ShipmentDetailsInput): Record<string, unknown> {
+  const p: Record<string, unknown> = {}
+  if ('container_type' in input)   p.container_type = input.container_type || null
+  if ('freight_cost' in input)     p.freight_cost = (input.freight_cost === null || input.freight_cost === undefined || Number.isNaN(input.freight_cost)) ? null : Number(input.freight_cost)
+  if ('freight_currency' in input) p.freight_currency = input.freight_currency || null
+  if ('cost_basis' in input)       p.cost_basis = input.cost_basis || null
+  if ('carrier' in input)          p.carrier = (input.carrier ?? '').trim() || null
+  if ('reference' in input)        p.reference = (input.reference ?? '').trim() || null
+  if ('booked_date' in input)      p.booked_date = input.booked_date || null
+  return p
+}
 
 function revalidateAll() {
   revalidatePath('/shipments')
@@ -28,7 +51,7 @@ export async function createShipment(input: {
   depart_date: string | null
   arrive_date: string | null
   notes: string | null
-}): Promise<{ ok: boolean; id?: string; shipment_number?: string; error?: string }> {
+} & ShipmentDetailsInput): Promise<{ ok: boolean; id?: string; shipment_number?: string; error?: string }> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
@@ -44,6 +67,7 @@ export async function createShipment(input: {
       arrive_date: input.arrive_date || null,
       notes: input.notes?.trim() || null,
       created_by: profile?.id ?? null,
+      ...detailsPatch(input),
     })
     .select('id')
     .single() as unknown as { data: { id: string } | null; error: { message: string } | null }
@@ -59,9 +83,9 @@ export async function updateShipment(input: {
   arrive_date?: string | null
   status?: ShipmentStatus
   notes?: string | null
-}): Promise<{ ok: boolean; error?: string }> {
+} & ShipmentDetailsInput): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
-  const patch: Record<string, unknown> = {}
+  const patch: Record<string, unknown> = { ...detailsPatch(input) }
   if (input.direction)       patch.direction = input.direction
   if (input.status)          patch.status = input.status
   if ('depart_date' in input) patch.depart_date = input.depart_date || null
