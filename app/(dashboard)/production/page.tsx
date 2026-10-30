@@ -10,6 +10,7 @@ import { MANUFACTURER_CHIP_COLOURS } from '@/lib/constants'
 import { ProductionRow } from '@/components/production/production-row'
 import { CreatePoButton, type CreatePoLine } from '@/components/production/create-po-button'
 import { CreateTransferButton, type CreateTransferLine } from '@/components/production/create-transfer-button'
+import { listOpenShipments } from '@/lib/shipments'
 import { SuggestProductionButton, type SuggestLine } from '@/components/production/suggest-production-button'
 import { SuggestionControls } from '@/components/production/suggestion-controls'
 import { ManufacturerFilter } from '@/components/production/manufacturer-filter'
@@ -69,6 +70,11 @@ export default async function ProductionPage({ searchParams }: PageProps) {
   ])
   const suppliers = suppliersRaw ?? []
   const sites = sitesRaw ?? []
+  const shipmentOptions = (await listOpenShipments()).map((s) => {
+    const route = s.direction === 'AU_TO_NZ' ? 'AU→NZ' : 'NZ→AU'
+    const arr = s.arrive_date ? new Date(s.arrive_date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : 'no date'
+    return { id: s.id, label: `${s.shipment_number} · ${route} · arrive ${arr}` }
+  })
   const lastPriceByProduct = new Map<string, number>()
   for (const l of priceLines ?? []) if (l.product_id && !lastPriceByProduct.has(l.product_id)) lastPriceByProduct.set(l.product_id, Number(l.unit_cost))
   const makerMonths = activeMonths.map((m) => ({ key: m, label: monthLabel(m) }))
@@ -243,7 +249,7 @@ export default async function ProductionPage({ searchParams }: PageProps) {
                     <>
                       <CreatePoButton maker={label} lines={poLinesFor(items)} months={makerMonths}
                         suppliers={suppliers} defaultSupplierId={bestSupplierForMaker(label, suppliers)} />
-                      <CreateTransferButton maker={label} lines={transferLinesFor(items)} months={makerMonths} sites={sites} />
+                      <CreateTransferButton maker={label} lines={transferLinesFor(items)} months={makerMonths} sites={sites} shipments={shipmentOptions} />
                     </>
                   )}
                 </div>

@@ -69,6 +69,7 @@ const NAV_GROUPS = [
     items: [
       { name: 'Suppliers',         href: '/suppliers' },
       { name: 'Purchase Orders',   href: '/purchase-orders' },
+      { name: 'Shipments',         href: '/shipments' },
       { name: 'Inwards Pending',   href: '/inwards-pending' },
     ],
   },

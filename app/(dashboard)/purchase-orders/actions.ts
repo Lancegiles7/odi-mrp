@@ -210,6 +210,7 @@ export async function createTransferFromProduction(input: {
   to_site_id: string
   market: 'NZ' | 'AU'
   stock_move: 'NZ_TO_AU' | 'AU_TO_NZ' | null
+  shipment_id?: string | null
   lines: Array<{ product_id: string; quantity: number }>
 }): Promise<{ ok: boolean; created?: { po_number: string; id: string }; error?: string }> {
   if (!input.from_site_id || !input.to_site_id) return { ok: false, error: 'Pick both a From and a To site.' }
@@ -239,6 +240,11 @@ export async function createTransferFromProduction(input: {
     })),
   })
   if (!res.ok || !res.id) return { ok: false, error: res.error ?? 'Failed to create the transfer' }
+  // Optionally load it onto a shipment (inherits the shipment's depart/arrive dates).
+  if (input.shipment_id) {
+    const { setTransferShipment } = await import('@/app/(dashboard)/shipments/actions')
+    await setTransferShipment(res.id, input.shipment_id)
+  }
   revalidatePath('/production')
   return { ok: true, created: { po_number, id: res.id } }
 }

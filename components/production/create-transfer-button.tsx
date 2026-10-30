@@ -13,22 +13,29 @@ export interface CreateTransferLine {
   prodByMonth: Record<string, number>
 }
 
+export interface TransferShipmentOption {
+  id: string
+  label: string   // e.g. "SHP-001 · AU→NZ · arrive 18 Dec 2026"
+}
+
 interface Props {
   maker: string
   lines: CreateTransferLine[]
   months: { key: string; label: string }[]
   sites: { id: string; name: string }[]
+  shipments: TransferShipmentOption[]
 }
 
 type Dir = 'none' | 'AU_TO_NZ' | 'NZ_TO_AU'
 const nf = (n: number) => Math.round(n).toLocaleString('en-NZ')
 
-export function CreateTransferButton({ maker, lines, months, sites }: Props) {
+export function CreateTransferButton({ maker, lines, months, sites, shipments }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<{ po_number: string; id: string } | null>(null)
+  const [shipmentId, setShipmentId] = useState('')
 
   const monthsWithPlan = useMemo(
     () => months.filter((m) => lines.some((l) => (l.prodByMonth[m.key] ?? 0) > 0)),
@@ -75,6 +82,7 @@ export function CreateTransferButton({ maker, lines, months, sites }: Props) {
         to_site_id: toSite,
         market: derivedMarket,
         stock_move: dir === 'none' ? null : dir,
+        shipment_id: shipmentId || null,
         lines: payloadLines,
       })
       if (!res.ok || !res.created) { setError(res.error ?? 'Failed to create the transfer'); return }
@@ -87,7 +95,7 @@ export function CreateTransferButton({ maker, lines, months, sites }: Props) {
 
   return (
     <>
-      <button onClick={(e) => { e.preventDefault(); setOpen(true); setDone(null); setError(null) }}
+      <button onClick={(e) => { e.preventDefault(); setOpen(true); setDone(null); setError(null); setShipmentId('') }}
         className="text-xs font-semibold px-3 py-1.5 rounded-md bg-emerald-700 text-white hover:bg-emerald-800">
         ⇄ Create transfer
       </button>
@@ -153,6 +161,16 @@ export function CreateTransferButton({ maker, lines, months, sites }: Props) {
                       ))}
                       <span className="text-[10px] text-gray-400">set a direction to shift stock between the NZ and AU builds (adds the ⇄ leg on Stock Movements)</span>
                     </div>
+                  </div>
+
+                  {/* Shipment (optional) */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-[11px] font-medium text-gray-600">Goes on shipment</label>
+                    <select value={shipmentId} onChange={(e) => setShipmentId(e.target.value)} className="text-xs border border-gray-300 rounded px-2 py-1 max-w-[320px]">
+                      <option value="">— none (standalone transfer) —</option>
+                      {shipments.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                    </select>
+                    {shipmentId && <span className="text-[10px] text-gray-400">takes the shipment&apos;s depart / arrive dates</span>}
                   </div>
 
                   {/* Lines */}
