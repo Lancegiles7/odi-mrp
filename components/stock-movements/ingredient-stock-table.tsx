@@ -48,7 +48,7 @@ export function IngredientStockTable({ ledger, group, entityType = 'ingredient' 
     return Array.from(by.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([name, rs]) => ({ key: name, name, rows: rs }))
   }, [group, filtered])
 
-  const minWidth = 240 + 74 + months.length * 6 * 58
+  const minWidth = 240 + 74 + months.length * 7 * 58
 
   // Total stock holding $ = sum of every ingredient's EOM value (NZ + AUS in
   // NZ$) — across ALL ingredients, independent of the search filter.
@@ -114,7 +114,7 @@ export function IngredientStockTable({ ledger, group, entityType = 'ingredient' 
                   <th className="sticky left-0 top-0 z-40 bg-gray-50 h-7 border-b border-gray-200" />
                   <th className="sticky left-[240px] top-0 z-40 bg-gray-50 h-7 border-b border-r-2 border-gray-300 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Opening<div className="text-[8px] font-normal normal-case text-gray-400">{seedLabel}</div></th>
                   {months.map((m, i) => (
-                    <th key={m} colSpan={6} className={`sticky top-0 z-30 h-7 text-center text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border-b border-gray-200 ${i > 0 ? 'border-l-2 border-emerald-200' : ''}`}>{label(m)}</th>
+                    <th key={m} colSpan={7} className={`sticky top-0 z-30 h-7 text-center text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border-b border-gray-200 ${i > 0 ? 'border-l-2 border-emerald-200' : ''}`}>{label(m)}</th>
                   ))}
                 </tr>
                 <tr>
@@ -123,6 +123,7 @@ export function IngredientStockTable({ ledger, group, entityType = 'ingredient' 
                   {months.map((m, i) => (
                     <Fragment key={m}>
                       <th className={`top-7 sticky z-30 bg-gray-50 px-1.5 py-1.5 text-right text-[9px] font-semibold text-gray-400 uppercase border-b border-gray-200 ${i > 0 ? 'border-l-2 border-emerald-200' : ''}`}>In</th>
+                      <th className="top-7 sticky z-30 bg-gray-50 px-1.5 py-1.5 text-right text-[9px] font-semibold text-rose-400 uppercase border-b border-gray-200" title="Leaving on a transfer to the other market">Out</th>
                       <th className="top-7 sticky z-30 bg-gray-50 px-1.5 py-1.5 text-right text-[9px] font-semibold text-gray-400 uppercase border-b border-gray-200">Used</th>
                       <th className="top-7 sticky z-30 bg-gray-50 px-1.5 py-1.5 text-right text-[9px] font-semibold text-gray-400 uppercase border-b border-gray-200">Waste</th>
                       <th className="top-7 sticky z-30 bg-gray-50 px-1.5 py-1.5 text-right text-[9px] font-semibold text-gray-400 uppercase border-b border-gray-200">Sys</th>
@@ -137,7 +138,7 @@ export function IngredientStockTable({ ledger, group, entityType = 'ingredient' 
                   <Fragment key={g.key}>
                     {g.name && (
                       <tr>
-                        <td colSpan={2 + months.length * 6} className="sticky left-0 bg-gray-100/70 px-3 py-1.5 text-[11px] font-bold text-gray-700 border-y border-gray-200">{g.name} · {g.rows.length}</td>
+                        <td colSpan={2 + months.length * 7} className="sticky left-0 bg-gray-100/70 px-3 py-1.5 text-[11px] font-bold text-gray-700 border-y border-gray-200">{g.name} · {g.rows.length}</td>
                       </tr>
                     )}
                     {g.rows.map((r) => (
@@ -177,7 +178,7 @@ function IngredientRows({ row, months, uomLabel }: { row: IngStockRow; months: s
 
   // Only show a market's row when that market actually has activity (used in a
   // recipe, received, counted or wasted). Total only when it's in BOTH.
-  const cellActive = (c: IngCell) => !!(c.used || c.inbound || c.wastage || c.counted != null)
+  const cellActive = (c: IngCell) => !!(c.used || c.inbound || c.wastage || c.transferIn || c.transferOut || c.counted != null)
   const auActiveRaw = row.au.opening !== 0 || months.some((m) => cellActive(row.au.cells[m]))
   // An item with no activity anywhere still gets its NZ row, so a first
   // count can be entered (the packaging ledger starts blank).
@@ -202,6 +203,7 @@ function IngredientRows({ row, months, uomLabel }: { row: IngStockRow; months: s
           {months.map((m, i) => (
             <Fragment key={m}>
               <td className={`bg-emerald-50/30 border-b border-gray-100 ${i > 0 ? 'border-l-2 border-emerald-200' : ''}`} />
+              <td className="bg-emerald-50/30 border-b border-gray-100" />
               <td className="bg-emerald-50/30 border-b border-gray-100 px-1.5 text-right text-blue-700">{d.byMonth[m] ? nf(d.byMonth[m]) : ''}</td>
               <td colSpan={4} className="bg-emerald-50/30 border-b border-gray-100" />
             </Fragment>
@@ -254,8 +256,12 @@ function MarketRow({ row, market, data, cur, months, uomLabel, head, showName, i
                 <div>
                   <ManualCell entity={row.entity_id} market={market} month={m} field="inbound" units={c.inboundManual || null} comment={c.inboundComment} tone="inbound" uom={uomLabel} />
                   {c.inboundPo > 0 && <div className="text-[8px] text-emerald-600 leading-none mt-0.5">+{nf(c.inboundPo)} PO</div>}
+                  {c.transferIn > 0 && <div className="text-[8px] text-teal-600 leading-none mt-0.5">+{nf(c.transferIn)} transfer</div>}
                 </div>
-              ) : <span className="text-emerald-700">{nf(c.inbound)}</span>}
+              ) : <span className="text-emerald-700">{nf(c.inbound + c.transferIn)}</span>}
+            </td>
+            <td className={`px-1.5 py-1 text-right ${rowBorder}`} title={c.transferOut ? 'Leaving on a transfer to the other market' : undefined}>
+              {c.transferOut > 0 ? <span className="text-rose-600 font-medium">−{nf(c.transferOut)}</span> : <span className="text-gray-300">—</span>}
             </td>
             <td className={`px-1.5 py-1 text-right text-blue-700 ${rowBorder}`}>{nf(c.used)}</td>
             <td className={`px-1 py-0.5 text-right ${rowBorder}`}>

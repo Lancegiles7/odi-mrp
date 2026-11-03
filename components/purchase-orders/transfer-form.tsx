@@ -8,6 +8,7 @@ import {
   type POLineInput,
 } from '@/app/(dashboard)/purchase-orders/actions'
 import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/constants'
+import { isCountUom } from '@/lib/costing'
 
 export interface SiteOption {
   id: string
@@ -26,6 +27,12 @@ export interface PackagingOption {
   sku_code: string
   name: string
 }
+export interface IngredientOption {
+  id: string
+  sku_code: string
+  name: string
+  unit_of_measure: string | null
+}
 export interface SrtInfo { name: string; unitsPerSrt: number }
 export interface TransferLine {
   product_id: string
@@ -36,6 +43,10 @@ export interface TransferLine {
 export interface TransferPkgLine {
   packaging_id: string
   quantity: string
+}
+export interface TransferIngLine {
+  ingredient_id: string
+  quantity: string       // in the ingredient's own unit (e.g. kg)
 }
 export interface TransferOtherLine {
   description: string
@@ -58,10 +69,12 @@ interface Props {
   initialNotes: string | null
   initialLines: TransferLine[]
   initialPkgLines: TransferPkgLine[]
+  initialIngLines: TransferIngLine[]
   initialOtherLines: TransferOtherLine[]
   sites: SiteOption[]
   products: ProductOption[]
   packaging: PackagingOption[]
+  ingredients: IngredientOption[]
   /** product_id → SRT pack info, when the product has an SRT packaging. */
   srtByProduct: Record<string, SrtInfo>
 }
@@ -69,6 +82,7 @@ interface Props {
 const groupLabel = (g: string | null) => (g ? (PRODUCT_GROUP_LABELS[g] ?? g) : 'Ungrouped')
 const emptyLine = (): TransferLine => ({ product_id: '', group: '', pack: 'individual', quantity: '' })
 const emptyPkgLine = (): TransferPkgLine => ({ packaging_id: '', quantity: '' })
+const emptyIngLine = (): TransferIngLine => ({ ingredient_id: '', quantity: '' })
 const emptyOtherLine = (): TransferOtherLine => ({ description: '', quantity: '' })
 const nf = (n: number) => n.toLocaleString()
 
@@ -89,6 +103,7 @@ export function TransferForm(props: Props) {
     props.initialLines.length ? props.initialLines : [emptyLine()],
   )
   const [pkgLines, setPkgLines] = useState<TransferPkgLine[]>(props.initialPkgLines)
+  const [ingLines, setIngLines] = useState<TransferIngLine[]>(props.initialIngLines)
   const [otherLines, setOtherLines] = useState<TransferOtherLine[]>(props.initialOtherLines)
 
   const readOnly = props.mode === 'edit' && props.status != null && !['draft', 'submitted'].includes(props.status)
@@ -132,6 +147,26 @@ export function TransferForm(props: Props) {
   function addPkg()      { setPkgLines((ls) => [...ls, emptyPkgLine()]) }
   function removePkg(i: number) { setPkgLines((ls) => ls.filter((_, idx) => idx !== i)) }
 
+  const ingById = useMemo(() => new Map(props.ingredients.map((i) => [i.id, i])), [props.ingredients])
+  // The unit a transfer line is entered + stored in. Weight ingredients are
+  // tracked in kg on the stock ledger (a few carry a legacy 'g' master unit, but
+  // every count and PO line for them is in kg); count ingredients keep their own
+  // unit (each/unit), liquids their own (l/ml). Matches how the ledger reads a
+  // line's quantity — a 'g' line would be divided by 1000, which we never want.
+  const ingLineUom = (id: string): string => {
+    const u = (ingById.get(id)?.unit_of_measure ?? '').trim().toLowerCase()
+    if (isCountUom(ingById.get(id)?.unit_of_measure ?? null) || u === 'l' || u === 'ml') {
+      return ingById.get(id)?.unit_of_measure?.trim() || 'units'
+    }
+    return 'kg'
+  }
+  const ingTotal = ingLines.reduce((s, l) => s + (l.ingredient_id && Number(l.quantity) > 0 ? Number(l.quantity) : 0), 0)
+  function patchIng(i: number, patch: Partial<TransferIngLine>) {
+    setIngLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
+  }
+  function addIng()      { setIngLines((ls) => [...ls, emptyIngLine()]) }
+  function removeIng(i: number) { setIngLines((ls) => ls.filter((_, idx) => idx !== i)) }
+
   const otherTotal = otherLines.reduce((s, l) => s + (l.description.trim() ? (Number(l.quantity) > 0 ? Number(l.quantity) : 1) : 0), 0)
   function patchOther(i: number, patch: Partial<TransferOtherLine>) {
     setOtherLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
@@ -172,6 +207,19 @@ export function TransferForm(props: Props) {
         unit_of_measure: 'units',
         notes: null,
       }))
+    const ingRows: POLineInput[] = ingLines
+      .filter((l) => l.ingredient_id && Number(l.quantity) > 0)
+      .map((l) => ({
+        line_type: 'ingredient' as const,
+        ingredient_id: l.ingredient_id,
+        product_id: null,
+        packaging_id: null,
+        description: null,
+        quantity_ordered: Number(l.quantity),   // in the line's unit (kg for weight)
+        unit_cost: null,
+        unit_of_measure: ingLineUom(l.ingredient_id),
+        notes: null,
+      }))
     const otherRows: POLineInput[] = otherLines
       // Other items are descriptive (e.g. "boxes stored at Moonbi") — the
       // quantity is optional. A description alone is enough; blank qty → 1.
@@ -187,7 +235,7 @@ export function TransferForm(props: Props) {
         unit_of_measure: 'units',
         notes: null,
       }))
-    return [...productRows, ...pkgRows, ...otherRows]
+    return [...productRows, ...ingRows, ...pkgRows, ...otherRows]
   }
 
   function validate(): string | null {
@@ -199,10 +247,12 @@ export function TransferForm(props: Props) {
     if (lines.some((l) => !l.product_id && Number(l.quantity) > 0))       return 'A product line has a quantity but no product selected.'
     if (pkgLines.some((l) => l.packaging_id && !(Number(l.quantity) > 0))) return 'A packaging line is missing its quantity.'
     if (pkgLines.some((l) => !l.packaging_id && Number(l.quantity) > 0))   return 'A packaging line has a quantity but no item selected.'
+    if (ingLines.some((l) => l.ingredient_id && !(Number(l.quantity) > 0))) return 'An ingredient line is missing its quantity.'
+    if (ingLines.some((l) => !l.ingredient_id && Number(l.quantity) > 0))   return 'An ingredient line has a quantity but no ingredient selected.'
     // Other items only need a description — quantity is optional (defaults to 1).
     if (otherLines.some((l) => !l.description.trim() && Number(l.quantity) > 0))   return 'An "other" item has a quantity but no description.'
     const poLines = toPoLines()
-    if (poLines.length === 0) return 'Add at least one product, packaging, or other item with a quantity.'
+    if (poLines.length === 0) return 'Add at least one product, ingredient, packaging, or other item with a quantity.'
     return null
   }
 
@@ -462,6 +512,55 @@ export function TransferForm(props: Props) {
             <button type="button" onClick={addLine}
               className="text-sm font-medium text-emerald-700 bg-emerald-50 border border-dashed border-emerald-300 rounded-lg px-3 py-1.5">
               ＋ Add product line
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Ingredients */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Ingredients to move</h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {stockMove
+                ? <>Posts an <span className="text-rose-600 font-medium">Out</span> on the {stockMove === 'NZ_TO_AU' ? 'NZ' : 'AUS'} ingredient stock and an <span className="text-teal-700 font-medium">In</span> on the {stockMove === 'NZ_TO_AU' ? 'AUS' : 'NZ'} stock, in Stock Movements.</>
+                : <>Within one market (e.g. Brand Nation → Radix, both NZ) the stock total doesn’t change, so nothing posts. Set “Moves stock between builds” above for a cross-market move to show.</>}
+            </p>
+          </div>
+          <span className="text-xs text-gray-500 tabular-nums">{nf(ingTotal)}</span>
+        </div>
+        {ingLines.length > 0 && (
+          <div className="divide-y divide-gray-100">
+            <div className="grid grid-cols-[minmax(0,1fr)_110px_32px] gap-2 px-4 py-2 bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+              <div>Ingredient</div><div className="text-right">Qty</div><div></div>
+            </div>
+            {ingLines.map((l, i) => (
+              <div key={i} className="grid grid-cols-[minmax(0,1fr)_110px_32px] gap-2 px-4 py-2 items-center">
+                <select value={l.ingredient_id} disabled={readOnly}
+                  onChange={(e) => patchIng(i, { ingredient_id: e.target.value })}
+                  className="w-full min-w-0 text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-50">
+                  <option value="">— Select ingredient —</option>
+                  {props.ingredients.map((p) => <option key={p.id} value={p.id}>{p.sku_code} · {p.name}</option>)}
+                </select>
+                <div className="flex items-center gap-1 justify-end">
+                  <input type="number" min={0} step="any" value={l.quantity} disabled={readOnly}
+                    onChange={(e) => patchIng(i, { quantity: e.target.value })}
+                    placeholder="0"
+                    className="w-[72px] min-w-0 text-sm text-right border border-gray-200 rounded px-2 py-1.5 tabular-nums bg-white disabled:bg-gray-50" />
+                  <span className="text-[10px] text-gray-400 w-8">{l.ingredient_id ? ingLineUom(l.ingredient_id) : ''}</span>
+                </div>
+                <button type="button" disabled={readOnly} onClick={() => removeIng(i)}
+                  className="text-gray-400 hover:text-rose-600 disabled:opacity-40 text-sm">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {!readOnly && (
+          <div className="px-4 py-3 border-t border-gray-100">
+            <button type="button" onClick={addIng}
+              className="text-sm font-medium text-emerald-700 bg-emerald-50 border border-dashed border-emerald-300 rounded-lg px-3 py-1.5">
+              ＋ Add ingredient line
             </button>
           </div>
         )}

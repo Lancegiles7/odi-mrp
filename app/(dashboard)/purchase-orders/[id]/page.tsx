@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { POForm } from '@/components/purchase-orders/po-form'
-import { TransferForm, type SiteOption, type ProductOption, type PackagingOption, type TransferLine, type TransferPkgLine, type TransferOtherLine } from '@/components/purchase-orders/transfer-form'
+import { TransferForm, type SiteOption, type ProductOption, type PackagingOption, type IngredientOption, type TransferLine, type TransferPkgLine, type TransferIngLine, type TransferOtherLine } from '@/components/purchase-orders/transfer-form'
 import { loadSrtByProduct } from '@/lib/transfer-orders'
 import { ReceiptHistory } from '@/components/purchase-orders/receipt-history'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
@@ -117,6 +117,15 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
     const transferOtherLines: TransferOtherLine[] = (lines ?? [])
       .filter((l) => !l.product_id && !l.packaging_id && !l.ingredient_id && l.description)
       .map((l) => ({ description: l.description ?? '', quantity: String(Number(l.quantity_ordered)) }))
+    // Ingredient picker: what Odi holds (purchased), plus anything already on this
+    // transfer so an existing line always keeps its name.
+    const ingOnThisTransfer = new Set((lines ?? []).map((l) => l.ingredient_id).filter(Boolean))
+    const transferIngredients: IngredientOption[] = (ingredients ?? [])
+      .filter((i) => (i.category ?? PROCURED_INGREDIENT_CATEGORY) === PROCURED_INGREDIENT_CATEGORY || ingOnThisTransfer.has(i.id))
+      .map((i) => ({ id: i.id, sku_code: i.sku_code, name: i.name, unit_of_measure: i.unit_of_measure }))
+    const transferIngLines: TransferIngLine[] = (lines ?? [])
+      .filter((l) => l.ingredient_id)
+      .map((l) => ({ ingredient_id: l.ingredient_id!, quantity: String(Number(l.quantity_ordered)) }))
     return (
       <TransferForm
         mode="edit"
@@ -133,10 +142,12 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         initialNotes={po.notes}
         initialLines={transferLines}
         initialPkgLines={transferPkgLines}
+        initialIngLines={transferIngLines}
         initialOtherLines={transferOtherLines}
         sites={sites ?? []}
         products={transferProducts ?? []}
         packaging={transferPackaging ?? []}
+        ingredients={transferIngredients}
         srtByProduct={srtByProduct}
       />
     )

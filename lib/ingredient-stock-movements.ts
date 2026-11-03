@@ -32,6 +32,8 @@ export interface IngCell {
   inboundPo: number        // from open POs
   inboundManual: number    // manually entered (no PO)
   inboundComment: string | null
+  transferIn: number       // arriving on a cross-market transfer (adds to this market)
+  transferOut: number      // leaving on a cross-market transfer (the "Out" column)
   used: number
   wastage: number
   system: number
@@ -89,6 +91,7 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     produced, { data: ingredients }, { data: suppliers },
     { data: bomItems },
     { data: openPos }, { data: openPoLines }, { data: adjustments },
+    { data: transferPos },
   ] = await Promise.all([
     loadProducedUnits(supabase, calcMonths),
     supabase.from('ingredients')
@@ -101,15 +104,24 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     supabase.from('suppliers').select('id, name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
     supabase.from('bom_items').select('bom_id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity') as unknown as Promise<{ data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null; unit_quantity: number | null }> | null }>,
     supabase.from('purchase_orders')
-      .select('id, po_number, status, expected_delivery_date, market')
+      .select('id, po_number, status, expected_delivery_date, market, po_type')
       .in('status', ['submitted', 'partially_received'])
-      .not('expected_delivery_date', 'is', null) as unknown as Promise<{ data: Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null; market: string | null }> | null }>,
+      .not('expected_delivery_date', 'is', null) as unknown as Promise<{ data: Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null; market: string | null; po_type: string | null }> | null }>,
     supabase.from('purchase_order_lines')
       .select('purchase_order_id, ingredient_id, quantity_ordered, quantity_received, unit_of_measure')
       .not('ingredient_id', 'is', null) as unknown as Promise<{ data: Array<{ purchase_order_id: string; ingredient_id: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string }> | null }>,
     supabase.from('stock_period_adjustments')
       .select('entity_id, year_month, market, wastage_units, wastage_comment, counted_units, count_comment, inbound_units, inbound_comment')
       .eq('entity_type', 'ingredient') as unknown as Promise<{ data: Array<{ entity_id: string; year_month: string; market: string; wastage_units: number; wastage_comment: string | null; counted_units: number | null; count_comment: string | null; inbound_units: number; inbound_comment: string | null }> | null }>,
+    // Transfers that move stock between the NZ and AUS builds — their ingredient
+    // lines post an OUT on the source market and an IN on the destination market
+    // (mirrors the finished-goods legs in lib/transfer-stock.ts). A within-market
+    // move leaves stock_move null and nets to zero, so it isn't fetched here.
+    supabase.from('purchase_orders')
+      .select('id, stock_move, pickup_date, expected_delivery_date, order_date')
+      .eq('po_type', 'transfer')
+      .in('stock_move', ['NZ_TO_AU', 'AU_TO_NZ'])
+      .in('status', ['submitted', 'partially_received']) as unknown as Promise<{ data: Array<{ id: string; stock_move: 'NZ_TO_AU' | 'AU_TO_NZ'; pickup_date: string | null; expected_delivery_date: string | null; order_date: string | null }> | null }>,
   ])
   const { products, activeBomByProduct, activeBomByProductAu, unitsNz, unitsAu } = produced
 
@@ -142,6 +154,9 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
   const ingById = new Map((ingredients ?? []).map((i) => [i.id, i]))
   const poMarketById = new Map<string, { market: Market; monthKey: string }>()
   for (const po of openPos ?? []) {
+    // Transfers are handled separately (OUT/IN legs below) — counting a transfer
+    // line as plain inbound would be a phantom receipt with no offsetting out.
+    if (po.po_type === 'transfer') continue
     if (!po.expected_delivery_date) continue
     const raw = po.expected_delivery_date.slice(0, 7) + '-01'
     const monthKey = raw < months[0] ? months[0] : raw
@@ -166,6 +181,44 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     const qty = ((ingUom === 'kg' || ingUom === 'g' || ingUom === '') && lineUom === 'g')
       ? convertGramsToIngredientUom(remaining, ing?.unit_of_measure ?? null) : remaining
     addInbound(po.market === 'AU' ? inboundAu : inboundNz, ln.ingredient_id, po.monthKey, qty)
+  }
+
+  // ── Transfer legs: OUT off the source market (pick-up month), IN onto the
+  // destination market (delivery month), for the still-to-come quantity. Mirrors
+  // the finished-goods legs; within-market moves aren't in transferPos at all. ──
+  const clampMonth = (d: string): string | null => {
+    const m = d.slice(0, 7) + '-01'
+    if (m < months[0]) return months[0]
+    return months.includes(m) ? m : null
+  }
+  const transferById = new Map<string, { out: Market; in: Market; outMonth: string | null; inMonth: string | null }>()
+  for (const po of transferPos ?? []) {
+    const [outC, inC]: [Market, Market] = po.stock_move === 'NZ_TO_AU' ? ['NZ', 'AU'] : ['AU', 'NZ']
+    const outRaw = po.pickup_date ?? po.expected_delivery_date ?? po.order_date
+    const inRaw  = po.expected_delivery_date ?? po.pickup_date ?? po.order_date
+    transferById.set(po.id, {
+      out: outC, in: inC,
+      outMonth: outRaw ? clampMonth(outRaw) : null,
+      inMonth:  inRaw  ? clampMonth(inRaw)  : null,
+    })
+  }
+  const transferOutNz = new Map<string, Map<string, number>>()
+  const transferOutAu = new Map<string, Map<string, number>>()
+  const transferInNz  = new Map<string, Map<string, number>>()
+  const transferInAu  = new Map<string, Map<string, number>>()
+  for (const ln of openPoLines ?? []) {
+    if (!ln.ingredient_id) continue
+    const t = transferById.get(ln.purchase_order_id)
+    if (!t) continue
+    const remaining = Math.max(0, Number(ln.quantity_ordered) - Number(ln.quantity_received))
+    if (remaining <= 0) continue
+    const ing = ingById.get(ln.ingredient_id)
+    const lineUom = (ln.unit_of_measure ?? '').trim().toLowerCase()
+    const ingUom = (ing?.unit_of_measure ?? '').trim().toLowerCase()
+    const qty = ((ingUom === 'kg' || ingUom === 'g' || ingUom === '') && lineUom === 'g')
+      ? convertGramsToIngredientUom(remaining, ing?.unit_of_measure ?? null) : remaining
+    if (t.outMonth) addInbound(t.out === 'AU' ? transferOutAu : transferOutNz, ln.ingredient_id, t.outMonth, qty)
+    if (t.inMonth)  addInbound(t.in  === 'AU' ? transferInAu  : transferInNz,  ln.ingredient_id, t.inMonth,  qty)
   }
 
   // ── Manual adjustments (wastage + counts) ──
@@ -195,7 +248,8 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     const costAu = ing.total_loaded_cost_au != null ? Number(ing.total_loaded_cost_au) : (costNz > 0 ? costNz / fx : 0)
 
     const buildMarket = (
-      mk: Market, usedRow: Row | undefined, inboundMap: Map<string, Map<string, number>>, cost: number,
+      mk: Market, usedRow: Row | undefined, inboundMap: Map<string, Map<string, number>>,
+      transferInMap: Map<string, Map<string, number>>, transferOutMap: Map<string, Map<string, number>>, cost: number,
     ): IngMarketRow => {
       const seed = adjOf(ing.id, mk, SEED_MONTH)
       const opening = seed.counted ?? 0
@@ -205,14 +259,17 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
         const inboundPo = inboundMap.get(ing.id)?.get(m) ?? 0
         const adj = adjOf(ing.id, mk, m)
         const inbound = inboundPo + adj.inbound
+        const transferIn  = transferInMap.get(ing.id)?.get(m) ?? 0
+        const transferOut = transferOutMap.get(ing.id)?.get(m) ?? 0
         const used = usedRow?.demandByMonth.get(m) ?? 0
-        const system = round(prevEom + inbound - used - adj.wastage, 3)
+        const system = round(prevEom + inbound + transferIn - used - adj.wastage - transferOut, 3)
         const eom = adj.counted != null ? adj.counted : system
         const drivers: IngDriver[] = (usedRow?.products ?? [])
           .map((p) => ({ product_id: p.id, sku: p.sku_code, name: p.name, used: round(p.demandByMonth.get(m) ?? 0, 3) }))
           .filter((d) => d.used > 0)
         cells[m] = {
           inbound: round(inbound, 3), inboundPo: round(inboundPo, 3), inboundManual: adj.inbound, inboundComment: adj.iComment,
+          transferIn: round(transferIn, 3), transferOut: round(transferOut, 3),
           used: round(used, 3), wastage: adj.wastage,
           system, counted: adj.counted, eom: round(eom, 3), value: round(eom * cost, 2),
           wastageComment: adj.wComment, countComment: adj.cComment, drivers,
@@ -222,8 +279,8 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
       return { market: mk, opening, openingComment: seed.cComment, cells }
     }
 
-    const nz = buildMarket('NZ', nzRowById.get(ing.id), inboundNz, costNz)
-    const au = buildMarket('AU', auRowById.get(ing.id), inboundAu, costAu)
+    const nz = buildMarket('NZ', nzRowById.get(ing.id), inboundNz, transferInNz, transferOutNz, costNz)
+    const au = buildMarket('AU', auRowById.get(ing.id), inboundAu, transferInAu, transferOutAu, costAu)
 
     // Total = NZ + AU per column; value in NZD (AU converted at FX).
     const totalCells: Record<string, IngCell> = {}
@@ -232,6 +289,7 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
       totalCells[m] = {
         inbound: round(a.inbound + b.inbound, 3), inboundPo: round(a.inboundPo + b.inboundPo, 3),
         inboundManual: round(a.inboundManual + b.inboundManual, 3), inboundComment: null,
+        transferIn: round(a.transferIn + b.transferIn, 3), transferOut: round(a.transferOut + b.transferOut, 3),
         used: round(a.used + b.used, 3),
         wastage: round(a.wastage + b.wastage, 3), system: round(a.system + b.system, 3),
         counted: null, eom: round(a.eom + b.eom, 3), value: round(a.value + b.value * fx, 2),
@@ -241,7 +299,9 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     const total: IngMarketRow = { market: 'TOTAL', opening: nz.opening + au.opening, openingComment: null, cells: totalCells }
 
     const hasActivity = nz.opening !== 0 || au.opening !== 0 ||
-      months.some((m) => nz.cells[m].inbound || nz.cells[m].used || au.cells[m].inbound || au.cells[m].used || nz.cells[m].wastage || au.cells[m].wastage)
+      months.some((m) =>
+        nz.cells[m].inbound || nz.cells[m].used || nz.cells[m].wastage || nz.cells[m].transferIn || nz.cells[m].transferOut ||
+        au.cells[m].inbound || au.cells[m].used || au.cells[m].wastage || au.cells[m].transferIn || au.cells[m].transferOut)
 
     rows.push({
       entity_id: ing.id, sku: ing.sku_code, name: ing.name, uom,
