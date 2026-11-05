@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { POQuickView, type QuickViewLine } from '@/components/purchase-orders/po-quick-view'
 
 export const metadata: Metadata = { title: 'Purchase orders' }
 
@@ -46,7 +47,7 @@ function fmtDate(d: string | null): string {
 export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
   const supabase = createClient()
 
-  const [{ data: pos }, { data: suppliers }, { data: lines }] = await Promise.all([
+  const [{ data: pos }, { data: suppliers }, { data: lines }, { data: products }, { data: ingredients }, { data: packaging }] = await Promise.all([
     supabase.from('purchase_orders')
       .select('id, po_number, po_type, destination_supplier_id, status, order_date, expected_delivery_date, supplier_id, market')
       .order('po_number', { ascending: false }) as unknown as Promise<{ data: POListRow[] | null }>,
@@ -55,23 +56,47 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
       .eq('is_active', true)
       .order('name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
     supabase.from('purchase_order_lines')
-      .select('purchase_order_id, quantity_ordered, unit_cost, ingredient_id, product_id, description') as unknown as Promise<{ data: Array<{
+      .select('purchase_order_id, quantity_ordered, unit_cost, ingredient_id, product_id, packaging_id, description, unit_of_measure') as unknown as Promise<{ data: Array<{
         purchase_order_id: string; quantity_ordered: number; unit_cost: number | null
-        ingredient_id: string | null; product_id: string | null; description: string | null
+        ingredient_id: string | null; product_id: string | null; packaging_id: string | null
+        description: string | null; unit_of_measure: string | null
       }> | null }>,
+    supabase.from('products').select('id, name').is('deleted_at', null) as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
+    supabase.from('ingredients').select('id, name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
+    supabase.from('packaging').select('id, name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
   ])
 
   const allPos = pos ?? []
   const supplierById = new Map((suppliers ?? []).map((s) => [s.id, s.name]))
+  const productName    = new Map((products ?? []).map((p) => [p.id, p.name]))
+  const ingredientName = new Map((ingredients ?? []).map((i) => [i.id, i.name]))
+  const packagingName  = new Map((packaging ?? []).map((p) => [p.id, p.name]))
 
-  // Aggregate line counts and totals per PO
-  const linesByPo = new Map<string, { count: number; total: number }>()
+  // Aggregate line counts, totals, units and item detail per PO. The detail feeds
+  // the quick-view popover on each row — the data is already loaded here, so the
+  // popover opens instantly with no extra fetch.
+  const linesByPo = new Map<string, { count: number; total: number; units: number; kinds: Set<string>; detail: QuickViewLine[] }>()
   for (const l of lines ?? []) {
-    const cur = linesByPo.get(l.purchase_order_id) ?? { count: 0, total: 0 }
+    const cur = linesByPo.get(l.purchase_order_id) ?? { count: 0, total: 0, units: 0, kinds: new Set<string>(), detail: [] as QuickViewLine[] }
     cur.count += 1
+    cur.units += Number(l.quantity_ordered)
     if (l.unit_cost != null) cur.total += Number(l.unit_cost) * Number(l.quantity_ordered)
+    const name = l.product_id ? (productName.get(l.product_id) ?? 'Product')
+      : l.ingredient_id ? (ingredientName.get(l.ingredient_id) ?? 'Ingredient')
+      : l.packaging_id ? (packagingName.get(l.packaging_id) ?? 'Packaging')
+      : (l.description || 'Item')
+    cur.kinds.add(l.product_id ? 'product' : l.ingredient_id ? 'ingredient' : l.packaging_id ? 'packaging' : 'other')
+    // Unit only matters on weight/count stock lines (kg, each…), not finished goods.
+    const uom = (l.ingredient_id || l.packaging_id) ? l.unit_of_measure : null
+    cur.detail.push({ name, qty: Number(l.quantity_ordered), uom, unitCost: l.unit_cost != null ? Number(l.unit_cost) : null })
     linesByPo.set(l.purchase_order_id, cur)
   }
+
+  const kindLabel = (kinds: Set<string>): string =>
+    kinds.size !== 1 ? 'Mixed'
+      : kinds.has('product') ? 'Finished goods'
+      : kinds.has('ingredient') ? 'Ingredients'
+      : kinds.has('packaging') ? 'Packaging' : 'Other'
 
   const filterStatus   = searchParams.status   ?? 'all'
   const filterSupplier = searchParams.supplier ?? 'all'
@@ -148,7 +173,7 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
-                <th className="text-left px-4 py-2 font-medium w-[120px]">PO #</th>
+                <th className="text-left px-4 py-2 font-medium w-[160px]">PO #</th>
                 <th className="text-left px-3 py-2 font-medium w-[92px]">Type</th>
                 <th className="text-left px-4 py-2 font-medium">Supplier / route</th>
                 <th className="text-right px-3 py-2 font-medium w-[60px]">Lines</th>
@@ -160,15 +185,33 @@ export default async function PurchaseOrdersPage({ searchParams }: PageProps) {
             </thead>
             <tbody>
               {filtered.map((p) => {
-                const stats = linesByPo.get(p.id) ?? { count: 0, total: 0 }
+                const stats = linesByPo.get(p.id) ?? { count: 0, total: 0, units: 0, kinds: new Set<string>(), detail: [] as QuickViewLine[] }
                 const isTransfer = poType(p) === 'transfer'
+                const subtitle = isTransfer ? 'Transfer' : `${kindLabel(stats.kinds)} · ${p.market === 'AU' ? 'AU' : 'NZ'}`
+                const route = `${supplierById.get(p.supplier_id) ?? '—'} → ${supplierById.get(p.destination_supplier_id ?? '') ?? '—'}`
+                const legs = isTransfer && p.expected_delivery_date ? `Arrives ${fmtDate(p.expected_delivery_date)}` : null
                 return (
                   <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-2 font-mono">
-                      <Link href={`/purchase-orders/${p.id}`} className="hover:underline text-gray-900">{p.po_number}</Link>
-                      {p.market === 'AU' && (
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-sans">AU</span>
-                      )}
+                      <span className="inline-flex items-center gap-2">
+                        <POQuickView
+                          poNumber={p.po_number}
+                          subtitle={subtitle}
+                          legs={legs}
+                          lines={stats.detail}
+                          totalUnits={stats.units}
+                          totalCost={stats.total}
+                          footerLeft={isTransfer ? route : (supplierById.get(p.supplier_id) ?? null)}
+                          href={`/purchase-orders/${p.id}`}
+                          isTransfer={isTransfer}
+                        />
+                        <span>
+                          <Link href={`/purchase-orders/${p.id}`} className="hover:underline text-gray-900">{p.po_number}</Link>
+                          {p.market === 'AU' && (
+                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-sans">AU</span>
+                          )}
+                        </span>
+                      </span>
                     </td>
                     <td className="px-3 py-2">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isTransfer ? 'bg-violet-100 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>
