@@ -80,9 +80,11 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
       .select('product_id, year_month, units_planned, market')
       .gte('year_month', firstMonth).lte('year_month', lastMonth) as unknown as Promise<{ data: Array<{ product_id: string; year_month: string; units_planned: number; market: string | null }> | null }>,
     supabase.from('purchase_orders')
-      .select('id, po_number, status, expected_delivery_date, market')
-      .in('status', ['submitted', 'partially_received'])
-      .not('expected_delivery_date', 'is', null) as unknown as Promise<{ data: Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null; market: string | null }> | null }>,
+      // 'received' is included so stock delivered inside the open window (no
+      // longer "on order") can still be credited as on-hand — see below.
+      .select('id, po_number, status, po_type, expected_delivery_date, market')
+      .in('status', ['submitted', 'partially_received', 'received'])
+      .not('expected_delivery_date', 'is', null) as unknown as Promise<{ data: Array<{ id: string; po_number: string; status: string; po_type: string | null; expected_delivery_date: string | null; market: string | null }> | null }>,
     supabase.from('purchase_order_lines')
       .select('purchase_order_id, ingredient_id, quantity_ordered, quantity_received, unit_of_measure')
       .not('ingredient_id', 'is', null) as unknown as Promise<{ data: Array<{ purchase_order_id: string; ingredient_id: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string }> | null }>,
@@ -151,11 +153,11 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
   // Only include lines from open POs with a delivery date inside the window.
   // Only count POs raised for the selected build (Combined counts all). POs are
   // tagged NZ/AU on their header; an AU PO replenishes the AU build, etc.
-  const poById = new Map<string, { po_number: string; expected_delivery_date: string | null; market: string }>()
+  const poById = new Map<string, { po_number: string; expected_delivery_date: string | null; market: string; status: string; po_type: string | null }>()
   for (const p of openPos ?? []) {
     const poMarket = p.market === 'AU' ? 'AU' : 'NZ'
     if (market !== 'combined' && poMarket !== (market === 'au' ? 'AU' : 'NZ')) continue
-    poById.set(p.id, { po_number: p.po_number, expected_delivery_date: p.expected_delivery_date, market: poMarket })
+    poById.set(p.id, { po_number: p.po_number, expected_delivery_date: p.expected_delivery_date, market: poMarket, status: p.status, po_type: p.po_type })
   }
 
   const arrivalsByIngredient = new Map<string, Array<{ po_id: string; po_number: string; month: string; qty: number }>>()
@@ -165,6 +167,9 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     if (!ln.ingredient_id) continue
     const po = poById.get(ln.purchase_order_id)
     if (!po?.expected_delivery_date) continue
+    // Fully-received POs aren't "still to come" — their stock is credited to
+    // opening as on-hand below, not shown as an arrival here.
+    if (po.status === 'received') continue
     // An open PO whose delivery date has already passed is still stock we're
     // owed, so pull it into the first planning month rather than dropping it.
     // POs due beyond the end of the window are still skipped.
@@ -196,6 +201,42 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
     arrivalsByIngredient.get(ln.ingredient_id)!.push({
       po_id: ln.purchase_order_id, po_number: po.po_number, month: monthKey, qty,
     })
+  }
+
+  // ── Stock already RECEIVED inside the open window ──────────
+  // Opening stock is the Stock Movements close of the last CLOSED month (e.g.
+  // end September). A purchase PO delivered after that — an October receipt when
+  // the window starts October — is no longer "on order", yet the stock is in the
+  // warehouse. It lands in neither opening nor arrivals, so the page reads a
+  // phantom shortfall. Credit the received quantity to opening so it shows as
+  // real on-hand stock. Deliveries dated in a closed month are already in opening
+  // via that month's stocktake (skipped). Transfers move existing stock, not new
+  // supply (skipped).
+  const receivedInWindow = new Map<string, { nz: number; au: number }>()
+  for (const ln of openPoLines ?? []) {
+    if (!ln.ingredient_id) continue
+    const po = poById.get(ln.purchase_order_id)
+    if (!po?.expected_delivery_date) continue
+    if (po.po_type === 'transfer') continue
+    if (po.status !== 'received' && po.status !== 'partially_received') continue
+
+    const received = Math.max(0, Number(ln.quantity_received))
+    if (received <= 0) continue
+
+    const monthKey = po.expected_delivery_date.slice(0, 7) + '-01'
+    if (monthKey < months[0]) continue   // already in opening via the month's close
+
+    const ing = ingredientById.get(ln.ingredient_id)
+    const ingUom = (ing?.unit_of_measure ?? '').trim().toLowerCase()
+    const lineUom = (ln.unit_of_measure ?? '').trim().toLowerCase()
+    let qty = received
+    if ((ingUom === 'kg' || ingUom === 'g' || ingUom === '') && lineUom === 'g') {
+      qty = convertGramsToIngredientUom(received, ing?.unit_of_measure ?? null)
+    }
+
+    const cur = receivedInWindow.get(ln.ingredient_id) ?? { nz: 0, au: 0 }
+    if (po.market === 'AU') cur.au += qty; else cur.nz += qty
+    receivedInWindow.set(ln.ingredient_id, cur)
   }
 
   // ── Aggregate (scoped to the selected market) ──────────────
@@ -241,8 +282,11 @@ export default async function IngredientDemandPage({ searchParams }: PageProps) 
   }
   const openingForMarket = (ing: { id: string }) => {
     const s = smOpenByIngredient.get(ing.id)
-    if (!s) return 0
-    return market === 'au' ? s.au : market === 'nz' ? s.nz : s.nz + s.au
+    const base = !s ? 0 : market === 'au' ? s.au : market === 'nz' ? s.nz : s.nz + s.au
+    // Stock received inside the open window counts as on-hand (see above).
+    const rec = receivedInWindow.get(ing.id)
+    const extra = !rec ? 0 : market === 'au' ? rec.au : market === 'nz' ? rec.nz : rec.nz + rec.au
+    return base + extra
   }
 
   // ── Derived totals for tiles ───────────────────────────────
