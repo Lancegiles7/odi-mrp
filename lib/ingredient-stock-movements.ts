@@ -104,12 +104,14 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
     supabase.from('suppliers').select('id, name') as unknown as Promise<{ data: Array<{ id: string; name: string }> | null }>,
     supabase.from('bom_items').select('bom_id, ingredient_id, quantity_g, wet_quantity_g, unit_quantity') as unknown as Promise<{ data: Array<{ bom_id: string; ingredient_id: string; quantity_g: number; wet_quantity_g: number | null; unit_quantity: number | null }> | null }>,
     supabase.from('purchase_orders')
+      // 'received' is included so a received PO's stock is booked as inbound in its
+      // delivery month — it shows in the ledger without waiting for a stocktake count.
       .select('id, po_number, status, expected_delivery_date, market, po_type')
-      .in('status', ['submitted', 'partially_received'])
+      .in('status', ['submitted', 'partially_received', 'received'])
       .not('expected_delivery_date', 'is', null) as unknown as Promise<{ data: Array<{ id: string; po_number: string; status: string; expected_delivery_date: string | null; market: string | null; po_type: string | null }> | null }>,
     supabase.from('purchase_order_lines')
-      .select('purchase_order_id, ingredient_id, quantity_ordered, quantity_received, unit_of_measure')
-      .not('ingredient_id', 'is', null) as unknown as Promise<{ data: Array<{ purchase_order_id: string; ingredient_id: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string }> | null }>,
+      .select('purchase_order_id, ingredient_id, quantity_ordered, quantity_received, unit_of_measure, short_closed')
+      .not('ingredient_id', 'is', null) as unknown as Promise<{ data: Array<{ purchase_order_id: string; ingredient_id: string | null; quantity_ordered: number; quantity_received: number; unit_of_measure: string; short_closed: boolean | null }> | null }>,
     supabase.from('stock_period_adjustments')
       .select('entity_id, year_month, market, wastage_units, wastage_comment, counted_units, count_comment, inbound_units, inbound_comment')
       .eq('entity_type', 'ingredient') as unknown as Promise<{ data: Array<{ entity_id: string; year_month: string; market: string; wastage_units: number; wastage_comment: string | null; counted_units: number | null; count_comment: string | null; inbound_units: number; inbound_comment: string | null }> | null }>,
@@ -152,17 +154,15 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
 
   // ── Inbound (open-PO arrivals) per ingredient per market ──
   const ingById = new Map((ingredients ?? []).map((i) => [i.id, i]))
-  const poMarketById = new Map<string, { market: Market; monthKey: string }>()
+  const poInfoById = new Map<string, { market: Market; rawMonth: string }>()
   for (const po of openPos ?? []) {
     // Transfers are handled separately (OUT/IN legs below) — counting a transfer
     // line as plain inbound would be a phantom receipt with no offsetting out.
     if (po.po_type === 'transfer') continue
     if (!po.expected_delivery_date) continue
-    const raw = po.expected_delivery_date.slice(0, 7) + '-01'
-    const monthKey = raw < months[0] ? months[0] : raw
-    if (!months.includes(monthKey)) continue
-    poMarketById.set(po.id, { market: po.market === 'AU' ? 'AU' : 'NZ', monthKey })
+    poInfoById.set(po.id, { market: po.market === 'AU' ? 'AU' : 'NZ', rawMonth: po.expected_delivery_date.slice(0, 7) + '-01' })
   }
+  const monthsSet = new Set(months)
   const inboundNz = new Map<string, Map<string, number>>()
   const inboundAu = new Map<string, Map<string, number>>()
   const addInbound = (map: Map<string, Map<string, number>>, ing: string, m: string, q: number) => {
@@ -171,16 +171,29 @@ export async function loadIngredientStockLedger(): Promise<IngStockLedger> {
   }
   for (const ln of openPoLines ?? []) {
     if (!ln.ingredient_id) continue
-    const po = poMarketById.get(ln.purchase_order_id)
+    const po = poInfoById.get(ln.purchase_order_id)
     if (!po) continue
-    const remaining = Math.max(0, Number(ln.quantity_ordered) - Number(ln.quantity_received))
-    if (remaining <= 0) continue
     const ing = ingById.get(ln.ingredient_id)
     const lineUom = (ln.unit_of_measure ?? '').trim().toLowerCase()
     const ingUom = (ing?.unit_of_measure ?? '').trim().toLowerCase()
-    const qty = ((ingUom === 'kg' || ingUom === 'g' || ingUom === '') && lineUom === 'g')
-      ? convertGramsToIngredientUom(remaining, ing?.unit_of_measure ?? null) : remaining
-    addInbound(po.market === 'AU' ? inboundAu : inboundNz, ln.ingredient_id, po.monthKey, qty)
+    const toDisplay = (raw: number) => ((ingUom === 'kg' || ingUom === 'g' || ingUom === '') && lineUom === 'g')
+      ? convertGramsToIngredientUom(raw, ing?.unit_of_measure ?? null) : raw
+    const map = po.market === 'AU' ? inboundAu : inboundNz
+
+    // Stock already RECEIVED on this PO — booked as inbound in its actual delivery
+    // month, so a received PO shows in the ledger without waiting for a stocktake.
+    // Deliveries before the ledger's first month are already baked into the seed
+    // count (the opening), so they're skipped — no double-count.
+    const received = Math.max(0, Number(ln.quantity_received))
+    if (received > 0 && monthsSet.has(po.rawMonth)) addInbound(map, ln.ingredient_id, po.rawMonth, toDisplay(received))
+
+    // Still to come — an overdue open PO rolls forward into the first planning month
+    // rather than being dropped. A written-off (short-closed) shortfall is dropped.
+    const remaining = ln.short_closed ? 0 : Math.max(0, Number(ln.quantity_ordered) - Number(ln.quantity_received))
+    if (remaining > 0) {
+      const rolled = po.rawMonth < months[0] ? months[0] : po.rawMonth
+      if (monthsSet.has(rolled)) addInbound(map, ln.ingredient_id, rolled, toDisplay(remaining))
+    }
   }
 
   // ── Transfer legs: OUT off the source market (pick-up month), IN onto the
