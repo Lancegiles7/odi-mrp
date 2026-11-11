@@ -151,12 +151,15 @@ function buildRow(
     const expected = stillToReceipt.reduce((s, o) => s + o.remaining, 0)
     const transfers = trByMonth?.get(m) ?? []
     const transfer = transfers.reduce((s, t) => s + t.units, 0)
-    // Supply = planned production OR the still-to-receipt PO total, whichever is
-    // larger. Taking the greater (not the sum) means a PO that backs a production
-    // plan (e.g. AU snacks: plan 2,500 + its PO 2,500) is NOT double-counted,
-    // while a PO with no plan behind it (e.g. a NZ snack PO) still gets counted
-    // into the balance. Overdue POs are rolled into the current month upstream.
-    const supply = Math.max(produced, expected)
+    // Supply = stock already RECEIVED this month (always counts — it's real) PLUS
+    // the still-to-come. The still-to-come is the larger of the plan not-yet-received
+    // or the open-PO remaining — max() (not sum) so a production plan and the PO that
+    // backs it aren't double-counted (e.g. plan 2,500 + its PO 2,500 = 2,500, not
+    // 5,000). Previously supply was max(produced, expected), which hid received stock
+    // whenever a separate open PO for the same month was larger. Overdue POs are
+    // rolled into the current month upstream.
+    const plannedUnits = maps.planned ? at(maps.planned, p.id, m) : 0
+    const supply = received + Math.max(0, plannedUnits - received, expected)
     eom = eom + supply - demand + transfer
     // A short-closed PO is excluded from the open-PO chips (nothing more to come),
     // so a month holding only its receipt would otherwise read "no PO". Pull those
