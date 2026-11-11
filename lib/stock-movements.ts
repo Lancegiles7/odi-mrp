@@ -56,15 +56,16 @@ export interface ActualCell {
 }
 
 export interface ForecastCell {
-  produced: number     // production plan
-  supply: number       // counted supply = max(production plan, still-to-receipt PO)
-  received: number      // real receipts booked this (open) month — PO-backed supply
+  produced: number     // production plan (or receipts, where logged)
+  supply: number       // counted supply = received stock + still-to-come (see builder)
+  received: number     // real receipts booked this (open) month — always counts
   demand: number       // demand forecast
-  eom: number          // supply = max(planned production, still-to-receipt PO)
+  eom: number
   transfer: number     // net NZ ↔ AU transfer (+ in / − out)
   transfers: TransferDetail[]
   shortfall: boolean   // eom < 0
-  stillToReceipt: OpenPoDetail[] // fully-open POs — counted as supply when ≥ the plan
+  receipts: ReceiptDetail[]      // breakdown behind `received` (for the hover)
+  stillToReceipt: OpenPoDetail[] // fully-open POs still to receive — counted into supply
   partialReceipt: OpenPoDetail[] // part-received PO lines — flagged only
   noPo: boolean             // planned production this month with no PO behind it at all
   fulfilments: PoFulfilment[] // short-closed PO receipts landing this month (chip)
@@ -181,7 +182,7 @@ function buildRow(
     const noPo = planned > 0 && open.length === 0 && poReceipts.length === 0
     if (produced || demand || open.length || transfers.length) activity = true
     if (!visible(m)) { carriedOpening = eom; continue }   // pre-launch build → opening
-    forecast[m] = { produced, supply, received, demand, eom, transfer, transfers, shortfall: eom < 0, stillToReceipt, partialReceipt, noPo, fulfilments }
+    forecast[m] = { produced, supply, received, demand, eom, transfer, transfers, shortfall: eom < 0, receipts: monthReceipts, stillToReceipt, partialReceipt, noPo, fulfilments }
   }
 
   return {

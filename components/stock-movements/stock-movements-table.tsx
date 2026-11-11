@@ -183,14 +183,14 @@ function LedgerRow({ r, actualMonths, forecastMonths, lockedThrough = null }: { 
       })}
       {forecastMonths.map((m, i) => {
         if (before(m)) return <BlankForecast key={m} first={i === 0} />
-        const c = r.forecast[m] ?? { produced: 0, supply: 0, demand: 0, eom: 0, transfer: 0, transfers: [], shortfall: false, stillToReceipt: [], partialReceipt: [], noPo: false, fulfilments: [] }
+        const c = r.forecast[m] ?? { produced: 0, supply: 0, received: 0, demand: 0, eom: 0, transfer: 0, transfers: [], shortfall: false, receipts: [], stillToReceipt: [], partialReceipt: [], noPo: false, fulfilments: [] }
         return (
           <Fragment key={m}>
             <td className={`px-1.5 py-2 text-right text-emerald-700 bg-amber-50/20 ${i === 0 ? 'border-l-2 border-amber-200' : 'border-l border-gray-100'}`}>
               {/* Planned production, then open POs as "still to receipt" chips so
                   incoming orders are visible. The chips are informational (not added
                   to the EOM, which stays in step with the Production page's balance). */}
-              <ForecastProdCell value={c.supply} fulfilments={c.fulfilments ?? []} />
+              <ForecastProdCell value={c.supply} received={c.received} receipts={c.receipts ?? []} stillToReceipt={c.stillToReceipt ?? []} />
               {(c.stillToReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.stillToReceipt} kind="still" /></div>}
               {(c.partialReceipt?.length ?? 0) > 0 && <div><OpenPoChips items={c.partialReceipt} kind="partial" /></div>}
               {(c.transfers?.length ?? 0) > 0 && <div><TransferChips items={c.transfers} /></div>}
