@@ -179,7 +179,14 @@ function buildRow(
     // the PO that backs it (they're the same stock), so the only honest "didn't
     // arrive" floor is the received figure.
     const supply = scenario === 'nodelivery' ? received : received + stillToCome
-    eom = eom + supply - demand + transfer
+    // An incoming transfer is a delivery too, so 'nodelivery' treats the whole
+    // uncertain (forecast-month) transfer like a still-to-receive PO: leave it
+    // out of the balance. A transfer whose despatch already happened lives in an
+    // actual month and still counts there — only the forecast legs (the part not
+    // yet moved) drop out, so origin keeps un-shipped stock and the destination
+    // doesn't receive it. Chips still show what's being held back.
+    const transferBal = scenario === 'nodelivery' ? 0 : transfer
+    eom = eom + supply - demand + transferBal
     // A short-closed PO is excluded from the open-PO chips (nothing more to come),
     // so a month holding only its receipt would otherwise read "no PO". Pull those
     // receipts off the month's receipt list and show them as "partially fulfilled ·

@@ -201,7 +201,7 @@ async function ProductsView({ label, lockedThrough, summaryView, scenario }: { l
       {scenario === 'nodelivery' && (
         <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-800">
           <span className="font-semibold">“If deliveries don’t arrive” scenario.</span>
-          <span>Forecast EOM counts only stock already physically received — every still-to-receive PO (the chips below) is treated as not turning up. Switch back to <b>Deliveries on time</b> for the normal view.</span>
+          <span>Forecast EOM counts only stock already physically received — every still-to-receive PO <b>and incoming transfer</b> (the chips below) is treated as not turning up. Switch back to <b>Deliveries on time</b> for the normal view.</span>
         </div>
       )}
       <p className="text-sm text-gray-500">
