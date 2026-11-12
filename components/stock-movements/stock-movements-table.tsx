@@ -161,14 +161,14 @@ function LedgerRow({ r, actualMonths, forecastMonths, lockedThrough = null }: { 
   const before = (m: string) => r.startMonth != null && m < r.startMonth
   return (
     <tr className={`group hover:bg-gray-50 [&>td]:border-b [&>td]:border-gray-100 ${isAu ? 'bg-sky-50/20' : ''}`}>
-      <td className={`px-3 py-2 sticky left-0 z-10 ${isAu ? 'bg-sky-50/40' : 'bg-white'} group-hover:bg-gray-50`}>
+      <td className={`px-3 py-2 sticky left-0 z-10 ${isAu ? 'bg-sky-50' : 'bg-white'} group-hover:bg-gray-50`}>
         <div className="flex items-center gap-1.5">
           <MarketBadge market={r.market} />
           <div className={`font-medium truncate max-w-[196px] ${isAu ? 'text-gray-600' : 'text-gray-900'}`}>{r.name}</div>
         </div>
         {!isAu && <div className="text-[10px] font-mono text-gray-500 mt-0.5">{r.sku}</div>}
       </td>
-      <td className={`px-2 py-2 text-right sticky left-[240px] z-10 border-r-2 border-gray-300 text-gray-500 ${isAu ? 'bg-sky-50/40' : 'bg-white'} group-hover:bg-gray-50`}>{nf(r.opening)}</td>
+      <td className={`px-2 py-2 text-right sticky left-[240px] z-10 border-r-2 border-gray-300 text-gray-500 ${isAu ? 'bg-sky-50' : 'bg-white'} group-hover:bg-gray-50`}>{nf(r.opening)}</td>
       {actualMonths.map((m) => {
         if (before(m)) return <BlankActual key={m} />
         const c = r.actual[m] ?? { inbound: 0, outbound: 0, writeoff: 0, eom: 0, transfer: 0, transfers: [], receipts: [], stillToReceipt: [], partialReceipt: [] }
