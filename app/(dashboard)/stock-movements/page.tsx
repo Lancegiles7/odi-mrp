@@ -46,8 +46,9 @@ const HUB_TABS: { key: Hub; label: string }[] = [
   { key: 'breakdown', label: 'Breakdown' },
 ]
 
-export default async function StockMovementsPage({ searchParams }: { searchParams: { view?: string; group?: string; hub?: string; sum?: string } }) {
+export default async function StockMovementsPage({ searchParams }: { searchParams: { view?: string; group?: string; hub?: string; sum?: string; scenario?: string } }) {
   const summaryView: 'monthly' | 'weekly' = searchParams.sum === 'weekly' ? 'weekly' : 'monthly'
+  const scenario: 'ontime' | 'nodelivery' = searchParams.scenario === 'nodelivery' ? 'nodelivery' : 'ontime'
   const hub: Hub = searchParams.hub === 'watch' ? 'watch'
     : searchParams.hub === 'uploads' ? 'uploads'
     : searchParams.hub === 'breakdown' ? 'breakdown' : 'summary'
@@ -97,7 +98,7 @@ export default async function StockMovementsPage({ searchParams }: { searchParam
             ))}
           </div>
 
-          {view === 'products' && <ProductsView label={monthLabel} lockedThrough={lock.lockedThrough} summaryView={summaryView} />}
+          {view === 'products' && <ProductsView label={monthLabel} lockedThrough={lock.lockedThrough} summaryView={summaryView} scenario={scenario} />}
           {view === 'ingredients' && <IngredientsView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
           {view === 'packaging' && <PackagingView group={searchParams.group === 'supplier' ? 'supplier' : 'flat'} />}
         </>
@@ -161,7 +162,18 @@ function SummaryViewToggle({ active }: { active: 'monthly' | 'weekly' }) {
   )
 }
 
-async function ProductsView({ label, lockedThrough, summaryView }: { label: (m: string) => string; lockedThrough: string | null; summaryView: 'monthly' | 'weekly' }) {
+/** Forecast supply assumption: incoming POs on time vs not arriving at all. */
+function ScenarioToggle({ active }: { active: 'ontime' | 'nodelivery' }) {
+  const base = 'text-xs font-medium px-3 py-1 rounded-md'
+  return (
+    <div className="inline-flex bg-white border border-gray-300 rounded-lg p-0.5 gap-0.5">
+      <Link href="/stock-movements" className={`${base} ${active === 'ontime' ? 'bg-emerald-700 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>Deliveries on time</Link>
+      <Link href="/stock-movements?scenario=nodelivery" className={`${base} ${active === 'nodelivery' ? 'bg-rose-700 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>If deliveries don&rsquo;t arrive</Link>
+    </div>
+  )
+}
+
+async function ProductsView({ label, lockedThrough, summaryView, scenario }: { label: (m: string) => string; lockedThrough: string | null; summaryView: 'monthly' | 'weekly'; scenario: 'ontime' | 'nodelivery' }) {
   if (summaryView === 'weekly') {
     const data = await loadWeeklyRunway()
     return (
@@ -173,7 +185,7 @@ async function ProductsView({ label, lockedThrough, summaryView }: { label: (m: 
   }
 
   const [ledger, notes] = await Promise.all([
-    loadStockLedger(),
+    loadStockLedger(scenario),
     loadStockMovementNotes('products'),
   ])
   const { rows, actualMonths, forecastMonths, actualThrough } = ledger
@@ -182,7 +194,16 @@ async function ProductsView({ label, lockedThrough, summaryView }: { label: (m: 
   const months = [...actualMonths, ...forecastMonths]
   return (
     <div className="space-y-3">
-      <SummaryViewToggle active="monthly" />
+      <div className="flex items-center gap-3 flex-wrap">
+        <SummaryViewToggle active="monthly" />
+        <ScenarioToggle active={scenario} />
+      </div>
+      {scenario === 'nodelivery' && (
+        <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-800">
+          <span className="font-semibold">“If deliveries don’t arrive” scenario.</span>
+          <span>Forecast EOM counts only stock already physically received — every still-to-receive PO (the chips below) is treated as not turning up. Switch back to <b>Deliveries on time</b> for the normal view.</span>
+        </div>
+      )}
       <p className="text-sm text-gray-500">
         Inbound − sold/samples − write-offs = predicted EOM
         {lastActualLabel && <> · actuals through <span className="font-semibold text-gray-800">{lastActualLabel}</span>, forecast thereafter</>}

@@ -103,6 +103,17 @@ export interface MarketMaps {
   transfers?: Map<string, Map<string, TransferDetail[]>>
 }
 
+/**
+ * Supply scenario for forecast months:
+ *   'ontime'     — still-to-receive POs (and planned production) are assumed to
+ *                  arrive on their expected month. This is the default view.
+ *   'nodelivery' — assume nothing still outstanding turns up: supply counts ONLY
+ *                  stock already physically received. Lets you see the floor EOM
+ *                  if open POs are late / don't land. Chips still show what's
+ *                  assumed missing; it's just not added to the balance.
+ */
+export type SupplyScenario = 'ontime' | 'nodelivery'
+
 function buildRow(
   p: { id: string; sku_code: string; name: string; product_type: string | null },
   market: 'NZ' | 'AU',
@@ -110,6 +121,7 @@ function buildRow(
   actualMonths: string[],
   forecastMonths: string[],
   startMonth: string | null,
+  scenario: SupplyScenario,
 ): StockRow {
   const openByMonth = maps.openPo?.get(p.id)
   const trByMonth = maps.transfers?.get(p.id)
@@ -160,7 +172,13 @@ function buildRow(
     // whenever a separate open PO for the same month was larger. Overdue POs are
     // rolled into the current month upstream.
     const plannedUnits = maps.planned ? at(maps.planned, p.id, m) : 0
-    const supply = received + Math.max(0, plannedUnits - received, expected)
+    const stillToCome = Math.max(0, plannedUnits - received, expected)
+    // 'nodelivery' scenario: count only stock already physically received —
+    // drop everything still outstanding (open POs + any planned-but-not-made).
+    // The still-to-come is a single quantity whether it's framed as the plan or
+    // the PO that backs it (they're the same stock), so the only honest "didn't
+    // arrive" floor is the received figure.
+    const supply = scenario === 'nodelivery' ? received : received + stillToCome
     eom = eom + supply - demand + transfer
     // A short-closed PO is excluded from the open-PO chips (nothing more to come),
     // so a month holding only its receipt would otherwise read "no PO". Pull those
@@ -219,13 +237,16 @@ export function buildStockLedger(input: {
   nz: MarketMaps
   au: MarketMaps
   auStartMonth: string
+  /** Forecast supply assumption (default 'ontime'). */
+  scenario?: SupplyScenario
 }): StockRow[] {
+  const scenario = input.scenario ?? 'ontime'
   const allMonths = [...input.actualMonths, ...input.forecastMonths]
   const out: StockRow[] = []
   for (const p of input.products) {
-    const nz = buildRow(p, 'NZ', input.nz, input.actualMonths, input.forecastMonths, null)
+    const nz = buildRow(p, 'NZ', input.nz, input.actualMonths, input.forecastMonths, null, scenario)
     const auStart = firstActivityMonth(p.id, input.au, allMonths) ?? input.auStartMonth
-    const au = buildRow(p, 'AU', input.au, input.actualMonths, input.forecastMonths, auStart)
+    const au = buildRow(p, 'AU', input.au, input.actualMonths, input.forecastMonths, auStart, scenario)
     if (nz.hasActivity || au.hasActivity) { out.push(nz); out.push(au) }
   }
   return out

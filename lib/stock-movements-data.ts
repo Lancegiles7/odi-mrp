@@ -42,7 +42,7 @@ export interface StockLedger {
   transfers: BuildTransfers
 }
 
-export async function loadStockLedger(): Promise<StockLedger> {
+export async function loadStockLedger(scenario: 'ontime' | 'nodelivery' = 'ontime'): Promise<StockLedger> {
   const supabase = createClient()
 
   const [
@@ -214,7 +214,7 @@ export async function loadStockLedger(): Promise<StockLedger> {
   }
 
   const rows = buildStockLedger({
-    products: products ?? [], actualMonths, forecastMonths, auStartMonth: AU_START,
+    products: products ?? [], actualMonths, forecastMonths, auStartMonth: AU_START, scenario,
     nz: { inbound: inboundNz, outbound: outboundNz, writeoff: writeoffNz, produced: producedNz, planned: plannedNz, demand: demandNz, inboundReceipts: receiptsNz, openPo: openPoNz, transfers: transfers.NZ },
     au: { inbound: inboundAu, outbound: outboundAu, writeoff: writeoffAu, produced: producedAu, planned: plannedAu, demand: demandAu, inboundReceipts: receiptsAu, openPo: openPoAu, transfers: transfers.AU },
   })
