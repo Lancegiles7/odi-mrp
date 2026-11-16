@@ -29,6 +29,11 @@ export interface StockoutRow {
   soldD2c: number
   daysElapsed: number
   incoming: StockoutIncoming[]
+  /** Committed NZ↔AU transfer departures still to despatch (date > as-of).
+   *  `units` is the quantity LEAVING this market. Applied in both views (a
+   *  committed transfer isn't optional incoming) — the walk subtracts it on its
+   *  pickup date. Legs already picked up (date ≤ as-of) are folded into onHand. */
+  outgoing: StockoutIncoming[]
 }
 export interface StockoutData {
   rows: StockoutRow[]
@@ -146,15 +151,44 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
       incoming.get(l.product_id)!.push({ units: remaining, date: po.expected_delivery_date, po: po.po_number })
     }
 
+    // Planned NZ↔AU transfers for this market (received legs are already booked
+    // as FG receipts, so they're in `recv` — these are only what's still to
+    // move). Legs signed: − leaving this market, + arriving into it.
+    //   • picked up / landed already (date ≤ as-of) → folded into onHand now
+    //   • still to despatch (date > as-of)          → departure event (always applied)
+    //   • still to arrive    (date > as-of)          → arrival (rides `incoming`, gated by POs toggle)
+    // Stale pre-month planned transfers (month < this month) are ignored.
+    const tOnHand = new Map<string, number>()
+    const tIn = new Map<string, StockoutIncoming[]>()
+    const tOut = new Map<string, StockoutIncoming[]>()
+    for (const [pid, byMonth] of Array.from(ledger.transfers[market].entries())) {
+      for (const [month, legs] of Array.from(byMonth.entries())) {
+        if (month < periodStart) continue
+        for (const leg of legs) {
+          const dt = leg.date ?? null
+          const past = dt != null && dt <= asOf
+          if (leg.units < 0) {
+            const qty = -leg.units
+            if (past) tOnHand.set(pid, (tOnHand.get(pid) ?? 0) - qty)
+            else { if (!tOut.has(pid)) tOut.set(pid, []); tOut.get(pid)!.push({ units: qty, date: dt, po: leg.po }) }
+          } else if (leg.units > 0) {
+            if (past) tOnHand.set(pid, (tOnHand.get(pid) ?? 0) + leg.units)
+            else { if (!tIn.has(pid)) tIn.set(pid, []); tIn.get(pid)!.push({ units: leg.units, date: dt, po: leg.po }) }
+          }
+        }
+      }
+    }
+
     for (const pid of Array.from(sold.keys())) {
       const m = meta[market].get(pid)
       if (!m) continue
-      const onHand = (eom[market].get(pid) ?? 0) + (recv.get(pid) ?? 0) - (sold.get(pid) ?? 0)
-      const inc = (incoming.get(pid) ?? []).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+      const onHand = (eom[market].get(pid) ?? 0) + (recv.get(pid) ?? 0) - (sold.get(pid) ?? 0) + (tOnHand.get(pid) ?? 0)
+      const inc = (incoming.get(pid) ?? []).concat(tIn.get(pid) ?? []).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+      const out = (tOut.get(pid) ?? []).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
       rows.push({
         product_id: pid, sku: m.sku, name: m.name, group: m.group, market,
         onHand: Math.round(onHand), soldMtd: Math.round(sold.get(pid) ?? 0),
-        soldD2c: Math.round(soldD2c.get(pid) ?? 0), daysElapsed, incoming: inc,
+        soldD2c: Math.round(soldD2c.get(pid) ?? 0), daysElapsed, incoming: inc, outgoing: out,
       })
     }
   }

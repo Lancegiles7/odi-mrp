@@ -30,6 +30,7 @@ function sellout(r: StockoutRow, asOf: string, usePos: boolean, uplift: number, 
   for (let d = 0; d < 160; d++) {
     const iso = new Date(start.getTime() + d * 86_400_000).toISOString().slice(0, 10)
     if (usePos) for (const i of r.incoming) if (i.date === iso) stock += i.units
+    for (const o of r.outgoing) if (o.date === iso) stock -= o.units   // committed transfer out — always
     stock -= fwdDaily(r, iso, uplift, monthEnd)
     if (stock < 0) return { txt: fmtD(iso), days: d }
   }
@@ -195,13 +196,15 @@ function Overview({ rows, asOf, showMkt, usePos, uplift, monthEnd }: { rows: Sto
                 </td>
                 <td className="px-3 py-2">{wks < 0.2 ? 'now' : `~${wks.toFixed(1)} wks`}</td>
                 <td className="px-3 py-2">{so.txt}</td>
-                <td className={`px-3 py-2 text-[11px] ${!usePos ? 'text-gray-400' : ''}`}>
-                  {r.incoming.length
-                    ? <>
-                        {r.incoming.map((i, k) => <div key={k} className={!usePos ? 'line-through decoration-gray-300' : ''}>+{nf(i.units)} · {i.date ? fmtD(i.date) : '—'} ({i.po})</div>)}
-                        {!usePos && <div className="text-[9px] uppercase tracking-wide text-gray-400">not counted</div>}
-                      </>
-                    : <span className="text-gray-300">— nothing on order</span>}
+                <td className="px-3 py-2 text-[11px]">
+                  {r.incoming.length > 0 && (
+                    <div className={!usePos ? 'text-gray-400' : ''}>
+                      {r.incoming.map((i, k) => <div key={k} className={!usePos ? 'line-through decoration-gray-300' : ''}>+{nf(i.units)} · {i.date ? fmtD(i.date) : '—'} ({i.po})</div>)}
+                      {!usePos && <div className="text-[9px] uppercase tracking-wide text-gray-400">not counted</div>}
+                    </div>
+                  )}
+                  {r.outgoing.map((o, k) => <div key={`o${k}`} className="text-rose-600">−{nf(o.units)} · {o.date ? fmtD(o.date) : '—'} ({o.po})</div>)}
+                  {r.incoming.length === 0 && r.outgoing.length === 0 && <span className="text-gray-300">— nothing on order</span>}
                 </td>
                 <td className="px-3 py-2"><span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${PILL[t]}`}>{t === 'red' ? 'AT RISK' : t === 'amber' ? 'WATCH' : 'OK'}</span></td>
               </tr>
@@ -219,6 +222,7 @@ function weeklyStock(r: StockoutRow, weekStarts: Date[], usePos: boolean, uplift
     for (let k = 0; k < 7; k++) {
       const iso = new Date(s0.getTime() + k * 86_400_000).toISOString().slice(0, 10)
       if (usePos) for (const inc of r.incoming) if (inc.date === iso) stock += inc.units
+      for (const o of r.outgoing) if (o.date === iso) stock -= o.units   // committed transfer out — always
       stock -= fwdDaily(r, iso, uplift, monthEnd)
     }
     return stock
