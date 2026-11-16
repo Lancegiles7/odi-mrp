@@ -24,6 +24,9 @@ export interface StockoutRow {
   market: Market
   onHand: number
   soldMtd: number
+  /** D2C (e-com) slice of soldMtd — the part a promo uplift scales. Retail,
+   *  samples and expo sit in (soldMtd − soldD2c) and stay flat. */
+  soldD2c: number
   daysElapsed: number
   incoming: StockoutIncoming[]
 }
@@ -38,6 +41,7 @@ const CHANNELS: Record<Market, Set<string>> = {
   NZ: new Set(['nz_d2c', 'nz_retail', 'nz_samples']),
   AU: new Set(['au_d2c', 'au_retail', 'au_samples']),
 }
+const D2C_CHANNEL: Record<Market, string> = { NZ: 'nz_d2c', AU: 'au_d2c' }
 const norm = (d: string) => d.slice(0, 7) + '-01'
 const mkt = (m: string | null): Market => ((m ?? 'NZ').toUpperCase() === 'AU' ? 'AU' : 'NZ')
 
@@ -105,9 +109,13 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
   for (const market of ['NZ', 'AU'] as Market[]) {
     // MTD sales for this market.
     const sold = new Map<string, number>()
+    const soldD2c = new Map<string, number>()
     for (const r of interim) {
       if (!CHANNELS[market].has(r.channel)) continue
       sold.set(r.product_id, (sold.get(r.product_id) ?? 0) + Number(r.units))
+      if (r.channel === D2C_CHANNEL[market]) {
+        soldD2c.set(r.product_id, (soldD2c.get(r.product_id) ?? 0) + Number(r.units))
+      }
     }
     // Receipts this month, this market.
     const recv = new Map<string, number>()
@@ -145,7 +153,8 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
       const inc = (incoming.get(pid) ?? []).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
       rows.push({
         product_id: pid, sku: m.sku, name: m.name, group: m.group, market,
-        onHand: Math.round(onHand), soldMtd: Math.round(sold.get(pid) ?? 0), daysElapsed, incoming: inc,
+        onHand: Math.round(onHand), soldMtd: Math.round(sold.get(pid) ?? 0),
+        soldD2c: Math.round(soldD2c.get(pid) ?? 0), daysElapsed, incoming: inc,
       })
     }
   }

@@ -13,18 +13,24 @@ function fmtD(iso: string): string {
 const WEEKS = 8
 const GROUP_ORDER = PRODUCT_GROUPS.map((g) => g.value as string)
 
-const daily = (r: StockoutRow) => (r.soldMtd > 0 ? r.soldMtd / r.daysElapsed : 0)
+const baseDaily = (r: StockoutRow) => (r.soldMtd > 0 ? r.soldMtd / r.daysElapsed : 0)
+const d2cDaily = (r: StockoutRow) => (r.daysElapsed > 0 ? r.soldD2c / r.daysElapsed : 0)
+// Forward daily sell rate on a given date. A promo uplift lifts the e-com (D2C)
+// slice only, and only through month-end — retail/samples stay flat and the
+// promo is assumed to end with the month, so the rate reverts afterwards.
+function fwdDaily(r: StockoutRow, iso: string, uplift: number, monthEnd: string): number {
+  return baseDaily(r) + (uplift > 0 && iso <= monthEnd ? d2cDaily(r) * uplift : 0)
+}
 // usePos=false walks the sellout on current stock alone (ignores open POs), so
 // you see the true cliff before crediting anything that's only on order.
-function sellout(r: StockoutRow, asOf: string, usePos: boolean): { txt: string; days: number } {
-  const dr = daily(r)
-  if (dr <= 0) return { txt: '—', days: 9999 }
+function sellout(r: StockoutRow, asOf: string, usePos: boolean, uplift: number, monthEnd: string): { txt: string; days: number } {
+  if (baseDaily(r) <= 0) return { txt: '—', days: 9999 }
   let stock = r.onHand
   const start = new Date(asOf + 'T00:00:00')
   for (let d = 0; d < 160; d++) {
     const iso = new Date(start.getTime() + d * 86_400_000).toISOString().slice(0, 10)
     if (usePos) for (const i of r.incoming) if (i.date === iso) stock += i.units
-    stock -= dr
+    stock -= fwdDaily(r, iso, uplift, monthEnd)
     if (stock < 0) return { txt: fmtD(iso), days: d }
   }
   return { txt: '>160d', days: 160 }
@@ -45,7 +51,16 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
   // Default to the bare position (POs off) — flip on to credit open POs.
   const [pos, setPos] = useState<'without' | 'with'>('without')
   const usePos = pos === 'with'
+  // Promo uplift on the e-com forward rate for the rest of the month (0 = none).
+  const [uplift, setUplift] = useState(0)
   const asOf = data.asOf ?? new Date().toISOString().slice(0, 10)
+
+  // Last day of the snapshot's month — the uplift applies through here only.
+  const monthEnd = useMemo(() => {
+    const s = new Date((data.periodStart ?? asOf) + 'T00:00:00')
+    return new Date(s.getFullYear(), s.getMonth() + 1, 0).toISOString().slice(0, 10)
+  }, [data.periodStart, asOf])
+  const hasD2c = data.rows.some((r) => r.soldD2c > 0)
 
   const weekStarts = useMemo(() => {
     const s = new Date(asOf + 'T00:00:00')
@@ -62,7 +77,7 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
 
   const rows = market === 'both' ? data.rows : data.rows.filter((r) => r.market === market)
   const showMkt = market === 'both'
-  const atRisk = rows.filter((r) => toneOf(sellout(r, asOf, usePos).days) === 'red').length
+  const atRisk = rows.filter((r) => toneOf(sellout(r, asOf, usePos, uplift, monthEnd).days) === 'red').length
   const totalSold = rows.reduce((s, r) => s + r.soldMtd, 0)
   const monthLbl = data.periodStart ? fmtD(data.periodStart).split(' ')[1] : ''
 
@@ -82,12 +97,42 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
             <Toggle value={view} onChange={(v) => setView(v as 'ov' | 'wk')} options={[['ov', 'Overview'], ['wk', 'Weekly cover']]} />
             <Toggle value={pos} onChange={(v) => setPos(v as 'without' | 'with')} options={[['without', 'Stock on hand only'], ['with', 'Incl. incoming POs']]} />
           </div>
-          <span className="text-xs text-gray-400">run-rate = MTD ÷ {data.rows[0]?.daysElapsed ?? '—'} days</span>
+          <span className="text-xs text-gray-400">
+            run-rate = MTD ÷ {data.rows[0]?.daysElapsed ?? '—'} days
+            {uplift > 0 && <span className="text-amber-700 font-medium"> · e-com +{Math.round(uplift * 100)}% to {fmtD(monthEnd)}</span>}
+          </span>
         </div>
 
+        {hasD2c && (
+          <div className="px-4 py-2.5 bg-amber-50/60 border-b border-amber-100 flex items-center gap-3 flex-wrap">
+            <div className="text-xs font-semibold text-amber-900 whitespace-nowrap">
+              Promo uplift · e-com, rest of {monthLbl}
+            </div>
+            <input
+              type="range" min={0} max={150} step={5}
+              value={Math.round(uplift * 100)}
+              onChange={(e) => setUplift(Number(e.target.value) / 100)}
+              className="flex-1 min-w-[150px] max-w-[300px] accent-amber-600"
+              aria-label="Promo uplift percent"
+            />
+            <div className="text-sm font-bold text-amber-800 tabular-nums w-12 text-right">{uplift > 0 ? `+${Math.round(uplift * 100)}%` : 'off'}</div>
+            <div className="flex gap-1">
+              {[0, 0.25, 0.5, 0.75, 1].map((u) => (
+                <button key={u} onClick={() => setUplift(u)}
+                  className={`text-[11px] px-2 py-0.5 rounded border ${Math.abs(uplift - u) < 0.001 ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-100'}`}>
+                  {u === 0 ? 'Off' : `+${Math.round(u * 100)}%`}
+                </button>
+              ))}
+            </div>
+            <div className="text-[11px] text-amber-700 whitespace-nowrap ml-auto">
+              lifts the e-com daily rate through {fmtD(monthEnd)} · retail stays flat
+            </div>
+          </div>
+        )}
+
         {view === 'ov'
-          ? <Overview rows={rows} asOf={asOf} showMkt={showMkt} usePos={usePos} />
-          : <Weekly rows={rows} weekStarts={weekStarts} showMkt={showMkt} usePos={usePos} />}
+          ? <Overview rows={rows} asOf={asOf} showMkt={showMkt} usePos={usePos} uplift={uplift} monthEnd={monthEnd} />
+          : <Weekly rows={rows} weekStarts={weekStarts} showMkt={showMkt} usePos={usePos} uplift={uplift} monthEnd={monthEnd} />}
       </div>
     </div>
   )
@@ -115,7 +160,7 @@ function Stat({ k, v, tone = 'text-gray-900' }: { k: string; v: string; tone?: s
   )
 }
 
-function Overview({ rows, asOf, showMkt, usePos }: { rows: StockoutRow[]; asOf: string; showMkt: boolean; usePos: boolean }) {
+function Overview({ rows, asOf, showMkt, usePos, uplift, monthEnd }: { rows: StockoutRow[]; asOf: string; showMkt: boolean; usePos: boolean; uplift: number; monthEnd: string }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
@@ -134,15 +179,20 @@ function Overview({ rows, asOf, showMkt, usePos }: { rows: StockoutRow[]; asOf: 
         </thead>
         <tbody>
           {rows.map((r) => {
-            const so = sellout(r, asOf, usePos), t = toneOf(so.days), dr = daily(r)
-            const wks = dr > 0 ? r.onHand / (dr * 7) : 999
+            const so = sellout(r, asOf, usePos, uplift, monthEnd), t = toneOf(so.days)
+            const dr = baseDaily(r)
+            const fwd = fwdDaily(r, asOf, uplift, monthEnd)   // promo-day forward rate
+            const wks = fwd > 0 ? r.onHand / (fwd * 7) : 999
             return (
               <tr key={`${r.market}:${r.product_id}`} className={`border-t border-gray-100 ${t === 'red' ? 'bg-red-50/40' : ''}`}>
                 <td className="px-4 py-2"><div className="font-medium">{r.name}</div><div className="text-[10px] text-gray-500 font-mono">{r.sku}</div></td>
                 {showMkt && <td className="px-2 py-2"><MktBadge m={r.market} /></td>}
                 <td className="px-3 py-2 text-right tabular-nums">{nf(r.onHand)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{nf(r.soldMtd)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{dr.toFixed(0)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {dr.toFixed(0)}
+                  {uplift > 0 && fwd > dr + 0.5 && <span className="text-amber-700 font-semibold"> →{fwd.toFixed(0)}</span>}
+                </td>
                 <td className="px-3 py-2">{wks < 0.2 ? 'now' : `~${wks.toFixed(1)} wks`}</td>
                 <td className="px-3 py-2">{so.txt}</td>
                 <td className={`px-3 py-2 text-[11px] ${!usePos ? 'text-gray-400' : ''}`}>
@@ -163,22 +213,19 @@ function Overview({ rows, asOf, showMkt, usePos }: { rows: StockoutRow[]; asOf: 
   )
 }
 
-function weeklyStock(r: StockoutRow, weekStarts: Date[], usePos: boolean): number[] {
-  const wd = daily(r) * 7
+function weeklyStock(r: StockoutRow, weekStarts: Date[], usePos: boolean, uplift: number, monthEnd: string): number[] {
   let stock = r.onHand
   return weekStarts.map((s0) => {
-    const s1 = new Date(s0.getTime() + 7 * 86_400_000)
-    if (usePos) for (const inc of r.incoming) {
-      if (!inc.date) continue
-      const id = new Date(inc.date + 'T00:00:00')
-      if (id >= s0 && id < s1) stock += inc.units
+    for (let k = 0; k < 7; k++) {
+      const iso = new Date(s0.getTime() + k * 86_400_000).toISOString().slice(0, 10)
+      if (usePos) for (const inc of r.incoming) if (inc.date === iso) stock += inc.units
+      stock -= fwdDaily(r, iso, uplift, monthEnd)
     }
-    stock -= wd
     return stock
   })
 }
 
-function Weekly({ rows, weekStarts, showMkt, usePos }: { rows: StockoutRow[]; weekStarts: Date[]; showMkt: boolean; usePos: boolean }) {
+function Weekly({ rows, weekStarts, showMkt, usePos, uplift, monthEnd }: { rows: StockoutRow[]; weekStarts: Date[]; showMkt: boolean; usePos: boolean; uplift: number; monthEnd: string }) {
   // Section per (market, product group), ordered like the Summary grid.
   const markets: Market[] = showMkt ? ['NZ', 'AU'] : [(rows[0]?.market ?? 'NZ')]
   const sections: { key: string; label: string; rows: StockoutRow[] }[] = []
@@ -217,7 +264,7 @@ function Weekly({ rows, weekStarts, showMkt, usePos }: { rows: StockoutRow[]; we
           {sections.map((sec) => {
             const subOn = sec.rows.reduce((s, r) => s + r.onHand, 0)
             const subSold = sec.rows.reduce((s, r) => s + r.soldMtd, 0)
-            const subWeeks = weekStarts.map((_, i) => sec.rows.reduce((s, r) => s + Math.max(0, weeklyStock(r, weekStarts, usePos)[i]), 0))
+            const subWeeks = weekStarts.map((_, i) => sec.rows.reduce((s, r) => s + Math.max(0, weeklyStock(r, weekStarts, usePos, uplift, monthEnd)[i]), 0))
             return (
               <Fragment key={sec.key}>
                 <tr className="bg-gray-100/80">
@@ -226,8 +273,8 @@ function Weekly({ rows, weekStarts, showMkt, usePos }: { rows: StockoutRow[]; we
                   </td>
                 </tr>
                 {sec.rows.map((r) => {
-                  const wd = daily(r) * 7
-                  const wkStock = weeklyStock(r, weekStarts, usePos)
+                  const wd = fwdDaily(r, weekStarts[0].toISOString().slice(0, 10), uplift, monthEnd) * 7
+                  const wkStock = weeklyStock(r, weekStarts, usePos, uplift, monthEnd)
                   const wks = wd > 0 ? r.onHand / wd : 999
                   return (
                     <tr key={`${r.market}:${r.product_id}`} className="border-t border-gray-100">
