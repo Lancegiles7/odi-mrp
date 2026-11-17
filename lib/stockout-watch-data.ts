@@ -34,6 +34,11 @@ export interface StockoutRow {
    *  committed transfer isn't optional incoming) — the walk subtracts it on its
    *  pickup date. Legs already picked up (date ≤ as-of) are folded into onHand. */
   outgoing: StockoutIncoming[]
+  /** Forward demand FORECAST per month (yyyy-mm-01 → units), straight from the
+   *  Stock Movements ledger demand — the same number that drives the Summary.
+   *  Lets Stockout Watch switch its forward rate from actual run-rate to the
+   *  planned forecast (remaining-this-month ÷ days left, then forecast ÷ days). */
+  forecastByMonth: Record<string, number>
 }
 export interface StockoutData {
   rows: StockoutRow[]
@@ -73,10 +78,15 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
   const closed = ledger.actualThrough
   const eom: Record<Market, Map<string, number>> = { NZ: new Map(), AU: new Map() }
   const meta: Record<Market, Map<string, { sku: string; name: string; group: string | null }>> = { NZ: new Map(), AU: new Map() }
+  // Forward demand forecast per market+product (month → units), from the ledger.
+  const fcByKey = new Map<string, Record<string, number>>()
   for (const r of ledger.rows) {
     const m = r.market as Market
     eom[m].set(r.product_id, closed ? (r.actual[closed]?.eom ?? r.opening) : r.opening)
     meta[m].set(r.product_id, { sku: r.sku, name: r.name, group: r.group })
+    const fm: Record<string, number> = {}
+    for (const [mo, cell] of Object.entries(r.forecast)) if (mo >= periodStart) fm[mo] = cell.demand
+    fcByKey.set(`${m}:${r.product_id}`, fm)
   }
 
   const productIds = Array.from(new Set(
@@ -189,6 +199,7 @@ export async function loadStockoutWatch(): Promise<StockoutData> {
         product_id: pid, sku: m.sku, name: m.name, group: m.group, market,
         onHand: Math.round(onHand), soldMtd: Math.round(sold.get(pid) ?? 0),
         soldD2c: Math.round(soldD2c.get(pid) ?? 0), daysElapsed, incoming: inc, outgoing: out,
+        forecastByMonth: fcByKey.get(`${market}:${pid}`) ?? {},
       })
     }
   }

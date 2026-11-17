@@ -15,23 +15,47 @@ const GROUP_ORDER = PRODUCT_GROUPS.map((g) => g.value as string)
 
 const baseDaily = (r: StockoutRow) => (r.soldMtd > 0 ? r.soldMtd / r.daysElapsed : 0)
 const d2cDaily = (r: StockoutRow) => (r.daysElapsed > 0 ? r.soldD2c / r.daysElapsed : 0)
-// Forward daily sell rate on a given date. A promo uplift lifts the e-com (D2C)
-// slice only, and only through month-end — retail/samples stay flat and the
-// promo is assumed to end with the month, so the rate reverts afterwards.
-function fwdDaily(r: StockoutRow, iso: string, uplift: number, monthEnd: string): number {
-  return baseDaily(r) + (uplift > 0 && iso <= monthEnd ? d2cDaily(r) * uplift : 0)
+
+type Basis = 'runrate' | 'forecast'
+// Everything the forward-rate needs, bundled so the walkers take one object.
+interface Proj { basis: Basis; uplift: number; monthEnd: string; asOf: string; daysLeftInMonth: number }
+const mKey = (iso: string) => iso.slice(0, 7) + '-01'
+function daysInMonthOf(iso: string): number {
+  const d = new Date(iso + 'T00:00:00')
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+}
+// True when there's any forward demand to deplete stock (else "runs out" = —).
+function hasRate(r: StockoutRow, o: Proj): boolean {
+  return o.basis === 'forecast'
+    ? Object.values(r.forecastByMonth).some((v) => v > 0)
+    : baseDaily(r) > 0
+}
+// Forward daily rate on a date.
+//  • run-rate  — MTD ÷ days, plus a promo uplift on the e-com slice through month-end.
+//  • forecast  — the planned demand: this (snapshot) month spreads what's LEFT of the
+//    forecast (forecast − sold MTD) over the days remaining; later months use the
+//    whole month's forecast ÷ its days. Ties the walk to the Stock Movements plan.
+function fwdDaily(r: StockoutRow, iso: string, o: Proj): number {
+  if (o.basis === 'forecast') {
+    const mk = mKey(iso)
+    const f = r.forecastByMonth[mk] ?? 0
+    if (mk === mKey(o.asOf)) return o.daysLeftInMonth > 0 ? Math.max(0, f - r.soldMtd) / o.daysLeftInMonth : 0
+    const dim = daysInMonthOf(iso)
+    return dim > 0 ? f / dim : 0
+  }
+  return baseDaily(r) + (o.uplift > 0 && iso <= o.monthEnd ? d2cDaily(r) * o.uplift : 0)
 }
 // usePos=false walks the sellout on current stock alone (ignores open POs), so
 // you see the true cliff before crediting anything that's only on order.
-function sellout(r: StockoutRow, asOf: string, usePos: boolean, uplift: number, monthEnd: string): { txt: string; days: number } {
-  if (baseDaily(r) <= 0) return { txt: '—', days: 9999 }
+function sellout(r: StockoutRow, o: Proj, usePos: boolean): { txt: string; days: number } {
+  if (!hasRate(r, o)) return { txt: '—', days: 9999 }
   let stock = r.onHand
-  const start = new Date(asOf + 'T00:00:00')
+  const start = new Date(o.asOf + 'T00:00:00')
   for (let d = 0; d < 160; d++) {
     const iso = new Date(start.getTime() + d * 86_400_000).toISOString().slice(0, 10)
     if (usePos) for (const i of r.incoming) if (i.date === iso) stock += i.units
-    for (const o of r.outgoing) if (o.date === iso) stock -= o.units   // committed transfer out — always
-    stock -= fwdDaily(r, iso, uplift, monthEnd)
+    for (const t of r.outgoing) if (t.date === iso) stock -= t.units   // committed transfer out — always
+    stock -= fwdDaily(r, iso, o)
     if (stock < 0) return { txt: fmtD(iso), days: d }
   }
   return { txt: '>160d', days: 160 }
@@ -54,6 +78,8 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
   const usePos = pos === 'with'
   // Promo uplift on the e-com forward rate for the rest of the month (0 = none).
   const [uplift, setUplift] = useState(0)
+  // Forward demand basis: actual run-rate, or the planned forecast (ties to Stock Movements).
+  const [basis, setBasis] = useState<Basis>('runrate')
   const asOf = data.asOf ?? new Date().toISOString().slice(0, 10)
 
   // Last day of the snapshot's month — the uplift applies through here only.
@@ -61,7 +87,18 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
     const s = new Date((data.periodStart ?? asOf) + 'T00:00:00')
     return new Date(s.getFullYear(), s.getMonth() + 1, 0).toISOString().slice(0, 10)
   }, [data.periodStart, asOf])
+  // Days left in the snapshot month, inclusive of as-of through month-end — the
+  // span the walk covers this month, so forecast-remaining ÷ this = the daily rate.
+  const daysLeftInMonth = useMemo(
+    () => Math.round((new Date(monthEnd + 'T00:00:00').getTime() - new Date(asOf + 'T00:00:00').getTime()) / 86_400_000) + 1,
+    [monthEnd, asOf],
+  )
+  const proj: Proj = useMemo(
+    () => ({ basis, uplift, monthEnd, asOf, daysLeftInMonth }),
+    [basis, uplift, monthEnd, asOf, daysLeftInMonth],
+  )
   const hasD2c = data.rows.some((r) => r.soldD2c > 0)
+  const hasForecast = data.rows.some((r) => Object.keys(r.forecastByMonth).length > 0)
 
   const weekStarts = useMemo(() => {
     const s = new Date(asOf + 'T00:00:00')
@@ -78,7 +115,7 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
 
   const rows = market === 'both' ? data.rows : data.rows.filter((r) => r.market === market)
   const showMkt = market === 'both'
-  const atRisk = rows.filter((r) => toneOf(sellout(r, asOf, usePos, uplift, monthEnd).days) === 'red').length
+  const atRisk = rows.filter((r) => toneOf(sellout(r, proj, usePos).days) === 'red').length
   const totalSold = rows.reduce((s, r) => s + r.soldMtd, 0)
   const monthLbl = data.periodStart ? fmtD(data.periodStart).split(' ')[1] : ''
 
@@ -97,14 +134,17 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
             <Toggle value={market} onChange={(v) => setMarket(v as MarketSel)} options={[['both', 'NZ + AU'], ['NZ', 'NZ'], ['AU', 'AU']]} />
             <Toggle value={view} onChange={(v) => setView(v as 'ov' | 'wk')} options={[['ov', 'Overview'], ['wk', 'Weekly cover']]} />
             <Toggle value={pos} onChange={(v) => setPos(v as 'without' | 'with')} options={[['without', 'Stock on hand only'], ['with', 'Incl. incoming POs']]} />
+            {hasForecast && <Toggle value={basis} onChange={(v) => setBasis(v as Basis)} options={[['runrate', 'Run-rate'], ['forecast', 'Forecast']]} />}
           </div>
           <span className="text-xs text-gray-400">
-            run-rate = MTD ÷ {data.rows[0]?.daysElapsed ?? '—'} days
-            {uplift > 0 && <span className="text-amber-700 font-medium"> · e-com +{Math.round(uplift * 100)}% to {fmtD(monthEnd)}</span>}
+            {basis === 'forecast'
+              ? <>demand = forecast · {monthLbl} balance ÷ {daysLeftInMonth} days left</>
+              : <>run-rate = MTD ÷ {data.rows[0]?.daysElapsed ?? '—'} days</>}
+            {basis === 'runrate' && uplift > 0 && <span className="text-amber-700 font-medium"> · e-com +{Math.round(uplift * 100)}% to {fmtD(monthEnd)}</span>}
           </span>
         </div>
 
-        {hasD2c && (
+        {basis === 'runrate' && hasD2c && (
           <div className="px-4 py-2.5 bg-amber-50/60 border-b border-amber-100 flex items-center gap-3 flex-wrap">
             <div className="text-xs font-semibold text-amber-900 whitespace-nowrap">
               Promo uplift · e-com, rest of {monthLbl}
@@ -132,8 +172,8 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
         )}
 
         {view === 'ov'
-          ? <Overview rows={rows} asOf={asOf} showMkt={showMkt} usePos={usePos} uplift={uplift} monthEnd={monthEnd} />
-          : <Weekly rows={rows} weekStarts={weekStarts} showMkt={showMkt} usePos={usePos} uplift={uplift} monthEnd={monthEnd} />}
+          ? <Overview rows={rows} showMkt={showMkt} usePos={usePos} proj={proj} />
+          : <Weekly rows={rows} weekStarts={weekStarts} showMkt={showMkt} usePos={usePos} proj={proj} />}
       </div>
     </div>
   )
@@ -161,7 +201,8 @@ function Stat({ k, v, tone = 'text-gray-900' }: { k: string; v: string; tone?: s
   )
 }
 
-function Overview({ rows, asOf, showMkt, usePos, uplift, monthEnd }: { rows: StockoutRow[]; asOf: string; showMkt: boolean; usePos: boolean; uplift: number; monthEnd: string }) {
+function Overview({ rows, showMkt, usePos, proj }: { rows: StockoutRow[]; showMkt: boolean; usePos: boolean; proj: Proj }) {
+  const fcMode = proj.basis === 'forecast'
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
@@ -171,7 +212,7 @@ function Overview({ rows, asOf, showMkt, usePos, uplift, monthEnd }: { rows: Sto
             {showMkt && <th className="text-left px-2 py-2 font-medium">Mkt</th>}
             <th className="text-right px-3 py-2 font-medium">On hand</th>
             <th className="text-right px-3 py-2 font-medium">Sold MTD</th>
-            <th className="text-right px-3 py-2 font-medium">Sold/day</th>
+            <th className="text-right px-3 py-2 font-medium">{fcMode ? 'Demand/day' : 'Sold/day'}</th>
             <th className="text-left px-3 py-2 font-medium">Weeks cover</th>
             <th className="text-left px-3 py-2 font-medium">Runs out</th>
             <th className="text-left px-3 py-2 font-medium">Next stock in</th>
@@ -180,9 +221,9 @@ function Overview({ rows, asOf, showMkt, usePos, uplift, monthEnd }: { rows: Sto
         </thead>
         <tbody>
           {rows.map((r) => {
-            const so = sellout(r, asOf, usePos, uplift, monthEnd), t = toneOf(so.days)
+            const so = sellout(r, proj, usePos), t = toneOf(so.days)
             const dr = baseDaily(r)
-            const fwd = fwdDaily(r, asOf, uplift, monthEnd)   // promo-day forward rate
+            const fwd = fwdDaily(r, proj.asOf, proj)   // forward rate on the snapshot day
             const wks = fwd > 0 ? r.onHand / (fwd * 7) : 999
             return (
               <tr key={`${r.market}:${r.product_id}`} className={`border-t border-gray-100 ${t === 'red' ? 'bg-red-50/40' : ''}`}>
@@ -191,8 +232,9 @@ function Overview({ rows, asOf, showMkt, usePos, uplift, monthEnd }: { rows: Sto
                 <td className="px-3 py-2 text-right tabular-nums">{nf(r.onHand)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{nf(r.soldMtd)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">
-                  {dr.toFixed(0)}
-                  {uplift > 0 && fwd > dr + 0.5 && <span className="text-amber-700 font-semibold"> →{fwd.toFixed(0)}</span>}
+                  {fcMode
+                    ? <span className="text-violet-700 font-medium">{fwd.toFixed(0)}</span>
+                    : <>{dr.toFixed(0)}{proj.uplift > 0 && fwd > dr + 0.5 && <span className="text-amber-700 font-semibold"> →{fwd.toFixed(0)}</span>}</>}
                 </td>
                 <td className="px-3 py-2">{wks < 0.2 ? 'now' : `~${wks.toFixed(1)} wks`}</td>
                 <td className="px-3 py-2">{so.txt}</td>
@@ -216,20 +258,20 @@ function Overview({ rows, asOf, showMkt, usePos, uplift, monthEnd }: { rows: Sto
   )
 }
 
-function weeklyStock(r: StockoutRow, weekStarts: Date[], usePos: boolean, uplift: number, monthEnd: string): number[] {
+function weeklyStock(r: StockoutRow, weekStarts: Date[], usePos: boolean, proj: Proj): number[] {
   let stock = r.onHand
   return weekStarts.map((s0) => {
     for (let k = 0; k < 7; k++) {
       const iso = new Date(s0.getTime() + k * 86_400_000).toISOString().slice(0, 10)
       if (usePos) for (const inc of r.incoming) if (inc.date === iso) stock += inc.units
-      for (const o of r.outgoing) if (o.date === iso) stock -= o.units   // committed transfer out — always
-      stock -= fwdDaily(r, iso, uplift, monthEnd)
+      for (const t of r.outgoing) if (t.date === iso) stock -= t.units   // committed transfer out — always
+      stock -= fwdDaily(r, iso, proj)
     }
     return stock
   })
 }
 
-function Weekly({ rows, weekStarts, showMkt, usePos, uplift, monthEnd }: { rows: StockoutRow[]; weekStarts: Date[]; showMkt: boolean; usePos: boolean; uplift: number; monthEnd: string }) {
+function Weekly({ rows, weekStarts, showMkt, usePos, proj }: { rows: StockoutRow[]; weekStarts: Date[]; showMkt: boolean; usePos: boolean; proj: Proj }) {
   // Section per (market, product group), ordered like the Summary grid.
   const markets: Market[] = showMkt ? ['NZ', 'AU'] : [(rows[0]?.market ?? 'NZ')]
   const sections: { key: string; label: string; rows: StockoutRow[] }[] = []
@@ -268,7 +310,7 @@ function Weekly({ rows, weekStarts, showMkt, usePos, uplift, monthEnd }: { rows:
           {sections.map((sec) => {
             const subOn = sec.rows.reduce((s, r) => s + r.onHand, 0)
             const subSold = sec.rows.reduce((s, r) => s + r.soldMtd, 0)
-            const subWeeks = weekStarts.map((_, i) => sec.rows.reduce((s, r) => s + Math.max(0, weeklyStock(r, weekStarts, usePos, uplift, monthEnd)[i]), 0))
+            const subWeeks = weekStarts.map((_, i) => sec.rows.reduce((s, r) => s + Math.max(0, weeklyStock(r, weekStarts, usePos, proj)[i]), 0))
             return (
               <Fragment key={sec.key}>
                 <tr className="bg-gray-100/80">
@@ -277,8 +319,8 @@ function Weekly({ rows, weekStarts, showMkt, usePos, uplift, monthEnd }: { rows:
                   </td>
                 </tr>
                 {sec.rows.map((r) => {
-                  const wd = fwdDaily(r, weekStarts[0].toISOString().slice(0, 10), uplift, monthEnd) * 7
-                  const wkStock = weeklyStock(r, weekStarts, usePos, uplift, monthEnd)
+                  const wd = fwdDaily(r, weekStarts[0].toISOString().slice(0, 10), proj) * 7
+                  const wkStock = weeklyStock(r, weekStarts, usePos, proj)
                   const wks = wd > 0 ? r.onHand / wd : 999
                   return (
                     <tr key={`${r.market}:${r.product_id}`} className="border-t border-gray-100">
