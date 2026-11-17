@@ -113,7 +113,15 @@ export function StockoutWatch({ data }: { data: StockoutData }) {
     )
   }
 
-  const rows = market === 'both' ? data.rows : data.rows.filter((r) => r.market === market)
+  // Soonest-runout first, recomputed on the CURRENT basis/POs/uplift (the server
+  // sort only knows run-rate, so it goes stale the moment you switch to Forecast).
+  const rows = useMemo(() => {
+    const base = market === 'both' ? data.rows : data.rows.filter((r) => r.market === market)
+    return base
+      .map((r) => ({ r, d: sellout(r, proj, usePos).days }))
+      .sort((a, b) => a.d - b.d)
+      .map((x) => x.r)
+  }, [data.rows, market, proj, usePos])
   const showMkt = market === 'both'
   const atRisk = rows.filter((r) => toneOf(sellout(r, proj, usePos).days) === 'red').length
   const totalSold = rows.reduce((s, r) => s + r.soldMtd, 0)
