@@ -14,14 +14,14 @@ export default async function ShipmentsPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Shipments</h1>
-          <p className="text-sm text-gray-500 mt-1">Book a freight movement once, then load transfer orders onto it. The shipment owns the depart / arrive dates.</p>
+          <p className="text-sm text-gray-500 mt-1">Book a freight movement once, then load transfers and purchase orders onto it. The shipment owns the depart / arrive dates.</p>
         </div>
         <NewShipmentButton />
       </div>
 
       {shipments.length === 0 ? (
         <div className="bg-white border border-dashed border-gray-300 rounded-lg p-8 text-center text-sm text-gray-500">
-          No shipments yet. Create one with <span className="font-medium">+ New shipment</span>, then load transfers onto it (from here or the Create‑transfer dialog on Production).
+          No shipments yet. Create one with <span className="font-medium">+ New shipment</span>, then load transfers and purchase orders onto it (from here or the Create‑transfer dialog on Production).
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -33,7 +33,7 @@ export default async function ShipmentsPage() {
                 <th className="text-left font-semibold px-3 py-2.5">Depart</th>
                 <th className="text-left font-semibold px-3 py-2.5">Arrive</th>
                 <th className="text-left font-semibold px-3 py-2.5">Status</th>
-                <th className="text-right font-semibold px-3 py-2.5">Transfers</th>
+                <th className="text-right font-semibold px-3 py-2.5">Orders</th>
                 <th className="text-right font-semibold px-4 py-2.5">Units</th>
               </tr>
             </thead>

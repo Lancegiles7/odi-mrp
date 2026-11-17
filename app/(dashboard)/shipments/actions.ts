@@ -118,23 +118,36 @@ export async function deleteShipment(id: string): Promise<{ ok: boolean; error?:
   return { ok: true }
 }
 
-/** Load a transfer onto a shipment (inheriting its dates) or take it off (shipmentId = null). */
-export async function setTransferShipment(transferId: string, shipmentId: string | null): Promise<{ ok: boolean; error?: string }> {
+/** Load an order (transfer OR purchase PO) onto a shipment — it inherits the
+ *  shipment's dates (arrive → expected delivery; depart → pickup for transfers)
+ *  — or take it off (shipmentId = null). */
+export async function setPoShipment(poId: string, shipmentId: string | null): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient()
+  const { data: po } = await supabase
+    .from('purchase_orders').select('po_type').eq('id', poId).maybeSingle() as { data: { po_type: string | null } | null }
+  const isTransfer = po?.po_type === 'transfer'
+
   const patch: Record<string, unknown> = { shipment_id: shipmentId }
   if (shipmentId) {
     const { data: ship } = await supabase
       .from('shipments').select('depart_date, arrive_date').eq('id', shipmentId).maybeSingle() as { data: { depart_date: string | null; arrive_date: string | null } | null }
     if (ship) {
-      patch.pickup_date = ship.depart_date
+      // Arrival is when the stock lands (drives Stock Movements) — applies to any
+      // order. Pickup is a transfer-only field, so only set it for transfers.
       patch.expected_delivery_date = ship.arrive_date
+      if (isTransfer) patch.pickup_date = ship.depart_date
     }
   }
   const { error } = await (supabase.from('purchase_orders') as ReturnType<typeof supabase.from>)
-    .update(patch).eq('id', transferId).eq('po_type', 'transfer')
+    .update(patch).eq('id', poId)
   if (error) return { ok: false, error: error.message }
   revalidateAll()
   return { ok: true }
+}
+
+/** @deprecated use setPoShipment — kept for existing transfer callers. */
+export async function setTransferShipment(transferId: string, shipmentId: string | null): Promise<{ ok: boolean; error?: string }> {
+  return setPoShipment(transferId, shipmentId)
 }
 
 /** Open shipments formatted for the "Goes on shipment" picker (fetched fresh when a

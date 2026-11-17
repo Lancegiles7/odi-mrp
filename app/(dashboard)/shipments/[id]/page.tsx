@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getShipment, listAssignableTransfers } from '@/lib/shipments'
+import { getShipment, listAssignableOrders } from '@/lib/shipments'
 import { ShipmentDetail } from '@/components/shipments/shipment-detail'
 
 export const metadata: Metadata = { title: 'Shipment' }
@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: 'Shipment' }
 export default async function ShipmentDetailPage({ params }: { params: { id: string } }) {
   const [shipment, assignable] = await Promise.all([
     getShipment(params.id),
-    listAssignableTransfers(),
+    listAssignableOrders(),
   ])
   if (!shipment) notFound()
 

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { updateShipment, deleteShipment, setTransferShipment } from '@/app/(dashboard)/shipments/actions'
+import { updateShipment, deleteShipment, setPoShipment } from '@/app/(dashboard)/shipments/actions'
 import type { ShipmentDetail as Detail, ShipmentStatus, ShipmentDirection, ShipmentTransfer, ContainerType, CostBasis, FreightCurrency } from '@/lib/shipments'
 import { RouteFlags, StatusPill, DIRECTION_LABEL } from '@/components/shipments/shipment-bits'
 
@@ -36,15 +36,15 @@ export function ShipmentDetail({ shipment, assignable }: { shipment: Detail; ass
     save({ id: shipment.id, depart_date: depart || null, arrive_date: arrive || null })
   }
 
-  const addTransfer = () => {
+  const addOrder = () => {
     if (!addId) return
-    start(async () => { await setTransferShipment(addId, shipment.id); setAddId(''); router.refresh() })
+    start(async () => { await setPoShipment(addId, shipment.id); setAddId(''); router.refresh() })
   }
-  const removeTransfer = (tid: string) =>
-    start(async () => { await setTransferShipment(tid, null); router.refresh() })
+  const removeOrder = (tid: string) =>
+    start(async () => { await setPoShipment(tid, null); router.refresh() })
 
   const onDelete = () => {
-    if (!confirm(`Delete ${shipment.shipment_number}? Transfers on it are kept — they just come off the shipment.`)) return
+    if (!confirm(`Delete ${shipment.shipment_number}? Orders on it are kept — they just come off the shipment.`)) return
     start(async () => { const r = await deleteShipment(shipment.id); if (r.ok) router.push('/shipments') })
   }
 
@@ -82,7 +82,7 @@ export function ShipmentDetail({ shipment, assignable }: { shipment: Detail; ass
               className="block mt-0.5 text-sm bg-emerald-800 border border-emerald-700 rounded-md px-2 py-1 text-white" />
           </label>
           <div className="pb-1 text-xs text-emerald-200/90 ml-auto">
-            <span className="font-semibold text-white">{shipment.transfers.length}</span> transfer{shipment.transfers.length === 1 ? '' : 's'} ·
+            <span className="font-semibold text-white">{shipment.transfers.length}</span> order{shipment.transfers.length === 1 ? '' : 's'} ·
             <span className="font-semibold text-white"> {shipment.total_units.toLocaleString()}</span> units
           </div>
         </div>
@@ -154,25 +154,29 @@ export function ShipmentDetail({ shipment, assignable }: { shipment: Detail; ass
         <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between gap-2 flex-wrap">
           <span className="text-[11px] uppercase font-semibold tracking-wide text-gray-500">Loaded on this shipment</span>
           <div className="flex items-center gap-2">
-            <select value={addId} onChange={(e) => setAddId(e.target.value)} className="text-xs border border-gray-300 rounded px-2 py-1 max-w-[320px]">
-              <option value="">＋ Add a transfer…</option>
+            <select value={addId} onChange={(e) => setAddId(e.target.value)} className="text-xs border border-gray-300 rounded px-2 py-1 max-w-[360px]">
+              <option value="">＋ Add a transfer or PO…</option>
               {assignable.map((t) => (
-                <option key={t.id} value={t.id}>{t.po_number} · {t.from_site ?? '?'} → {t.to_site ?? '?'} · {t.units.toLocaleString()} units</option>
+                <option key={t.id} value={t.id}>
+                  {t.kind === 'transfer'
+                    ? `${t.po_number} · transfer · ${t.from_site ?? '?'} → ${t.to_site ?? '?'} · ${t.units.toLocaleString()} units`
+                    : `${t.po_number} · PO · ${t.from_site ?? 'supplier'} · ${t.units.toLocaleString()} units`}
+                </option>
               ))}
             </select>
-            <button onClick={addTransfer} disabled={!addId || pending}
+            <button onClick={addOrder} disabled={!addId || pending}
               className="text-xs bg-emerald-700 text-white rounded px-2.5 py-1 hover:bg-emerald-800 disabled:opacity-40">Add</button>
           </div>
         </div>
 
         {shipment.transfers.length === 0 ? (
-          <div className="p-6 text-sm text-gray-500 text-center">Nothing loaded yet. Add a transfer above, or pick this shipment when creating a transfer on Production.</div>
+          <div className="p-6 text-sm text-gray-500 text-center">Nothing loaded yet. Add a transfer or purchase order above, or pick this shipment when creating a transfer on Production.</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-[11px] uppercase text-gray-500 border-b border-gray-100">
-                <th className="text-left font-semibold px-4 py-2">Transfer</th>
-                <th className="text-left font-semibold px-3 py-2">From → To</th>
+                <th className="text-left font-semibold px-4 py-2">Order</th>
+                <th className="text-left font-semibold px-3 py-2">From → To / Supplier</th>
                 <th className="text-left font-semibold px-3 py-2">Contents</th>
                 <th className="text-right font-semibold px-3 py-2">Units</th>
                 <th className="px-3 py-2"></th>
@@ -183,13 +187,19 @@ export function ShipmentDetail({ shipment, assignable }: { shipment: Detail; ass
                 <tr key={t.id} className="border-b border-gray-50 last:border-0">
                   <td className="px-4 py-2">
                     <Link href={`/purchase-orders/${t.id}`} className="font-semibold text-emerald-800 hover:underline">{t.po_number}</Link>
-                    {t.moves_build && <span className="ml-1.5 text-[9px] bg-emerald-100 text-emerald-700 rounded px-1 py-0.5 font-bold" title="Moves stock between builds">⇄ build</span>}
+                    {t.kind === 'transfer'
+                      ? t.moves_build && <span className="ml-1.5 text-[9px] bg-emerald-100 text-emerald-700 rounded px-1 py-0.5 font-bold" title="Moves stock between builds">⇄ build</span>
+                      : <span className="ml-1.5 text-[9px] bg-sky-100 text-sky-700 rounded px-1 py-0.5 font-bold" title="Purchase order">PO</span>}
                   </td>
-                  <td className="px-3 py-2 text-gray-700">{t.from_site ?? '?'} <span className="text-emerald-700">→</span> {t.to_site ?? '?'}</td>
+                  <td className="px-3 py-2 text-gray-700">
+                    {t.kind === 'transfer'
+                      ? <>{t.from_site ?? '?'} <span className="text-emerald-700">→</span> {t.to_site ?? '?'}</>
+                      : (t.from_site ?? '—')}
+                  </td>
                   <td className="px-3 py-2 text-gray-600">{t.contents}</td>
                   <td className="px-3 py-2 text-right tabular-nums font-medium">{t.units.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right">
-                    <button onClick={() => removeTransfer(t.id)} disabled={pending} className="text-xs text-gray-400 hover:text-rose-600">remove</button>
+                    <button onClick={() => removeOrder(t.id)} disabled={pending} className="text-xs text-gray-400 hover:text-rose-600">remove</button>
                   </td>
                 </tr>
               ))}
@@ -197,7 +207,7 @@ export function ShipmentDetail({ shipment, assignable }: { shipment: Detail; ass
           </table>
         )}
       </div>
-      <p className="text-[11px] text-gray-400">Each row is a transfer order (products and/or miscellaneous items). Changing the arrive date above moves every transfer on this shipment to the new month.</p>
+      <p className="text-[11px] text-gray-400">Each row is a transfer or purchase order loaded on this shipment. Changing the arrive date above moves everything on this shipment to the new month (it becomes each order's expected delivery).</p>
     </div>
   )
 }
