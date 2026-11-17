@@ -232,7 +232,9 @@ function Overview({ rows, showMkt, usePos, proj }: { rows: StockoutRow[]; showMk
             const so = sellout(r, proj, usePos), t = toneOf(so.days)
             const dr = baseDaily(r)
             const fwd = fwdDaily(r, proj.asOf, proj)   // forward rate on the snapshot day
-            const wks = fwd > 0 ? r.onHand / (fwd * 7) : 999
+            // Cover = time to the actual runout (so it reflects dated transfers /
+            // POs and month-to-month forecast changes), not a flat stock ÷ rate.
+            const wks = so.days / 7
             return (
               <tr key={`${r.market}:${r.product_id}`} className={`border-t border-gray-100 ${t === 'red' ? 'bg-red-50/40' : ''}`}>
                 <td className="px-4 py-2"><div className="font-medium">{r.name}</div><div className="text-[10px] text-gray-500 font-mono">{r.sku}</div></td>
@@ -244,7 +246,7 @@ function Overview({ rows, showMkt, usePos, proj }: { rows: StockoutRow[]; showMk
                     ? <span className="text-violet-700 font-medium">{fwd.toFixed(0)}</span>
                     : <>{dr.toFixed(0)}{proj.uplift > 0 && fwd > dr + 0.5 && <span className="text-amber-700 font-semibold"> →{fwd.toFixed(0)}</span>}</>}
                 </td>
-                <td className="px-3 py-2">{wks < 0.2 ? 'now' : `~${wks.toFixed(1)} wks`}</td>
+                <td className="px-3 py-2">{so.days >= 9999 ? '—' : so.days >= 160 ? '>22 wks' : wks < 0.2 ? 'now' : `~${wks.toFixed(1)} wks`}</td>
                 <td className="px-3 py-2">{so.txt}</td>
                 <td className="px-3 py-2 text-[11px]">
                   {r.incoming.length > 0 && (
@@ -329,13 +331,14 @@ function Weekly({ rows, weekStarts, showMkt, usePos, proj }: { rows: StockoutRow
                 {sec.rows.map((r) => {
                   const wd = fwdDaily(r, weekStarts[0].toISOString().slice(0, 10), proj) * 7
                   const wkStock = weeklyStock(r, weekStarts, usePos, proj)
-                  const wks = wd > 0 ? r.onHand / wd : 999
+                  const so = sellout(r, proj, usePos)
+                  const wks = so.days / 7   // time to actual runout (matches Overview)
                   return (
                     <tr key={`${r.market}:${r.product_id}`} className="border-t border-gray-100">
                       <td className="px-4 py-2"><div className="font-medium">{r.name}</div><div className="text-[10px] text-gray-500 font-mono">{r.sku}</div></td>
                       <td className="px-3 py-2 text-right tabular-nums">{nf(r.onHand)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{nf(r.soldMtd)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{wks < 0.2 ? 'now' : wks.toFixed(1)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{so.days >= 9999 ? '—' : so.days >= 160 ? '>22' : wks < 0.2 ? 'now' : wks.toFixed(1)}</td>
                       {wkStock.map((stock, i) => {
                         const cls = stock < 0 ? CELL.red : stock < wd ? CELL.amber : CELL.green
                         return <td key={i} className={`px-2 py-2 text-right tabular-nums border-l border-gray-100 ${cls}`}>{stock < 0 ? '0' : nf(stock)}</td>
