@@ -5,6 +5,7 @@ import { POForm } from '@/components/purchase-orders/po-form'
 import { TransferForm, type SiteOption, type ProductOption, type PackagingOption, type IngredientOption, type TransferLine, type TransferPkgLine, type TransferIngLine, type TransferOtherLine } from '@/components/purchase-orders/transfer-form'
 import { loadSrtByProduct } from '@/lib/transfer-orders'
 import { ReceiptHistory } from '@/components/purchase-orders/receipt-history'
+import { ChangeHistory } from '@/components/purchase-orders/change-history'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
 import { getAppSettings } from '@/lib/settings'
 import { PROCURED_INGREDIENT_CATEGORY } from '@/lib/constants'
@@ -210,6 +211,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
       companies={companies ?? []}
       />
       <ReceiptHistory poId={po.id} />
+      <ChangeHistory poId={po.id} />
     </div>
   )
 }

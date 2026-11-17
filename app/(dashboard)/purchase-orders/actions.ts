@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { convertGramsToIngredientUom } from '@/lib/ingredient-demand'
 import { getAppSettings } from '@/lib/settings'
 import { isMonthLocked, lockLabel } from '@/lib/stock-lock'
+import { snapshotPoForLog, logPoAmendment, logPoEvent } from '@/lib/po-change-log'
 
 export type POStatus = 'draft' | 'submitted' | 'partially_received' | 'received' | 'cancelled'
 
@@ -147,6 +148,7 @@ export async function createPurchaseOrder(input: {
   }
 
   await applySaveBackToIngredients(supabase, input.lines)
+  await logPoEvent(supabase, { poId: poHeader.id, poNumber: input.po_number.trim(), changedBy: profile?.id ?? null, action: 'created', newValue: isTransfer ? 'Transfer created' : 'PO created' })
 
   revalidatePath('/purchase-orders')
   revalidatePath('/ingredients')
@@ -396,6 +398,9 @@ export async function updatePurchaseOrder(input: {
   const lineErr = validateLines(sanitised)
   if (lineErr) return { ok: false, error: lineErr }
 
+  // Snapshot the PO as it stands now, to diff against this edit for the log.
+  const beforeSnap = await snapshotPoForLog(supabase, input.id)
+
   // Editing a PO that already has receipts: reverse its stock first, apply the
   // edit, then re-apply the received quantities so stock re-syncs to the new
   // lines. This is what auto-corrects a wrong unit / quantity / ingredient.
@@ -479,6 +484,23 @@ export async function updatePurchaseOrder(input: {
   // A transfer's stock in Stock Movements re-syncs from its (edited) lines.
   if (isTransfer) await syncTransferReceipts(supabase, input.id, profile?.id ?? null)
 
+  // Record who changed what (best-effort; never blocks the edit).
+  if (beforeSnap) await logPoAmendment(supabase, {
+    poId: input.id, poNumber: input.po_number.trim(), changedBy: profile?.id ?? null, before: beforeSnap,
+    afterHeader: {
+      po_type: isTransfer ? 'transfer' : 'purchase',
+      po_number: input.po_number.trim(), supplier_id: input.supplier_id,
+      destination_supplier_id: isTransfer ? (input.destination_supplier_id ?? null) : null,
+      order_date: input.order_date, expected_delivery_date: input.expected_delivery_date,
+      pickup_date: isTransfer ? (input.pickup_date ?? null) : null,
+      stock_move: isTransfer ? (input.stock_move === 'NZ_TO_AU' || input.stock_move === 'AU_TO_NZ' ? input.stock_move : null) : null,
+      transport_provider: isTransfer ? (input.transport_provider?.trim() || null) : null,
+      currency: (input.currency ?? 'NZD').toUpperCase(), market: input.market === 'AU' ? 'AU' : 'NZ',
+      delivery_notes: input.delivery_notes, notes: input.notes, external_notes: input.external_notes,
+    },
+    afterLines: input.lines,
+  })
+
   revalidatePath('/purchase-orders')
   revalidatePath(`/purchase-orders/${input.id}`)
   revalidatePath('/ingredients')
@@ -525,10 +547,17 @@ export async function setPoStatus(id: string, status: POStatus): Promise<{ ok: b
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'not_authenticated' }
+  const { data: profile } = await supabase.from('user_profiles').select('id').eq('id', user.id).maybeSingle() as { data: { id: string } | null }
+  const { data: prev } = await supabase
+    .from('purchase_orders').select('po_number, status').eq('id', id).maybeSingle() as { data: { po_number: string; status: POStatus } | null }
 
   const { error } = await supabase
     .from('purchase_orders').update({ status }).eq('id', id)
   if (error) return { ok: false, error: error.message }
+
+  if (prev && prev.status !== status) {
+    await logPoEvent(supabase, { poId: id, poNumber: prev.po_number, changedBy: profile?.id ?? null, action: 'status', field: 'Status', oldValue: prev.status, newValue: status })
+  }
 
   revalidatePath('/purchase-orders')
   revalidatePath(`/purchase-orders/${id}`)
@@ -570,6 +599,10 @@ export async function deletePurchaseOrder(id: string): Promise<{ ok: boolean; er
   if (delLineIds.length) {
     await supabase.from('finished_goods_receipts').delete().eq('source', 'transfer').in('purchase_order_line_id', delLineIds)
   }
+
+  // Log the deletion before the row goes (the log's FK is SET NULL, so the
+  // entry survives — identifiable by po_number).
+  await logPoEvent(supabase, { poId: id, poNumber: existing.po_number, changedBy: profile?.id ?? null, action: 'deleted', newValue: `${existing.po_number} deleted` })
 
   // Lines cascade-delete via FK ON DELETE CASCADE (migration 001).
   const { error } = await supabase.from('purchase_orders').delete().eq('id', id)
