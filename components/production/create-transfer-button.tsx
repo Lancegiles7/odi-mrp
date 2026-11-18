@@ -164,7 +164,7 @@ export function CreateTransferButton({ maker, lines, months, sites, shipments }:
 
                   {/* Direction */}
                   <div>
-                    <div className="text-[11px] font-medium text-gray-600 mb-1">Moves stock between builds?</div>
+                    <div className="text-[11px] font-medium text-gray-600 mb-1">Add this stock to the destination build?</div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {([['none', 'No — logistics only'], ['AU_TO_NZ', 'AU → NZ build'], ['NZ_TO_AU', 'NZ → AU build']] as Array<[Dir, string]>).map(([val, lbl]) => (
                         <button key={val} onClick={() => setDir(val)}
@@ -172,7 +172,7 @@ export function CreateTransferButton({ maker, lines, months, sites, shipments }:
                           {lbl}
                         </button>
                       ))}
-                      <span className="text-[10px] text-gray-400">set a direction to shift stock between the NZ and AU builds (adds the ⇄ leg on Stock Movements)</span>
+                      <span className="text-[10px] text-gray-400">pick a direction only if the destination build has no PO of its own for this stock — otherwise leave as logistics only (it would double-count)</span>
                     </div>
                   </div>
 

@@ -397,10 +397,10 @@ export function TransferForm(props: Props) {
 
         {/* Stock move between builds */}
         <div className="mt-4">
-          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Moves stock between builds?</label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Add this stock to the destination build?</label>
           <div className="inline-flex gap-1.5 flex-wrap">
             {([
-              { v: null,        label: 'No' },
+              { v: null,        label: 'No — logistics only' },
               { v: 'NZ_TO_AU',  label: 'NZ → AU' },
               { v: 'AU_TO_NZ',  label: 'AU → NZ' },
             ] as const).map((o) => (
@@ -413,8 +413,8 @@ export function TransferForm(props: Props) {
           </div>
           <p className="text-xs text-gray-500 mt-1.5">
             {stockMove
-              ? <>Takes the product units off the {stockMove === 'NZ_TO_AU' ? 'NZ' : 'AUS'} build at pick-up and puts them on the {stockMove === 'NZ_TO_AU' ? 'AUS' : 'NZ'} build on delivery, in the Production schedule and Stock Movements. Not counted as production.</>
-              : <>Logistics only. Stock stays on the same build, e.g. factory → DC, or AU-made stock shipped to NZ for the NZ build.</>}
+              ? <>Takes the units off the {stockMove === 'NZ_TO_AU' ? 'NZ' : 'AUS'} build and adds them to the {stockMove === 'NZ_TO_AU' ? 'AUS' : 'NZ'} build (Production schedule + Stock Movements). <b className="text-amber-700">Only use this when the destination has no separate PO for the stock</b> — if it already has its own PO (e.g. I Eat Fresh snacks with an NZ PO), leave this as <b>No</b> or it will double-count.</>
+              : <>Logistics only — doesn’t change the stock numbers. Use when the destination country already has its own PO for the stock, or for factory → DC moves.</>}
           </p>
         </div>
 
@@ -525,7 +525,7 @@ export function TransferForm(props: Props) {
             <p className="text-[11px] text-gray-400 mt-0.5">
               {stockMove
                 ? <>Posts an <span className="text-rose-600 font-medium">Out</span> on the {stockMove === 'NZ_TO_AU' ? 'NZ' : 'AUS'} ingredient stock and an <span className="text-teal-700 font-medium">In</span> on the {stockMove === 'NZ_TO_AU' ? 'AUS' : 'NZ'} stock, in Stock Movements.</>
-                : <>Within one market (e.g. Brand Nation → Radix, both NZ) the stock total doesn’t change, so nothing posts. Set “Moves stock between builds” above for a cross-market move to show.</>}
+                : <>Within one market (e.g. Brand Nation → Radix, both NZ) the stock total doesn’t change, so nothing posts. Set “Add this stock to the destination build?” above for a cross-market move to show.</>}
             </p>
           </div>
           <span className="text-xs text-gray-500 tabular-nums">{nf(ingTotal)}</span>

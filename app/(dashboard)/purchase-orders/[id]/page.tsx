@@ -6,6 +6,7 @@ import { TransferForm, type SiteOption, type ProductOption, type PackagingOption
 import { loadSrtByProduct } from '@/lib/transfer-orders'
 import { ReceiptHistory } from '@/components/purchase-orders/receipt-history'
 import { ChangeHistory } from '@/components/purchase-orders/change-history'
+import { checkTransferDoubleCount } from '@/lib/transfer-double-check'
 import type { POLineInput } from '@/app/(dashboard)/purchase-orders/actions'
 import { getAppSettings } from '@/lib/settings'
 import { PROCURED_INGREDIENT_CATEGORY } from '@/lib/constants'
@@ -127,7 +128,31 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
     const transferIngLines: TransferIngLine[] = (lines ?? [])
       .filter((l) => l.ingredient_id)
       .map((l) => ({ ingredient_id: l.ingredient_id!, quantity: String(Number(l.quantity_ordered)) }))
+
+    // Guard: a stock-moving transfer whose product also has its own PO on the
+    // destination build this month is double-counting (the I Eat Fresh case).
+    const prodMeta = new Map((transferProducts ?? []).map((p) => [p.id, { name: p.name, sku: p.sku_code }]))
+    const dcConflicts = await checkTransferDoubleCount({
+      stockMove: stockMove?.stock_move ?? null,
+      expectedDate: po.expected_delivery_date ?? null,
+      productLines: (lines ?? []).filter((l) => l.product_id).map((l) => ({
+        product_id: l.product_id!, name: prodMeta.get(l.product_id!)?.name ?? l.product_id!, sku: prodMeta.get(l.product_id!)?.sku ?? null,
+      })),
+    })
+    const dcDest = stockMove?.stock_move === 'AU_TO_NZ' ? 'NZ' : 'AU'
     return (
+      <div className="space-y-4">
+      {dcConflicts.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3.5 text-sm">
+          <div className="font-semibold text-amber-900">⚠ Possible double-count</div>
+          <p className="mt-1 text-amber-800">
+            This transfer adds stock to the <b>{dcDest}</b> build, but these lines already have a {dcDest} purchase order this month — so the stock would be counted twice. If the {dcDest} PO is the real supply, set <b>“Add this stock to the destination build?”</b> to <b>No (logistics only)</b> below.
+          </p>
+          <ul className="mt-1.5 list-disc pl-5 text-amber-900">
+            {dcConflicts.map((c) => <li key={c.product_id}>{c.name}{c.sku ? ` (${c.sku})` : ''} — {c.pos.join(', ')}</li>)}
+          </ul>
+        </div>
+      )}
       <TransferForm
         mode="edit"
         id={po.id}
@@ -151,6 +176,7 @@ export default async function PurchaseOrderDetailPage({ params }: PageProps) {
         ingredients={transferIngredients}
         srtByProduct={srtByProduct}
       />
+      </div>
     )
   }
 
