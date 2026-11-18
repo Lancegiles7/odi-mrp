@@ -473,15 +473,15 @@ export function POForm(props: POFormProps) {
                 <button onClick={addLine} className="text-xs text-blue-600 hover:underline">+ Add line</button>
               )}
             </div>
-            <div className="border border-gray-200 rounded-md overflow-hidden">
+            <div className="border border-gray-200 rounded-md overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
                     <th className="text-left px-3 py-2 font-medium w-[110px]">Type</th>
-                    <th className="text-left px-3 py-2 font-medium">Item</th>
+                    <th className="text-left px-3 py-2 font-medium min-w-[240px]">Item</th>
                     <th className="text-left px-3 py-2 font-medium w-[120px]">Supplier code</th>
                     <th className="text-right px-3 py-2 font-medium w-[110px]">Qty</th>
-                    <th className="text-left px-3 py-2 font-medium w-[60px]">UoM</th>
+                    <th className="text-left px-3 py-2 font-medium w-[72px]">UoM</th>
                     <th className="text-right px-3 py-2 font-medium w-[80px]">Pack size</th>
                     <th className="text-right px-3 py-2 font-medium w-[100px]">Unit price</th>
                     <th className="text-right px-3 py-2 font-medium w-[100px]">Line total</th>
